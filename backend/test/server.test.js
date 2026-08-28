@@ -36,27 +36,45 @@ function rawGet(server, path) {
   });
 }
 
-test('GET / serves the game HTML', async () => {
+test('GET / serves the Astryx landing page HTML', async () => {
   const { baseUrl, close } = await start();
   try {
     const res = await fetch(`${baseUrl}/`);
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type') || '', /text\/html/);
     const body = await res.text();
-    assert.match(body, /NEON VOID/);
-    assert.match(body, /gameSvg/);
+    assert.match(body, /NOX/);
+    assert.match(body, /PLAY NOW/);
+    assert.match(body, /astryx-card/);
   } finally {
     await close();
   }
 });
 
-test('GET /index.html serves the same game HTML', async () => {
+test('GET /index.html serves the same landing HTML', async () => {
   const { baseUrl, close } = await start();
   try {
     const res = await fetch(`${baseUrl}/index.html`);
     assert.equal(res.status, 200);
     const body = await res.text();
-    assert.match(body, /NEON VOID/);
+    assert.match(body, /NOX/);
+    assert.match(body, /PLAY NOW/);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /play serves the game page via index fallback (directory route)', async () => {
+  const { baseUrl, close } = await start();
+  try {
+    // Astro outputs /play as play/index.html; both /play and /play/ must resolve.
+    for (const p of ['/play', '/play/']) {
+      const res = await fetch(`${baseUrl}${p}`);
+      assert.equal(res.status, 200, `expected 200 for ${p}, got ${res.status}`);
+      assert.match(res.headers.get('content-type') || '', /text\/html/);
+      const body = await res.text();
+      assert.match(body, /NEON VOID/, `game marker missing on ${p}`);
+    }
   } finally {
     await close();
   }

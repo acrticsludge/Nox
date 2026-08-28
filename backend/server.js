@@ -103,17 +103,35 @@ export function createServer() {
         return;
       }
 
+      let served = file;
       let data;
       try {
-        data = await readFile(file);
+        data = await readFile(served);
       } catch {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Not Found');
-        log(404);
-        return;
+        // Static-build URL fallbacks: a directory route serves its index
+        // (/play → play/index.html), and an extensionless URL can hit a
+        // flat file (/play → play.html) — mirroring Astro/Vercel output.
+        const candidates = [path.join(served, 'index.html'), served + '.html'];
+        let ok = false;
+        for (const c of candidates) {
+          try {
+            served = c;
+            data = await readFile(c);
+            ok = true;
+            break;
+          } catch {
+            /* try next */
+          }
+        }
+        if (!ok) {
+          res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('Not Found');
+          log(404);
+          return;
+        }
       }
 
-      const ext = path.extname(file).toLowerCase();
+      const ext = path.extname(served).toLowerCase();
       res.writeHead(200, {
         'Content-Type': MIME[ext] || 'application/octet-stream',
         'Content-Length': data.length,
