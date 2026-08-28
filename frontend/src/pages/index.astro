@@ -1558,12 +1558,27 @@ function render(){
   });
 }
 
-function loop(){
-  update(1);
+// Fixed 60 Hz simulation step. requestAnimationFrame fires at the display's
+// refresh rate (60/120/144/180 Hz), so calling update(1) once per frame would
+// run the whole sim at displayHz/60 × speed (3× on a 180 Hz screen). Instead,
+// accumulate real elapsed time and step the simulation exactly 60×/second —
+// identical gameplay on any monitor.
+const SIM_STEP = 1000/60;
+let simLast = performance.now();
+let simAccum = 0;
+function loop(now){
+  simAccum += now - simLast;
+  simLast = now;
+  // Clamp so a long pause (tab switch, debugger) doesn't cause a catch-up burst.
+  if(simAccum > 250) simAccum = 250;
+  while(simAccum >= SIM_STEP){
+    update(1);
+    simAccum -= SIM_STEP;
+  }
   render();
   raf=requestAnimationFrame(loop);
 }
-loop();
+requestAnimationFrame(loop);
 
 // UI bindings
 document.getElementById('playBtn').onclick=()=>{
