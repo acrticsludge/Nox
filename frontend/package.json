@@ -11,7 +11,12 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "astro": "^7.2.9"
+    "@astrojs/react": "^6.0.4",
+    "@astryxdesign/core": "^0.5.0",
+    "@astryxdesign/theme-neutral": "^0.5.0",
+    "astro": "^7.2.9",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

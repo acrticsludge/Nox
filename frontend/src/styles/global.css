@@ -1,0 +1,363 @@
+/* ------------------------------------------------------------------ */
+/* Astryx core + neutral theme (precompiled CSS, no StyleX build)     */
+/* ------------------------------------------------------------------ */
+@import '@astryxdesign/core/reset.css';
+@import '@astryxdesign/core/astryx.css';
+@import '@astryxdesign/theme-neutral/theme.css';
+
+/* ------------------------------------------------------------------ */
+/* Nox neon theme — overrides Astryx design tokens                    */
+/* ------------------------------------------------------------------ */
+:root {
+  --nox-bg: #07090b;
+  --nox-surface: #0c1012;
+  --nox-card: #0a0e10;
+  --nox-border: #1b2427;
+  --nox-fg: #f1f4f3;
+  --nox-muted: #879397;
+  --nox-lime: #c9ff2f;
+  --nox-cyan: #58d8ff;
+  --nox-pink: #ff5ca8;
+  --nox-amber: #ffb23e;
+  --nox-mono: 'Courier New', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* Astryx token overrides */
+  --color-accent: var(--nox-lime);
+  --color-accent-muted: rgba(201, 255, 47, 0.12);
+  --color-on-accent: var(--nox-bg);
+  --color-background-body: var(--nox-bg);
+  --color-background-surface: var(--nox-surface);
+  --color-background-card: var(--nox-card);
+  --color-background-muted: #0d1214;
+  --color-background-cyan: rgba(88, 216, 255, 0.07);
+  --color-background-pink: rgba(255, 92, 168, 0.07);
+  --color-background-orange: rgba(255, 178, 62, 0.07);
+  --color-border: var(--nox-border);
+  --color-border-emphasized: #2a3438;
+  --color-border-cyan: rgba(88, 216, 255, 0.45);
+  --color-border-pink: rgba(255, 92, 168, 0.45);
+  --color-border-orange: rgba(255, 178, 62, 0.45);
+  --color-text-primary: var(--nox-fg);
+  --color-text-secondary: var(--nox-muted);
+  --color-text-accent: var(--nox-lime);
+  --color-text-cyan: var(--nox-cyan);
+  --color-text-pink: var(--nox-pink);
+  --color-text-orange: var(--nox-amber);
+  --color-icon-primary: var(--nox-fg);
+  --color-icon-secondary: var(--nox-muted);
+  --color-icon-cyan: var(--nox-cyan);
+  --color-icon-pink: var(--nox-pink);
+  --color-icon-orange: var(--nox-amber);
+  --font-family-body: var(--nox-mono);
+  --font-family-heading: var(--nox-mono);
+  --font-family-code: var(--nox-mono);
+  --radius-container: 0px;
+  --radius-element: 2px;
+  --radius-page: 0px;
+  --radius-inner: 0px;
+}
+
+html {
+  background: var(--nox-bg);
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--nox-bg);
+  color: var(--nox-fg);
+  font-family: var(--nox-mono);
+}
+
+/* ------------------------------------------------------------------ */
+/* Bespoke styles — only where Astryx has no component for it         */
+/* ------------------------------------------------------------------ */
+.nox-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--nox-bg);
+}
+.grid-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: linear-gradient(#172024 1px, transparent 1px),
+    linear-gradient(90deg, #172024 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+.grid-noise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(#768187 0.7px, transparent 0.7px);
+  background-size: 18px 18px;
+  opacity: 0.12;
+}
+.nox-content {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, calc(100% - 48px));
+  margin-inline: auto;
+}
+.nox-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(1180px, calc(100% - 48px));
+  margin-inline: auto;
+  padding: 32px 0;
+  border-bottom: 1px solid var(--nox-border);
+}
+.hero-section {
+  position: relative;
+  padding-top: 110px;
+  padding-bottom: 102px;
+}
+.brand-lockup {
+  letter-spacing: 0.28em;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--nox-fg);
+}
+.diamond-mark {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid var(--nox-lime);
+  transform: rotate(45deg);
+}
+.diamond-mark span {
+  width: 7px;
+  height: 7px;
+  background: var(--nox-lime);
+}
+.status-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--nox-lime);
+  box-shadow: 0 0 12px var(--nox-lime);
+}
+.eyebrow,
+.section-kicker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--nox-lime);
+  font-family: var(--nox-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+}
+.eyebrow-line {
+  width: 34px;
+  height: 1px;
+  background: var(--nox-lime);
+}
+.hero-title {
+  margin: 28px 0 22px;
+  font-size: clamp(76px, 13vw, 172px);
+  line-height: 0.78;
+  letter-spacing: -0.085em;
+  font-weight: 800;
+}
+.hero-title em {
+  color: transparent;
+  font-style: normal;
+  -webkit-text-stroke: 1px #ecf3ef;
+}
+.hero-copy {
+  color: var(--nox-muted);
+  font-size: 16px;
+  line-height: 1.55;
+}
+.hero-decoration {
+  position: absolute;
+  right: 5%;
+  bottom: 110px;
+  color: #617074;
+  font: 10px var(--nox-mono);
+  letter-spacing: 0.1em;
+}
+.crosshair {
+  display: block;
+  color: #d7e0de;
+  font-size: 44px;
+  font-weight: 200;
+  line-height: 1;
+}
+.coordinates {
+  display: block;
+  margin-top: 12px;
+  line-height: 1.6;
+}
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 52px 0 36px;
+}
+.section-title {
+  margin: 0;
+  font-size: clamp(48px, 7vw, 82px);
+  line-height: 0.78;
+  letter-spacing: -0.07em;
+}
+.section-title span {
+  color: var(--nox-lime);
+}
+.instruction-card {
+  min-height: 280px;
+  border-top: 2px solid var(--nox-border) !important;
+}
+.card-accent-cyan {
+  border-top-color: var(--nox-cyan) !important;
+}
+.card-accent-pink {
+  border-top-color: var(--nox-pink) !important;
+}
+.card-accent-amber {
+  border-top-color: var(--nox-amber) !important;
+}
+.card-number {
+  font: 11px var(--nox-mono);
+  color: #778387;
+}
+.card-rule {
+  height: 1px;
+  flex: 1;
+  background: var(--nox-border);
+}
+.instruction-content {
+  font: 12px var(--nox-mono);
+  color: #93a0a2;
+}
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+.player-label {
+  width: 20px;
+  color: #dfe7e5;
+}
+.key-group {
+  display: flex;
+  gap: 4px;
+}
+.keycap {
+  display: inline-grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0 7px;
+  border: 1px solid #526064;
+  color: #dfe7e5;
+  font-size: 11px;
+}
+.keycap-accent {
+  margin-left: auto;
+  border-color: var(--nox-cyan);
+  color: var(--nox-cyan);
+  font-size: 9px;
+}
+.orb-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+.orb {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid;
+  font: 18px Arial, sans-serif;
+}
+.orb-dash {
+  color: var(--nox-cyan);
+  border-color: var(--nox-cyan);
+}
+.orb-shield {
+  color: var(--nox-pink);
+  border-color: var(--nox-pink);
+}
+.orb-gravity {
+  color: var(--nox-amber);
+  border-color: var(--nox-amber);
+}
+.orb-split {
+  color: var(--nox-lime);
+  border-color: var(--nox-lime);
+}
+.instruction-content p {
+  line-height: 1.7;
+  margin: 0;
+}
+.instruction-content strong {
+  color: #e8efed;
+  font-weight: 400;
+}
+.hazard-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 25px;
+  color: var(--nox-amber);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+.hazard-icon {
+  font-size: 28px;
+  line-height: 10px;
+}
+.nox-footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  width: min(1180px, calc(100% - 48px));
+  margin-inline: auto;
+  padding: 18px 0 28px;
+  border-top: 1px solid var(--nox-border);
+}
+
+@media (max-width: 700px) {
+  .nox-header,
+  .nox-content,
+  .nox-footer {
+    width: min(100% - 32px, 1180px);
+  }
+  .hero-section {
+    padding-top: 90px;
+  }
+  .hero-copy {
+    font-size: 14px;
+  }
+  .desktop-break {
+    display: none;
+  }
+  .hero-decoration {
+    right: 0;
+    bottom: 70px;
+  }
+  .section-heading {
+    display: block;
+  }
+  .section-kicker {
+    margin-bottom: 34px;
+  }
+  .instruction-card {
+    min-height: auto;
+  }
+  .nox-footer {
+    gap: 12px;
+    flex-direction: column;
+  }
+}
