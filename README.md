@@ -46,7 +46,16 @@ denylist — all against the real Astro build output.
 3. Set **Root Directory** to `frontend` — Vercel auto-detects Astro.
 4. Deploy. Static output = fast CDN, no spin-down.
 
-### Backend → Render (free)
+### Backend → Render (free — deferred until online multiplayer)
+
+The backend's only production job will be hosting the multiplayer WebSocket
+rooms. Until that exists, **skip this step** — the game runs entirely on
+Vercel, and deploying the backend now would just add a second URL for the same
+static page (plus a ~1 min cold start after 15 min idle). The backend still
+works locally (`npm start`) as a preview server and is the tested foundation
+for the next phase.
+
+When online play lands:
 
 1. Push this repository to GitHub.
 2. In Render: **New → Blueprint** → select the repo.

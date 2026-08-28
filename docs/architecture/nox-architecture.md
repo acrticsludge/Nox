@@ -44,9 +44,11 @@
   - Structured request logging: `METHOD path status ms`.
 - **`test/`** — `node:test` suite (12 tests) covering serving, health,
   404/405, traversal (incl. raw-path variants), denylist, dotfiles.
-- **Deploy:** `render.yaml` Blueprint with `rootDir: backend` (free plan,
-  `healthCheckPath: /health`). This is also the future home of the
-  multiplayer WebSocket server.
+- **Deploy:** deferred until the online multiplayer phase. `render.yaml`
+  (Blueprints) is ready (`rootDir: backend`, free plan,
+  `healthCheckPath: /health`) but nothing is deployed to Render yet — the
+  game runs entirely on Vercel today. The backend's first production job will
+  be the multiplayer WebSocket server.
 
 ## Repo layout
 
