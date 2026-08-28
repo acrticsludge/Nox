@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Agent artifacts
+graphify-out/
+
+# OS
+.DS_Store
+Thumbs.db

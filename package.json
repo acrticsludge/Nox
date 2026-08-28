@@ -1,0 +1,16 @@
+{
+  "name": "nox",
+  "version": "0.1.0",
+  "description": "Nox (NEON VOID) — 2-player arena duel. Zero-dependency static game server, Render-ready.",
+  "type": "module",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
