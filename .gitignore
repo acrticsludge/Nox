@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Frontend build output
+frontend/dist/
+.astro/
+
 # Environment
 .env
 .env.*

@@ -1,10 +1,12 @@
+---
+---
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NEON VOID — 2P Duel</title>
-<style>
+<style is:global>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Space+Grotesk:wght@600;700&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
   body{
@@ -476,7 +478,7 @@
 
 <footer>Built with SVG • No canvas • 60fps • Made for bored legends at 2am</footer>
 
-<script>
+<script is:inline>
 const SVG = document.getElementById('gameSvg');
 const wallsG = document.getElementById('walls');
 const hazardsG = document.getElementById('hazards');
