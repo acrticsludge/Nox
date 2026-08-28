@@ -3,40 +3,59 @@
 A fast 2-player arena duel, played on one keyboard. Dash through walls, grab
 power orbs, dodge lava — first to **5 wins** takes the void.
 
-This repository wraps the single-file game (`index.html`, zero dependencies)
-in a tiny Node.js server so it can run locally or deploy to Render's free
-tier and be reached at a public URL.
+**Nox is a monorepo:**
+
+| Folder | What | Deploys to |
+|---|---|---|
+| `frontend/` | The game, built with **Astro 7** (static output) | **Vercel** (free, auto-detected) |
+| `backend/` | Zero-dependency **Node server** + `/health` + tests | **Render** (free, `rootDir: backend`) |
+
+The game itself is unchanged from the original single file — it now lives as
+an Astro page with its CSS/JS preserved verbatim.
 
 ## Quick start (local)
 
 Requires Node.js 18+.
 
 ```bash
-npm start
-# open http://localhost:3000
+npm install            # root orchestrator (no deps)
+npm --prefix frontend install
+npm --prefix backend install
+
+npm run dev            # Astro dev server (hot reload) → http://localhost:4321
+npm start              # build frontend, serve via backend → http://localhost:3000
 ```
 
-`npm run dev` starts the server with auto-restart on file changes.
-
-## Tests
+## Tests & checks
 
 ```bash
-npm test
+npm test               # builds the frontend, then runs backend tests (12)
+npm run check          # astro check (typecheck the Astro project)
 ```
 
-Runs the `node:test` suite (`test/server.test.js`) against the server on an
-ephemeral port — covers serving, the health endpoint, 404/405 handling,
-path-traversal blocking, and the sensitive-file denylist.
+Backend tests (`backend/test/`) cover serving, the health endpoint, 404/405,
+path-traversal blocking (incl. raw-path variants), and the sensitive-file
+denylist — all against the real Astro build output.
 
-## Deploy to Render (free)
+## Deploy
+
+### Frontend → Vercel (free)
 
 1. Push this repository to GitHub.
-2. In the Render dashboard: **New → Blueprint**, select the repo.
-3. Render reads `render.yaml` (web service, free plan, `healthCheckPath: /health`)
-   and deploys automatically.
+2. In Vercel: **Add New → Project** → import the repo.
+3. Set **Root Directory** to `frontend` — Vercel auto-detects Astro.
+4. Deploy. Static output = fast CDN, no spin-down.
 
-Free-tier caveat: Render spins the service down after **15 minutes without
-traffic**; the first visit after idle takes ~1 minute to wake up.
+### Backend → Render (free)
+
+1. Push this repository to GitHub.
+2. In Render: **New → Blueprint** → select the repo.
+3. `render.yaml` defines the web service (`rootDir: backend`, free plan,
+   `/health` check) and builds the frontend as part of the deploy.
+
+Free-tier caveat (Render only): the service spins down after **15 minutes
+without traffic**; the first visit after idle takes ~1 minute to wake. The
+Vercel-hosted frontend is unaffected.
 
 ## How to play
 
@@ -51,15 +70,16 @@ traffic**; the first visit after idle takes ~1 minute to wake up.
 ## Project structure
 
 ```text
-index.html   the game (unchanged single file)
-server.js    zero-dependency static server + /health
-test/        node:test suite
-render.yaml  Render blueprint (free plan)
-docs/        plans, ADRs, architecture
+frontend/            Astro game (src/pages/index.astro) → dist/
+backend/             Node server (server.js) + tests + package.json
+render.yaml          Render blueprint (rootDir: backend)
+package.json         root orchestrator (dev/build/start/test)
+docs/                plans, ADRs, architecture
 ```
 
 ## Roadmap
 
 - **Online 1v1 / free-for-all / teams** — server-authoritative play over
-  WebSockets (room codes, input snapshots, state broadcast). The current
-  server is the foundation for this.
+  WebSockets (room codes, input snapshots, state broadcast). The backend in
+  `backend/` is the foundation; the frontend will connect to it via a
+  configurable WebSocket URL. See `docs/architecture/nox-architecture.md`.

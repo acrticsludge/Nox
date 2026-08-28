@@ -1,8 +1,10 @@
 # Implementation Plan: Nox — Render Deployment Migration
 
-**Status:** Implemented (awaiting Render deploy by user)
+**Status:** Implemented (awaiting Render deploy by user). *Revised 2026-08-28:
+frontend moved to Astro on Vercel, backend split into `backend/` — see ADR 0002
+and `docs/architecture/nox-architecture.md`.*
 **Date:** 2026-08-28
-**Branch:** `feat/render-deploy`
+**Branch:** `feat/astro-vercel-frontend`
 
 ## Overview
 

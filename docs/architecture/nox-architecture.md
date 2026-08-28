@@ -1,76 +1,108 @@
 # Nox — Architecture Overview
 
-**Status:** Implemented (phase 1)
+**Status:** Implemented (phase 2 — Astro frontend on Vercel, monorepo split)
 **Date:** 2026-08-28
 
-## Current system (phase 1)
+## System shape
 
 ```text
-Browser ──HTTP──▶ Node static server (server.js) ──fs──▶ index.html + assets
-                        │
-                        └─ GET /health → {"ok":true,"service":"nox"}
+                    INTERNET
+                       │
+          ┌────────────┴────────────┐
+          ▼                         ▼
+   Vercel (static)            Render (Node backend)
+   frontend/                  backend/
+   Astro 7 → dist             zero-dep HTTP server
+        │                         │
+        └─ index.astro ──┐   ┌────┴────┐
+                         │   │         │
+                     game page   /health   (future: WebSocket rooms)
 ```
 
-- **`index.html`** — the game: a 2-player, same-keyboard arena duel. All
-  simulation and rendering live in one page (SVG, ~60 fps
-  `requestAnimationFrame` loop). Game code is unchanged from the original
-  single file.
+## Frontend — `frontend/` (Astro, deployed on Vercel)
+
+- **`src/pages/index.astro`** — the game (NEON VOID). Migrated from the
+  original single-file `index.html` with its CSS and JS preserved:
+  - `<style is:global>` — exact game CSS (Astro extracts + minifies it into
+    `dist/_astro/index.*.css` at build; functionally identical).
+  - `<script is:inline>` — exact game JS, emitted inline byte-for-byte.
+- **Build:** `npm run build` (in `frontend/`) → static `frontend/dist`.
+- **Deploy:** Vercel auto-detects Astro (root directory: `frontend`), zero
+  configuration, free Hobby tier, no spin-down.
+- The game is fully client-side — no SSR, no adapter needed. The Astro
+  project is the growth point for future pages (e.g., an online lobby).
+
+## Backend — `backend/` (Node, deployed on Render)
+
 - **`server.js`** — zero-dependency Node HTTP server (ESM, Node ≥18):
-  - Serves the game at `/` (and other public files from the project root).
-  - `GET /health` for Render health checks and observability.
-  - Security posture: URL-decode then canonicalize paths; reject any path
-    that escapes the root (both `/` and `\` separators), any dotfile segment,
-    any file on the sensitive denylist (`server.js`, `package.json`,
-    `render.yaml`, `CLAUDE.md`, `README.md`, `docs/`, `test/`, `.git/`, …),
-    and any method other than GET/HEAD (405).
+  - Serves the built game from `../frontend/dist` (local preview /
+    fallback hosting; warns if the build is missing).
+  - `GET /health` for Render health checks.
+  - Security posture: root-scoped paths (decode → normalize → prefix check),
+    dotfile + `..` segment denial, sensitive-file denylist, 405 for
+    non-GET/HEAD, fail-safe 500 with no internals leaked.
   - Structured request logging: `METHOD path status ms`.
-- **Deployment** — `render.yaml` Blueprint: Node web service, free plan,
-  `healthCheckPath: /health`.
+- **`test/`** — `node:test` suite (12 tests) covering serving, health,
+  404/405, traversal (incl. raw-path variants), denylist, dotfiles.
+- **Deploy:** `render.yaml` Blueprint with `rootDir: backend` (free plan,
+  `healthCheckPath: /health`). This is also the future home of the
+  multiplayer WebSocket server.
+
+## Repo layout
+
+```text
+Nox/
+├── frontend/          Astro game (Vercel)
+├── backend/           Node server + tests (Render)
+├── render.yaml        Render blueprint (rootDir: backend)
+├── package.json       thin root orchestrator (dev/build/start/test)
+├── docs/              plans, ADRs, architecture
+└── README.md
+```
 
 ## Design rules
 
-- **Zero runtime dependencies** — the whole project runs on Node's standard
-  library. Rationale: the game is dependency-free; keeping the server
-  dependency-free removes supply-chain and version drift entirely.
-- **Single-file game preserved** — the game itself is untouched; the server
-  only wraps and serves it. This keeps the multiplayer migration (next phase)
-  isolated to the networking layer.
-- **Smallest architecture that works** — no framework, no build step, no
-  database. See ADR 0001.
+- **Monorepo with clear separation** — `frontend/` and `backend/` are
+  independent npm projects; the root package.json only orchestrates.
+- **Zero-dependency backend** — the whole server runs on Node's standard
+  library (ADR 0001).
+- **Game code preserved** — the migration kept the game logic untouched
+  (script byte-identical; CSS minified only by Astro).
+- **Static frontend, WebSocket-ready backend** — Vercel serves the page; the
+  real-time layer, when added, lives on Render.
 
 ## Security boundaries
 
 | Boundary | Control |
 |----------|---------|
-| Public files | Root-scoped; denylist for project/source files; no dotfiles |
+| Public files (backend) | Root-scoped to `frontend/dist`; denylist for project/source files; no dotfiles |
 | Path traversal | Decode + normalize + root-prefix check (tests cover encoded `/` and `\` variants) |
 | Method abuse | 405 for anything but GET/HEAD |
 | Malformed input | 4xx without crashing |
 | Headers | `X-Content-Type-Options: nosniff`, explicit Content-Type, `Cache-Control: no-cache` |
 
-There is no user input, auth, or stored data in this phase, so the trust
-surface is the HTTP request path only.
+Vercel serves only the static build output, so the frontend exposes no
+server surface. The backend trust surface is the HTTP request path.
 
 ## Roadmap: online multiplayer (next phase)
 
-The intended evolution, per the product goal (play against college mates on
-separate laptops):
-
 ```text
 Client A ──inputs──▶ Room (server-authoritative sim) ──state──▶ Client A
-Client B ──inputs──▶  (runs the existing update() logic)  ──state──▶ Client B
+Client B ──inputs──▶  (backend/ + ws)                   ──state──▶ Client B
 ```
 
-- Add `ws` (WebSocket) to `server.js`; rooms keyed by shareable codes.
-- The server runs the authoritative game sim (the same logic already in
-  `index.html`); clients send input snapshots (~20–30 Hz) and interpolate
-  broadcast state (~30 Hz).
+- Add `ws` to `backend/server.js`; rooms keyed by shareable codes.
+- The server runs the authoritative game sim (the same logic already in the
+  page); clients send input snapshots (~20–30 Hz) and interpolate broadcast
+  state (~30 Hz).
 - Map generation (currently `Math.random` in the client) moves to the server
-  and is broadcast once per room so all clients see the identical arena.
+  and is broadcast once per room.
 - Later: free-for-all/teams, client-side prediction.
+- The frontend page will connect to the backend WebSocket URL (configurable
+  via a Vercel environment variable).
 
 ## Observability
 
-- Request log line per request (method, path, status, ms).
+- Backend request log line per request (method, path, status, ms).
 - `/health` endpoint used by Render's health checks.
 - No secrets, tokens, or PII are logged or stored.
