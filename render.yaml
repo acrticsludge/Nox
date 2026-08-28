@@ -1,0 +1,16 @@
+# Nox backend — Render blueprint.
+# STATUS: deferred — do NOT deploy until the online multiplayer phase lands.
+# The game currently runs entirely on Vercel (static); this service's only
+# production job will be hosting the multiplayer WebSocket rooms.
+services:
+  - type: web
+    name: nox
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm --prefix ../frontend install && npm --prefix ../frontend run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

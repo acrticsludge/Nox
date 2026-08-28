@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Frontend build output
+frontend/dist/
+.astro/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Agent artifacts
+graphify-out/
+.reasonix/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Refrence
+nox/

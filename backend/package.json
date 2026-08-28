@@ -1,0 +1,16 @@
+{
+  "name": "nox-backend",
+  "version": "0.1.0",
+  "description": "Nox (NEON VOID) — Node backend foundation: static preview server + /health. Zero dependencies. Serves the built frontend from ../frontend/dist; future home of the multiplayer WebSocket server.",
+  "type": "module",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

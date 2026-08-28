@@ -1,0 +1,5 @@
+minimumReleaseAgeExclude:
+  - '@next/*'
+  - next
+allowBuilds:
+  '@astryxdesign/core': true
