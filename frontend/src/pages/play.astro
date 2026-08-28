@@ -10,7 +10,7 @@
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Space+Grotesk:wght@600;700&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
   body{
-    background:#070A12;
+    background:#07090b;
     color:#fff;
     font-family:'Space Grotesk',system-ui,sans-serif;
     overflow-y:auto; overflow-x:hidden;
@@ -27,10 +27,10 @@
     content:"";
     position:fixed; inset:0;
     background:
-      linear-gradient(rgba(99,102,241,0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(99,102,241,0.07) 1px, transparent 1px),
-      radial-gradient(800px 600px at 50% -10%, rgba(139,92,246,0.25), transparent 60%),
-      radial-gradient(600px 500px at 90% 90%, rgba(6,182,212,0.15), transparent 60%);
+      linear-gradient(rgba(23,32,36,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(23,32,36,0.07) 1px, transparent 1px),
+      radial-gradient(800px 600px at 50% -10%, rgba(201,255,47,0.25), transparent 60%),
+      radial-gradient(600px 500px at 90% 90%, rgba(88,216,255,0.15), transparent 60%);
     background-size: 40px 40px, 40px 40px, auto, auto;
     pointer-events:none;
   }
@@ -45,16 +45,16 @@
   }
   .logo-mark{
     width:38px; height:38px;
-    background:linear-gradient(135deg,#8b5cf6,#06b6d4);
+    background:linear-gradient(135deg,#c9ff2f,#58d8ff);
     border-radius:10px;
     display:grid; place-items:center;
     font-weight:800; font-size:18px;
-    box-shadow:0 0 20px rgba(139,92,246,0.6);
+    box-shadow:0 0 20px rgba(201,255,47,0.6);
   }
   .logo h1{
     font-size:22px; letter-spacing:0.06em; line-height:1;
   }
-  .logo h1 span{ color:#a78bfa; }
+  .logo h1 span{ color:#c9ff2f; }
   .logo p{ font-size:11px; opacity:0.6; letter-spacing:0.14em; text-transform:uppercase; margin-top:2px}
   .controls-legend{
     display:flex; gap:10px; font-size:11px;
@@ -65,18 +65,18 @@
     border-radius:12px; padding:8px 10px; min-width:145px;
     backdrop-filter: blur(8px);
   }
-  .legend-card.p2{ border-color: rgba(251,113,133,0.25)}
-  .legend-card.p1{ border-color: rgba(96,165,250,0.25)}
+  .legend-card.p2{ border-color: rgba(255,92,168,0.25)}
+  .legend-card.p1{ border-color: rgba(88,216,255,0.25)}
   .legend-title{ font-weight:700; letter-spacing:0.08em; font-size:10px; opacity:0.9; margin-bottom:4px}
-  .legend-card.p1 .legend-title{ color:#60a5fa}
-  .legend-card.p2 .legend-title{ color:#fb7185}
+  .legend-card.p1 .legend-title{ color:#58d8ff}
+  .legend-card.p2 .legend-title{ color:#ff5ca8}
   .keys{ display:flex; gap:3px; flex-wrap:wrap; margin-top:4px}
   .k{
     background:rgba(255,255,255,0.09); border:1px solid rgba(255,255,255,0.12);
     border-bottom-width:2px; border-radius:6px; padding:2px 5px; font-family:'JetBrains Mono',monospace; font-size:10px; min-width:22px; text-align:center;
   }
   .k.action{ background:#fff; color:#111; border-color:#fff; font-weight:800}
-  .k.dash{ background:linear-gradient(135deg,#8b5cf6,#06b6d4); color:#fff; border-color:transparent}
+  .k.dash{ background:linear-gradient(135deg,#c9ff2f,#58d8ff); color:#fff; border-color:transparent}
 
   .top-bar{
     position:relative; z-index:2;
@@ -90,21 +90,21 @@
     min-height:86px;
   }
   .player-hud::before{ content:""; position:absolute; inset:0; opacity:0.06; pointer-events:none}
-  .p1.player-hud::before{ background:linear-gradient(135deg, #38bdf8, transparent 65%)}
-  .p2.player-hud::before{ background:linear-gradient(135deg, #fb7185, transparent 65%)}
+  .p1.player-hud::before{ background:linear-gradient(135deg, #58d8ff, transparent 65%)}
+  .p2.player-hud::before{ background:linear-gradient(135deg, #ff5ca8, transparent 65%)}
   .avatar{
     width:44px; height:44px; border-radius:12px; display:grid; place-items:center; font-size:18px; flex-shrink:0;
     box-shadow:0 0 18px rgba(0,0,0,0.3); position:relative; overflow:hidden;
   }
-  .p1 .avatar{ background:linear-gradient(135deg,#3b82f6,#06b6d4); box-shadow:0 0 18px rgba(59,130,246,0.5)}
-  .p2 .avatar{ background:linear-gradient(135deg,#f43f5e,#ec4899); box-shadow:0 0 18px rgba(244,63,94,0.5)}
+  .p1 .avatar{ background:linear-gradient(135deg,#58d8ff,#58d8ff); box-shadow:0 0 18px rgba(88,216,255,0.5)}
+  .p2 .avatar{ background:linear-gradient(135deg,#f43f5e,#f43f5e); box-shadow:0 0 18px rgba(244,63,94,0.5)}
   .avatar .ava-dash{
     position:absolute; bottom:0; left:0; height:3px; width:0%; background:#22c55e; transition:width 0.08s linear;
   }
   .avatar .ava-extra{
     position:absolute; top:4px; right:4px; display:flex; gap:2px;
   }
-  .ava-extra i{ width:6px; height:6px; border-radius:50%; background:#a78bfa; box-shadow:0 0 6px #a78bfa; display:block }
+  .ava-extra i{ width:6px; height:6px; border-radius:50%; background:#c9ff2f; box-shadow:0 0 6px #c9ff2f; display:block }
   .hud-main{ flex:1; display:flex; flex-direction:column; gap:5px; min-width:0; position:relative}
   .hud-topline{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px}
   .hud-name{ font-weight:700; font-size:13px; letter-spacing:0.06em; line-height:1}
@@ -125,8 +125,8 @@
     position:absolute; left:0; top:0; bottom:0; border-radius:999px; width:0%;
     transition:width 0.32s cubic-bezier(0.22,1,0.36,1), filter 0.2s, background 0.2s;
   }
-  .p1 .hp-fill{ background:linear-gradient(90deg,#38bdf8,#0ea5e9); box-shadow:0 0 10px rgba(56,189,248,0.55)}
-  .p2 .hp-fill{ background:linear-gradient(90deg,#fb7185,#ec4899); box-shadow:0 0 10px rgba(251,113,133,0.55)}
+  .p1 .hp-fill{ background:linear-gradient(90deg,#58d8ff,#3ec5f2); box-shadow:0 0 10px rgba(88,216,255,0.55)}
+  .p2 .hp-fill{ background:linear-gradient(90deg,#ff5ca8,#f43f5e); box-shadow:0 0 10px rgba(255,92,168,0.55)}
   .hp-fill.low{ animation:hpPulse 0.9s infinite}
   @keyframes hpPulse{ 0%,100%{ filter:brightness(1)} 50%{ filter:brightness(1.25)} }
   .hp-text{
@@ -145,8 +145,8 @@
     font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:800; line-height:1;
     text-shadow:0 0 12px currentColor; min-width:28px; text-align:center;
   }
-  .p1 .score{ color:#60a5fa}
-  .p2 .score{ color:#fb7185}
+  .p1 .score{ color:#58d8ff}
+  .p2 .score{ color:#ff5ca8}
   .status-row{ display:flex; gap:5px; align-items:stretch; flex-wrap:nowrap}
   .power-chip{
     flex:1; display:flex; flex-direction:column; gap:3px; padding:5px 6px 4px; border-radius:10px;
@@ -155,19 +155,19 @@
   }
   .power-chip.active{ opacity:1; filter:saturate(1); background:rgba(255,255,255,0.08); transform:translateY(-1px)}
   .power-chip.active::after{ content:""; position:absolute; inset:0; border-radius:10px; pointer-events:none; box-shadow:inset 0 0 12px rgba(255,255,255,0.06)}
-  .power-chip.ov.active{ border-color:rgba(251,191,36,0.45); box-shadow:0 0 10px rgba(251,191,36,0.22), inset 0 0 10px rgba(251,191,36,0.08)}
-  .power-chip.sh.active{ border-color:rgba(56,189,248,0.45); box-shadow:0 0 10px rgba(56,189,248,0.22), inset 0 0 10px rgba(56,189,248,0.08)}
-  .power-chip.bl.active{ border-color:rgba(167,139,250,0.45); box-shadow:0 0 10px rgba(167,139,250,0.22), inset 0 0 10px rgba(167,139,250,0.08)}
+  .power-chip.ov.active{ border-color:rgba(255,178,62,0.45); box-shadow:0 0 10px rgba(255,178,62,0.22), inset 0 0 10px rgba(255,178,62,0.08)}
+  .power-chip.sh.active{ border-color:rgba(88,216,255,0.45); box-shadow:0 0 10px rgba(88,216,255,0.22), inset 0 0 10px rgba(88,216,255,0.08)}
+  .power-chip.bl.active{ border-color:rgba(201,255,47,0.45); box-shadow:0 0 10px rgba(201,255,47,0.22), inset 0 0 10px rgba(201,255,47,0.08)}
   .chip-head{ display:flex; align-items:center; gap:4px; font-size:10px; font-weight:800; letter-spacing:0.06em; white-space:nowrap; min-width:0}
   .chip-head svg{ width:12px; height:12px; flex-shrink:0 }
-  .power-chip.ov .chip-head{ color:#fbbf24 } .power-chip.sh .chip-head{ color:#38bdf8 } .power-chip.bl .chip-head{ color:#a78bfa }
+  .power-chip.ov .chip-head{ color:#ffb23e } .power-chip.sh .chip-head{ color:#58d8ff } .power-chip.bl .chip-head{ color:#c9ff2f }
   .chip-label{ opacity:0.9; overflow:hidden; text-overflow:ellipsis}
   .chip-timer{ font-family:'JetBrains Mono',monospace; font-size:9px; opacity:0.75; margin-left:auto}
   .chip-bar{ height:3px; border-radius:999px; background:rgba(255,255,255,0.12); overflow:hidden; position:relative}
   .chip-fill{ height:100%; width:0%; border-radius:999px; transition:width 0.08s linear}
-  .power-chip.ov .chip-fill{ background:linear-gradient(90deg,#fbbf24,#f59e0b)}
-  .power-chip.sh .chip-fill{ background:linear-gradient(90deg,#38bdf8,#0ea5e9)}
-  .power-chip.bl .chip-fill{ background:linear-gradient(90deg,#a78bfa,#8b5cf6)}
+  .power-chip.ov .chip-fill{ background:linear-gradient(90deg,#ffb23e,#ff9d2e)}
+  .power-chip.sh .chip-fill{ background:linear-gradient(90deg,#58d8ff,#3ec5f2)}
+  .power-chip.bl .chip-fill{ background:linear-gradient(90deg,#c9ff2f,#c9ff2f)}
   .center-hud{
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     min-width:110px; gap:4px;
@@ -185,7 +185,7 @@
     aspect-ratio: 960 / 560;
     max-height:min(560px, calc(100vh - 210px));
     max-height:min(560px, calc(100dvh - 210px));
-    background:rgba(10,14,26,0.85);
+    background:rgba(12,16,18,0.85);
     border:1px solid rgba(255,255,255,0.08);
     border-radius:18px;
     overflow:hidden;
@@ -196,7 +196,7 @@
   #gameSvg{ width:100%; height:100%; display:block}
   .overlay{
     position:absolute; inset:0; display:grid; place-items:center;
-    background:radial-gradient(600px 400px at 50% 50%, rgba(15,23,42,0.9), rgba(7,10,18,0.92));
+    background:radial-gradient(600px 400px at 50% 50%, rgba(15,23,42,0.9), rgba(7,9,11,0.92));
     backdrop-filter:blur(6px);
     z-index:5;
   }
@@ -211,13 +211,13 @@
   .badge{
     display:inline-flex; align-items:center; gap:6px;
     font-size:10px; letter-spacing:0.16em; text-transform:uppercase;
-    background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3);
-    color:#c4b5fd; padding:6px 10px; border-radius:999px; font-weight:700;
+    background:rgba(201,255,47,0.15); border:1px solid rgba(201,255,47,0.3);
+    color:#d9ff7a; padding:6px 10px; border-radius:999px; font-weight:700;
   }
   .menu-card h2{
     font-size:30px; line-height:1; margin:12px 0 8px; letter-spacing:-0.02em;
   }
-  .menu-card h2 span{ background:linear-gradient(135deg,#8b5cf6,#06b6d4,#f43f5e); -webkit-background-clip:text; -webkit-text-fill-color:transparent}
+  .menu-card h2 span{ background:linear-gradient(135deg,#c9ff2f,#58d8ff,#f43f5e); -webkit-background-clip:text; -webkit-text-fill-color:transparent}
   .menu-card p{ opacity:0.65; font-size:13px; line-height:1.5; margin-bottom:18px}
   .btn-row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap}
   .btn{
@@ -227,10 +227,10 @@
     display:inline-flex; align-items:center; gap:8px; letter-spacing:0.02em;
   }
   .btn-primary{
-    background:linear-gradient(135deg,#8b5cf6,#06b6d4); color:#fff;
-    box-shadow:0 8px 24px rgba(139,92,246,0.4);
+    background:linear-gradient(135deg,#c9ff2f,#58d8ff); color:#fff;
+    box-shadow:0 8px 24px rgba(201,255,47,0.4);
   }
-  .btn-primary:hover{ transform:translateY(-1px); box-shadow:0 12px 32px rgba(139,92,246,0.5)}
+  .btn-primary:hover{ transform:translateY(-1px); box-shadow:0 12px 32px rgba(201,255,47,0.5)}
   .btn-primary:active{ transform:translateY(0)}
   .btn-ghost{
     background:rgba(255,255,255,0.07); color:#fff; border:1px solid rgba(255,255,255,0.1);
@@ -238,19 +238,19 @@
   .btn-ghost:hover{ background:rgba(255,255,255,0.1)}
   .speed-row{ display:flex; gap:10px; margin:10px 0 14px; text-align:left}
   .speed-card{ flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:10px 11px}
-  .speed-card.s1{ border-color: rgba(56,189,248,0.22)} .speed-card.s2{ border-color: rgba(251,113,133,0.22)}
+  .speed-card.s1{ border-color: rgba(88,216,255,0.22)} .speed-card.s2{ border-color: rgba(255,92,168,0.22)}
   .speed-label{ font-size:10px; letter-spacing:0.12em; font-weight:700; opacity:0.85; display:flex; justify-content:space-between}
   .speed-label span.val{ font-family:'JetBrains Mono',monospace; opacity:1}
-  .speed-card.s1 .val{ color:#7dd3fc} .speed-card.s2 .val{ color:#fda4af}
+  .speed-card.s1 .val{ color:#a9e9ff} .speed-card.s2 .val{ color:#ff9ec9}
   input[type=range]{ width:100%; margin-top:8px; -webkit-appearance:none; appearance:none; height:4px; background:rgba(255,255,255,0.12); border-radius:999px; outline:none}
   input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:#fff; cursor:pointer; box-shadow:0 0 8px rgba(0,0,0,0.4); border:2px solid transparent}
-  #speedP1::-webkit-slider-thumb{ border-color:#38bdf8 } #speedP2::-webkit-slider-thumb{ border-color:#fb7185 }
-  #speedP1::-moz-range-thumb{ background:#38bdf8 } #speedP2::-moz-range-thumb{ background:#fb7185 }
+  #speedP1::-webkit-slider-thumb{ border-color:#58d8ff } #speedP2::-webkit-slider-thumb{ border-color:#ff5ca8 }
+  #speedP1::-moz-range-thumb{ background:#58d8ff } #speedP2::-moz-range-thumb{ background:#ff5ca8 }
   .hint{ margin-top:14px; font-size:11px; opacity:0.45; letter-spacing:0.04em}
   .result-score{ font-family:'JetBrains Mono',monospace; font-size:44px; font-weight:800; margin:6px 0}
-  .winner-p1{ color:#60a5fa; text-shadow:0 0 18px rgba(96,165,250,0.6)}
-  .winner-p2{ color:#fb7185; text-shadow:0 0 18px rgba(251,113,133,0.6)}
-  .winner-draw{ color:#a78bfa}
+  .winner-p1{ color:#58d8ff; text-shadow:0 0 18px rgba(88,216,255,0.6)}
+  .winner-p2{ color:#ff5ca8; text-shadow:0 0 18px rgba(255,92,168,0.6)}
+  .winner-draw{ color:#c9ff2f}
   footer{
     position:relative; z-index:2;
     padding:10px 0 8px; font-size:11px; opacity:0.4; letter-spacing:0.06em; text-align:center;
@@ -359,7 +359,7 @@
         <feGaussianBlur stdDeviation="3"/>
       </filter>
       <radialGradient id="arenaGrad" cx="50%" cy="40%">
-        <stop offset="0%" stop-color="#1e1b4b" stop-opacity="0.9"/>
+        <stop offset="0%" stop-color="#0f1218" stop-opacity="0.9"/>
         <stop offset="100%" stop-color="#020617" stop-opacity="1"/>
       </radialGradient>
       <linearGradient id="wallGrad" x1="0" y1="0" x2="1" y2="1">
@@ -367,7 +367,7 @@
         <stop offset="100%" stop-color="#0f172a"/>
       </linearGradient>
       <pattern id="gridPat" width="40" height="40" patternUnits="userSpaceOnUse">
-        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(99,102,241,0.12)" stroke-width="1"/>
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(23,32,36,0.12)" stroke-width="1"/>
       </pattern>
       <radialGradient id="lavaGrad" cx="50%" cy="50%">
         <stop offset="0%" stop-color="#fb923c"/>
@@ -394,8 +394,8 @@
 
     <!-- decorative rings -->
     <g opacity="0.25">
-      <circle cx="480" cy="280" r="120" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="6 8"/>
-      <circle cx="480" cy="280" r="190" fill="none" stroke="#06b6d4" stroke-width="1" stroke-dasharray="2 10" opacity="0.5"/>
+      <circle cx="480" cy="280" r="120" fill="none" stroke="#c9ff2f" stroke-width="1" stroke-dasharray="6 8"/>
+      <circle cx="480" cy="280" r="190" fill="none" stroke="#58d8ff" stroke-width="1" stroke-dasharray="2 10" opacity="0.5"/>
     </g>
 
     <!-- walls group -->
@@ -404,9 +404,9 @@
     <g id="hazards"></g>
     <!-- void -->
     <g id="void" opacity="0" pointer-events="none">
-      <rect x="0" y="0" width="960" height="560" rx="18" fill="rgba(7,10,18,0.62)" mask="url(#voidMask)"/>
-      <circle id="voidRing" cx="480" cy="280" r="420" fill="none" stroke="#a78bfa" stroke-width="3" stroke-dasharray="8 6" opacity="0.95"/>
-      <circle id="voidInner" cx="480" cy="280" r="420" fill="none" stroke="#8b5cf6" stroke-width="14" opacity="0.10"/>
+      <rect x="0" y="0" width="960" height="560" rx="18" fill="rgba(7,9,11,0.62)" mask="url(#voidMask)"/>
+      <circle id="voidRing" cx="480" cy="280" r="420" fill="none" stroke="#c9ff2f" stroke-width="3" stroke-dasharray="8 6" opacity="0.95"/>
+      <circle id="voidInner" cx="480" cy="280" r="420" fill="none" stroke="#c9ff2f" stroke-width="14" opacity="0.10"/>
     </g>
     <!-- pickups -->
     <g id="pickups"></g>
@@ -443,10 +443,10 @@
         <button class="btn btn-ghost" id="howBtn">How to play</button>
       </div>
       <div class="hint" id="howText" style="display:none; opacity:0.75; margin-top:12px; text-align:left; background:rgba(255,255,255,0.06); padding:10px 12px; border-radius:10px; line-height:1.5">
-        <b style="color:#60a5fa">P1 (Cyan):</b> WASD move, hold <b>Left Shift</b> to dash (1s cooldown), <b>Space</b> to shoot (hold for auto).<br>
-        <b style="color:#fb7185">P2 (Magenta):</b> Arrow keys move, <b>/ or Right Shift</b> to dash, <b>Enter</b> to shoot.<br>
+        <b style="color:#58d8ff">P1 (Cyan):</b> WASD move, hold <b>Left Shift</b> to dash (1s cooldown), <b>Space</b> to shoot (hold for auto).<br>
+        <b style="color:#ff5ca8">P2 (Magenta):</b> Arrow keys move, <b>/ or Right Shift</b> to dash, <b>Enter</b> to shoot.<br>
         Dash = 0.25s invincible + speed burst. Walls block movement & bullets.<br>
-        <b style="color:#fbbf24">⚡ Overcharge</b> = triple shot 4s &nbsp; <b style="color:#38bdf8">❄ Frost</b> = shield 3 HP (cracks) &nbsp; <b style="color:#a78bfa">✦ Blink</b> = dash reset + 22% speed 3s<br>
+        <b style="color:#ffb23e">⚡ Overcharge</b> = triple shot 4s &nbsp; <b style="color:#58d8ff">❄ Frost</b> = shield 3 HP (cracks) &nbsp; <b style="color:#c9ff2f">✦ Blink</b> = dash reset + 22% speed 3s<br>
         <b style="color:#22c55e">✚ Heal</b> = <b>+1 HP</b> only (capped at 5, wasted if full) — rare, contested, green flash
       </div>
       <div class="hint">Walls 1-unit grid • 🟧 Lava burns 1/s when active • 🟩 Slime slows to 55% • ⭕ Void crushes after 45s — don’t camp! • Orbs never spawn in hazards</div>
@@ -465,7 +465,7 @@
   <!-- game over -->
   <div class="overlay hidden" id="gameOverOverlay">
     <div class="menu-card">
-      <div class="badge" style="background:rgba(251,191,36,0.15); border-color:rgba(251,191,36,0.3); color:#fde68a">🏆 CHAMPION OF THE VOID</div>
+      <div class="badge" style="background:rgba(255,178,62,0.15); border-color:rgba(255,178,62,0.3); color:#ffe9a8">🏆 CHAMPION OF THE VOID</div>
       <div class="result-score" id="winnerText">PLAYER 1 WINS!</div>
       <p id="winnerSub">5 — 2 • Flawless dodges</p>
       <div class="btn-row">
@@ -502,9 +502,9 @@ const MAX_HP = 5;
 const ROUND_TIME = 60;
 const WIN_SCORE = 5;
 const POWER_TYPES = {
-  overcharge: { color:'#fbbf24', bg:'#f59e0b', icon:'⚡', duration:240, life:480 },
-  shield:     { color:'#38bdf8', bg:'#0ea5e9', icon:'❄', life:480, hp:3 },
-  blink:      { color:'#a78bfa', bg:'#8b5cf6', icon:'✦', duration:180, life:480 },
+  overcharge: { color:'#ffb23e', bg:'#ff9d2e', icon:'⚡', duration:240, life:480 },
+  shield:     { color:'#58d8ff', bg:'#3ec5f2', icon:'❄', life:480, hp:3 },
+  blink:      { color:'#c9ff2f', bg:'#c9ff2f', icon:'✦', duration:180, life:480 },
   heal:       { color:'#22c55e', bg:'#16a34a', icon:'✚', life:480, heal:1 }
 };
 const SHIELD_MAX_HP = 3;
@@ -712,8 +712,8 @@ let raf = 0;
 let lastPickupTime = 0;
 
 const players = [
-  { id:0, x:160, y:280, vx:0, vy:0, angle:0, hp:MAX_HP, dash:0, dashCd:0, inv:0, shootCd:0, overcharge:0, shield:false, shieldHp:0, shieldMax:SHIELD_MAX_HP, speedBoost:0, extraDash:0, baseSpeed:BASE_SPEED, squish:0, inSlime:false, lavaCd:0, voidCd:0, color:'#38bdf8', alive:true },
-  { id:1, x:800, y:280, vx:0, vy:0, angle:0, hp:MAX_HP, dash:0, dashCd:0, inv:0, shootCd:0, overcharge:0, shield:false, shieldHp:0, shieldMax:SHIELD_MAX_HP, speedBoost:0, extraDash:0, baseSpeed:BASE_SPEED, squish:0, inSlime:false, lavaCd:0, voidCd:0, color:'#fb7185', alive:true },
+  { id:0, x:160, y:280, vx:0, vy:0, angle:0, hp:MAX_HP, dash:0, dashCd:0, inv:0, shootCd:0, overcharge:0, shield:false, shieldHp:0, shieldMax:SHIELD_MAX_HP, speedBoost:0, extraDash:0, baseSpeed:BASE_SPEED, squish:0, inSlime:false, lavaCd:0, voidCd:0, color:'#58d8ff', alive:true },
+  { id:1, x:800, y:280, vx:0, vy:0, angle:0, hp:MAX_HP, dash:0, dashCd:0, inv:0, shootCd:0, overcharge:0, shield:false, shieldHp:0, shieldMax:SHIELD_MAX_HP, speedBoost:0, extraDash:0, baseSpeed:BASE_SPEED, squish:0, inSlime:false, lavaCd:0, voidCd:0, color:'#ff5ca8', alive:true },
 ];
 let bullets = [];
 let pickups = [];
@@ -833,7 +833,7 @@ function spawnHit(x,y,color){
 function spawnPickupEffect(x,y,color){
   for(let i=0;i<16;i++){
     const a=Math.random()*Math.PI*2, s=2+Math.random()*3;
-    particles.push({x,y,vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:22, max:22, r:2.2, color:color||'#fbbf24', type:'star'});
+    particles.push({x,y,vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:22, max:22, r:2.2, color:color||'#ffb23e', type:'star'});
   }
 }
 
@@ -1013,7 +1013,7 @@ function update(dt){
         p.shieldHp--; p.lavaCd=60; p.inv=Math.max(p.inv,12);
         spawnHit(p.x,p.y,'#fb923c');
         for(let k=0;k<6;k++){ const a=Math.random()*Math.PI*2, s=1+Math.random()*2; particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:14,max:14,r:1.6,color:'#fb923c',type:'hit'}); }
-        if(p.shieldHp<=0){ p.shield=false; p.shieldHp=0; for(let k=0;k<10;k++){ const a=Math.random()*Math.PI*2,s=2+Math.random()*2.5; particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:18,max:18,r:1.9,color:'#fed7aa',type:'star'}); } }
+        if(p.shieldHp<=0){ p.shield=false; p.shieldHp=0; for(let k=0;k<10;k++){ const a=Math.random()*Math.PI*2,s=2+Math.random()*2.5; particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:18,max:18,r:1.9,color:'#ffd9a6',type:'star'}); } }
       } else if(p.inv===0) {
         p.hp--; p.lavaCd=60; p.inv=26;
         spawnHit(p.x,p.y,'#fb923c');
@@ -1032,13 +1032,13 @@ function update(dt){
         p.voidCd = 54; // 0.9s
         if(p.shield && p.shieldHp>0){
           p.shieldHp--; p.inv=Math.max(p.inv,10);
-          spawnHit(p.x,p.y,'#a78bfa');
-          for(let k=0;k<6;k++){ const a=Math.random()*Math.PI*2,s=1+Math.random()*2; particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:14,max:14,r:1.5,color:'#a78bfa',type:'hit'}); }
+          spawnHit(p.x,p.y,'#c9ff2f');
+          for(let k=0;k<6;k++){ const a=Math.random()*Math.PI*2,s=1+Math.random()*2; particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:14,max:14,r:1.5,color:'#c9ff2f',type:'hit'}); }
           if(p.shieldHp<=0){ p.shield=false; p.shieldHp=0; }
         } else if(p.inv===0){
           p.hp--; p.inv=22;
-          spawnHit(p.x,p.y,'#a78bfa');
-          particles.push({x:p.x, y:p.y-18, vx:0, vy:-0.6, life:30, max:30, r:0, color:'#a78bfa', type:'healText', text:'VOID'});
+          spawnHit(p.x,p.y,'#c9ff2f');
+          particles.push({x:p.x, y:p.y-18, vx:0, vy:-0.6, life:30, max:30, r:0, color:'#c9ff2f', type:'healText', text:'VOID'});
           if(p.hp<=0){
             p.alive=false;
             for(let k=0;k<16;k++){ const a=Math.random()*Math.PI*2,s=1+Math.random()*4; particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20,max:20,r:2,color:p.color,type:'hit'}); }
@@ -1114,7 +1114,7 @@ function update(dt){
     let hitWall=false;
     for(const w of wallData){ if(rectCircleCollide(b.x,b.y,BULLET_R,w.x,w.y,w.w,w.h)){ hitWall=true; break; } }
     if(hitWall || b.life<=0 || b.x<0||b.x>960||b.y<0||b.y>560){
-      if(hitWall) spawnHit(b.x,b.y, b.owner===0?'#38bdf8':'#fb7185');
+      if(hitWall) spawnHit(b.x,b.y, b.owner===0?'#58d8ff':'#ff5ca8');
       bullets.splice(i,1); continue;
     }
     // hit player (with squish-adjusted radius)
@@ -1127,18 +1127,18 @@ function update(dt){
         if(p.shield){
           p.shieldHp = (p.shieldHp||SHIELD_MAX_HP) - 1;
           p.inv=16;
-          spawnHit(b.x,b.y,'#38bdf8');
+          spawnHit(b.x,b.y,'#58d8ff');
           // crack particles — more when near break
           const crackCount = p.shieldHp===2 ? 8 : p.shieldHp===1 ? 10 : 14;
           for(let k=0;k<crackCount;k++){
             const a=Math.random()*Math.PI*2, s=1.5+Math.random()*3.2;
-            const shard = p.shieldHp<=0 ? '#7dd3fc' : '#38bdf8';
+            const shard = p.shieldHp<=0 ? '#a9e9ff' : '#58d8ff';
             particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:16+Math.round(Math.random()*8), max:22, r: p.shieldHp<=0?2.4:1.9, color:shard, type:'hit'});
           }
           // extra shatter on break
           if(p.shieldHp<=0){
             p.shield=false; p.shieldHp=0;
-            for(let k=0;k<12;k++){ const a=Math.random()*Math.PI*2, s=2+Math.random()*4; particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:20, max:20, r:2.2, color:'#bae6fd', type:'star'}); }
+            for(let k=0;k<12;k++){ const a=Math.random()*Math.PI*2, s=2+Math.random()*4; particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:20, max:20, r:2.2, color:'#a9e9ff', type:'star'}); }
           }
           bullets.splice(i,1);
           break;
@@ -1180,9 +1180,9 @@ function endRound(winner, reason){
     sub.textContent = reason + ' • No points';
   } else {
     badge.textContent = `ROUND ${round} — ${reason}`;
-    badge.style.background = winner===0 ? 'rgba(56,189,248,0.15)' : 'rgba(251,113,133,0.15)';
-    badge.style.color = winner===0 ? '#7dd3fc' : '#fda4af';
-    badge.style.borderColor = winner===0 ? 'rgba(56,189,248,0.3)' : 'rgba(251,113,133,0.3)';
+    badge.style.background = winner===0 ? 'rgba(88,216,255,0.15)' : 'rgba(255,92,168,0.15)';
+    badge.style.color = winner===0 ? '#a9e9ff' : '#ff9ec9';
+    badge.style.borderColor = winner===0 ? 'rgba(88,216,255,0.3)' : 'rgba(255,92,168,0.3)';
     title.textContent = `PLAYER ${winner+1} WINS ROUND!`;
     title.className = 'result-score '+(winner===0?'winner-p1':'winner-p2');
     sub.textContent = `${scores[0]} — ${scores[1]} • First to ${WIN_SCORE}`;
@@ -1219,7 +1219,7 @@ function startCountdown(){
   ro.classList.remove('hidden');
   let c=3;
   badge.textContent = `ROUND ${round}`;
-  badge.style.background='rgba(139,92,246,0.15)'; badge.style.color='#c4b5fd'; badge.style.borderColor='rgba(139,92,246,0.3)';
+  badge.style.background='rgba(201,255,47,0.15)'; badge.style.color='#d9ff7a'; badge.style.borderColor='rgba(201,255,47,0.3)';
   const tick = ()=>{
     if(c>0){ title.textContent=c; title.className='result-score winner-draw'; sub.textContent='Get ready...'; c--; setTimeout(tick, 650); }
     else { title.textContent='FIGHT!'; title.className='result-score winner-draw'; sub.textContent='Dash = invincible • Grab the orb!'; setTimeout(()=>{ ro.classList.add('hidden'); gameState='playing'; }, 420); }
@@ -1234,7 +1234,7 @@ function updateHUD(){
   const rl = document.getElementById('roundLabel');
   if(safeRadius < 900){
     rl.textContent = `⚠ VOID ${Math.round(safeRadius)} • ROUND ${round}`;
-    rl.style.color = '#c4b5fd';
+    rl.style.color = '#d9ff7a';
     rl.style.opacity = '0.95';
   } else {
     rl.textContent = `FIRST TO ${WIN_SCORE} • ROUND ${round}`;
@@ -1246,13 +1246,13 @@ function updateHUD(){
   const timerEl = document.getElementById('timer');
   timerEl.textContent=`${m}:${s}`;
   if(safeRadius < 900){
-    timerEl.style.color = '#c4b5fd';
-    timerEl.style.boxShadow = '0 0 14px rgba(167,139,250,0.6)';
-    timerEl.style.borderColor = 'rgba(167,139,250,0.28)';
+    timerEl.style.color = '#d9ff7a';
+    timerEl.style.boxShadow = '0 0 14px rgba(201,255,47,0.6)';
+    timerEl.style.borderColor = 'rgba(201,255,47,0.28)';
   } else if(timeLeft<10){
-    timerEl.style.color = '#fbbf24';
-    timerEl.style.boxShadow = '0 0 16px rgba(251,191,36,0.5)';
-    timerEl.style.borderColor = 'rgba(251,191,36,0.35)';
+    timerEl.style.color = '#ffb23e';
+    timerEl.style.boxShadow = '0 0 16px rgba(255,178,62,0.5)';
+    timerEl.style.borderColor = 'rgba(255,178,62,0.35)';
   } else {
     timerEl.style.color = '#fff';
     timerEl.style.boxShadow = 'none';
@@ -1330,7 +1330,7 @@ function updateHUD(){
       const ready = p.dashCd===0;
       const pct = ready ? 100 : (1 - p.dashCd/DASH_COOLDOWN)*100;
       dashEl.style.width = pct+'%';
-      dashEl.style.background = ready ? '#22c55e' : (pct>65?'#f59e0b':'#ef4444');
+      dashEl.style.background = ready ? '#22c55e' : (pct>65?'#ff9d2e':'#ef4444');
       dashEl.style.opacity = p.dash>0 ? '0.95' : '1';
       dashEl.style.boxShadow = p.dash>0 ? '0 0 6px #22c55e' : 'none';
     }
@@ -1343,8 +1343,8 @@ function updateHUD(){
     const card = document.getElementById(`cardP${n}`);
     if(card){
       const anyActive = p.overcharge>0 || p.shield || p.speedBoost>0 || p.extraDash>0;
-      card.style.borderColor = anyActive ? (pi===0?'rgba(56,189,248,0.28)':'rgba(251,113,133,0.28)') : 'rgba(255,255,255,0.08)';
-      card.style.boxShadow = anyActive ? (pi===0?'0 0 18px rgba(56,189,248,0.16)':'0 0 18px rgba(251,113,133,0.16)') : 'none';
+      card.style.borderColor = anyActive ? (pi===0?'rgba(88,216,255,0.28)':'rgba(255,92,168,0.28)') : 'rgba(255,255,255,0.08)';
+      card.style.boxShadow = anyActive ? (pi===0?'0 0 18px rgba(88,216,255,0.16)':'0 0 18px rgba(255,92,168,0.16)') : 'none';
     }
   }
   // timer handled at top with void priority
@@ -1369,7 +1369,7 @@ function render(){
     const body=document.createElementNS('http://www.w3.org/2000/svg','path');
     // triangle ship
     body.setAttribute('d','M 18 0 L -12 -11 L -8 0 L -12 11 Z');
-    body.setAttribute('fill', p.id===0 ? '#0ea5e9' : '#e11d48');
+    body.setAttribute('fill', p.id===0 ? '#3ec5f2' : '#f43f5e');
     body.setAttribute('stroke','#fff'); body.setAttribute('stroke-width','1.6');
     body.setAttribute('stroke-linejoin','round');
     body.setAttribute('filter', p.id===0?'url(#glowCyan)':'url(#glowPink)');
@@ -1389,7 +1389,7 @@ function render(){
     if(p.dash>0){
       const flame=document.createElementNS('http://www.w3.org/2000/svg','path');
       flame.setAttribute('d','M -12 0 L -22 -6 L -26 0 L -22 6 Z');
-      flame.setAttribute('fill', p.id===0?'#7dd3fc':'#fda4af');
+      flame.setAttribute('fill', p.id===0?'#a9e9ff':'#ff9ec9');
       flame.setAttribute('opacity','0.9'); g.appendChild(flame);
     }
 
@@ -1397,7 +1397,7 @@ function render(){
     if(p.overcharge>0){
       const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
       ring.setAttribute('cx','0'); ring.setAttribute('cy','0'); ring.setAttribute('r','20');
-      ring.setAttribute('fill','none'); ring.setAttribute('stroke','#fbbf24'); ring.setAttribute('stroke-width','2');
+      ring.setAttribute('fill','none'); ring.setAttribute('stroke','#ffb23e'); ring.setAttribute('stroke-width','2');
       ring.setAttribute('stroke-dasharray','4 4'); ring.setAttribute('opacity','0.85');
       ring.setAttribute('transform',`rotate(${(Date.now()/12)%360})`);
       g.appendChild(ring);
@@ -1410,32 +1410,32 @@ function render(){
       else if(hp===1){ dash='3.5 9'; op='0.42'; sw='1.8'; }
       const sr=document.createElementNS('http://www.w3.org/2000/svg','circle');
       sr.setAttribute('cx','0'); sr.setAttribute('cy','0'); sr.setAttribute('r','22');
-      sr.setAttribute('fill','none'); sr.setAttribute('stroke','#38bdf8'); sr.setAttribute('stroke-width',sw);
+      sr.setAttribute('fill','none'); sr.setAttribute('stroke','#58d8ff'); sr.setAttribute('stroke-width',sw);
       sr.setAttribute('opacity',op); sr.setAttribute('stroke-dasharray',dash);
       sr.setAttribute('stroke-linecap','round');
       if(hp===1) sr.setAttribute('transform',`rotate(${(Date.now()/14)%360})`);
       g.appendChild(sr);
       const sr2=document.createElementNS('http://www.w3.org/2000/svg','circle');
       sr2.setAttribute('cx','0'); sr2.setAttribute('cy','0'); sr2.setAttribute('r','24');
-      sr2.setAttribute('fill','#38bdf8'); sr2.setAttribute('opacity', hp===1?'0.06': hp===2?'0.09':'0.13');
+      sr2.setAttribute('fill','#58d8ff'); sr2.setAttribute('opacity', hp===1?'0.06': hp===2?'0.09':'0.13');
       g.appendChild(sr2);
       // cracks — jagged lines inside shield
       if(hp<=2){
         const crack1=document.createElementNS('http://www.w3.org/2000/svg','path');
         crack1.setAttribute('d','M 0 -18 L 4 -10 L -2 -2 L 5 6 L -1 14');
-        crack1.setAttribute('fill','none'); crack1.setAttribute('stroke','#bae6fd'); crack1.setAttribute('stroke-width','1.1');
+        crack1.setAttribute('fill','none'); crack1.setAttribute('stroke','#a9e9ff'); crack1.setAttribute('stroke-width','1.1');
         crack1.setAttribute('opacity', hp===1?'0.85':'0.55'); crack1.setAttribute('stroke-linecap','round'); crack1.setAttribute('stroke-linejoin','round');
         g.appendChild(crack1);
       }
       if(hp===1){
         const crack2=document.createElementNS('http://www.w3.org/2000/svg','path');
         crack2.setAttribute('d','M -14 -4 L -6 0 L -10 7 L -2 11');
-        crack2.setAttribute('fill','none'); crack2.setAttribute('stroke','#bae6fd'); crack2.setAttribute('stroke-width','1');
+        crack2.setAttribute('fill','none'); crack2.setAttribute('stroke','#a9e9ff'); crack2.setAttribute('stroke-width','1');
         crack2.setAttribute('opacity','0.5'); crack2.setAttribute('stroke-linecap','round');
         g.appendChild(crack2);
         const crack3=document.createElementNS('http://www.w3.org/2000/svg','path');
         crack3.setAttribute('d','M 10 -12 L 13 -4 L 8 2');
-        crack3.setAttribute('fill','none'); crack3.setAttribute('stroke','#bae6fd'); crack3.setAttribute('stroke-width','0.9');
+        crack3.setAttribute('fill','none'); crack3.setAttribute('stroke','#a9e9ff'); crack3.setAttribute('stroke-width','0.9');
         crack3.setAttribute('opacity','0.45');
         g.appendChild(crack3);
       }
@@ -1443,7 +1443,7 @@ function render(){
     if(p.speedBoost>0){
       const br=document.createElementNS('http://www.w3.org/2000/svg','circle');
       br.setAttribute('cx','0'); br.setAttribute('cy','0'); br.setAttribute('r','18');
-      br.setAttribute('fill','none'); br.setAttribute('stroke','#a78bfa'); br.setAttribute('stroke-width','2');
+      br.setAttribute('fill','none'); br.setAttribute('stroke','#c9ff2f'); br.setAttribute('stroke-width','2');
       br.setAttribute('opacity','0.8'); br.setAttribute('stroke-dasharray','2 5');
       br.setAttribute('transform',`rotate(${(Date.now()/8)%360})`);
       g.appendChild(br);
@@ -1451,7 +1451,7 @@ function render(){
     if(p.extraDash>0){
       const ed=document.createElementNS('http://www.w3.org/2000/svg','text');
       ed.setAttribute('x','14'); ed.setAttribute('y','-14'); ed.setAttribute('font-size','10'); ed.setAttribute('font-weight','800');
-      ed.setAttribute('fill','#a78bfa'); ed.textContent='◆'.repeat(p.extraDash);
+      ed.setAttribute('fill','#c9ff2f'); ed.textContent='◆'.repeat(p.extraDash);
       g.appendChild(ed);
     }
 
@@ -1472,7 +1472,7 @@ function render(){
       g.appendChild(cd);
       const fill=document.createElementNS('http://www.w3.org/2000/svg','rect');
       fill.setAttribute('x','-12'); fill.setAttribute('y','-18'); fill.setAttribute('width', String(24*(1-p.dashCd/DASH_COOLDOWN))); fill.setAttribute('height','3');
-      fill.setAttribute('rx','2'); fill.setAttribute('fill', p.dashCd<10?'#22c55e':'#f59e0b');
+      fill.setAttribute('rx','2'); fill.setAttribute('fill', p.dashCd<10?'#22c55e':'#ff9d2e');
       g.appendChild(fill);
     }
 
@@ -1486,17 +1486,17 @@ function render(){
     b.trail.forEach((t,i)=>{
       const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
       c.setAttribute('cx',t.x); c.setAttribute('cy',t.y); c.setAttribute('r', String(3 - i*0.5));
-      c.setAttribute('fill', b.owner===0?'#38bdf8':'#fb7185'); c.setAttribute('opacity', String(0.35 - i*0.07));
+      c.setAttribute('fill', b.owner===0?'#58d8ff':'#ff5ca8'); c.setAttribute('opacity', String(0.35 - i*0.07));
       bulletsG.appendChild(c);
     });
     const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
     circle.setAttribute('cx',b.x); circle.setAttribute('cy',b.y); circle.setAttribute('r', String(BULLET_R));
-    circle.setAttribute('fill','#fff'); circle.setAttribute('stroke', b.owner===0?'#38bdf8':'#fb7185'); circle.setAttribute('stroke-width','2');
+    circle.setAttribute('fill','#fff'); circle.setAttribute('stroke', b.owner===0?'#58d8ff':'#ff5ca8'); circle.setAttribute('stroke-width','2');
     circle.setAttribute('filter', b.owner===0?'url(#glowCyan)':'url(#glowPink)');
     bulletsG.appendChild(circle);
     const core=document.createElementNS('http://www.w3.org/2000/svg','circle');
     core.setAttribute('cx',b.x); core.setAttribute('cy',b.y); core.setAttribute('r','2');
-    core.setAttribute('fill', b.owner===0?'#7dd3fc':'#fda4af');
+    core.setAttribute('fill', b.owner===0?'#a9e9ff':'#ff9ec9');
     bulletsG.appendChild(core);
   });
 
