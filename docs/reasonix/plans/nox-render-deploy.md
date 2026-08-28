@@ -1,6 +1,6 @@
 # Implementation Plan: Nox — Render Deployment Migration
 
-**Status:** In Progress
+**Status:** Implemented (awaiting Render deploy by user)
 **Date:** 2026-08-28
 **Branch:** `feat/render-deploy`
 
