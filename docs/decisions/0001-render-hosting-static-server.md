@@ -1,8 +1,10 @@
 # ADR 0001: Host Nox on Render free tier as a zero-dependency Node server
 
-- **Status:** Accepted
+- **Status:** Accepted — *partially superseded by ADR 0002 (2026-08-28): the
+  frontend moved to Astro on Vercel; the zero-dependency Node server remains
+  as the backend in `backend/`.*
 - **Date:** 2026-08-28
-- **Branch:** `feat/render-deploy`
+- **Branch:** `feat/astro-vercel-frontend`
 
 ## Context
 
