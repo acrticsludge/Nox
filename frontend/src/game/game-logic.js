@@ -8,26 +8,53 @@ const BULLET_SPEED = 7.2;
 const BASE_SPEED = 3.6;
 const DASH_COOLDOWN = 60;
 const DASH_TIME = 16;
-const MAX_HP = 5;
+const MAX_HP = 12;
 const ROUND_TIME = 60;
 const WIN_SCORE = 5;
-const SHIELD_MAX_HP = 3;
-const HEAL_AMOUNT = 1;
+const SHIELD_MAX_HP = 5;
+const HEAL_AMOUNT = 2;
 const GRID = 40;
 const COLS = 24;
 const ROWS = 14;
 
 const POWER_TYPES = {
   overcharge: { color:'#ffb23e', bg:'#ff9d2e', icon:'⚡', duration:240, life:480 },
-  shield:     { color:'#58d8ff', bg:'#3ec5f2', icon:'❄', life:480, hp:3 },
+  shield:     { color:'#58d8ff', bg:'#3ec5f2', icon:'❄', life:480, hp:5 },
   blink:      { color:'#c9ff2f', bg:'#c9ff2f', icon:'✦', duration:180, life:480 },
-  heal:       { color:'#22c55e', bg:'#16a34a', icon:'✚', life:480, heal:1 }
+  heal:       { color:'#22c55e', bg:'#16a34a', icon:'✚', life:480, heal:2 }
+};
+
+// Bullet archetypes — balanced for MAX_HP 12, guest only, no ELO
+// dmg integer (except trick decay uses 0.5 steps via table), speed / r / cd / life / ammo tuned
+const BULLET_TYPES = {
+  standard: { id:'standard', label:'STD', color:'#f1f4f3', bg:'#f1f4f3', icon:'●', speed:7.2, r:5,   dmg:2, cd:11, life:90,  ammo: Infinity, bouncesMax:0, lifeDecay:false },
+  needle:   { id:'needle',   label:'NEEDLE', color:'#a78bfa', bg:'#7c3aed', icon:'◈', speed:8.5, r:3.5, dmgFront:0, dmgRear:6, cd:14, life:90,  ammo:5, bouncesMax:0 },
+  cannon:   { id:'cannon',   label:'CANNON', color:'#ffb23e', bg:'#ff9d2e', icon:'■', speed:3.8, r:7,   dmg:4, cd:32, life:120, ammo:3, bouncesMax:0 },
+  trick:    { id:'trick',    label:'TRICK',  color:'#58d8ff', bg:'#3ec5f2', icon:'◇', speed:6.2, r:4,   dmg:2.5, cd:16, life:180, ammo:6, bouncesMax:5, decay:0.82 }
+};
+const AMMO_KINDS = ['ammo_needle','ammo_cannon','ammo_trick'];
+const AMMO_PICKUP_CFG = {
+  ammo_needle: { color:'#a78bfa', bg:'#7c3aed', icon:'◈', life:480, ammo:5, bullet:'needle' },
+  ammo_cannon: { color:'#ffb23e', bg:'#ff9d2e', icon:'■', life:480, ammo:3, bullet:'cannon' },
+  ammo_trick:  { color:'#58d8ff', bg:'#3ec5f2', icon:'◇', life:480, ammo:6, bullet:'trick' }
 };
 
 let wallData = [];
 let hazards = [];
 let safeRadius = 999;
 let voidTick = [0, 0];
+const HAZARD_RELOCATE_MIN = 480; // 8s @60fps
+const HAZARD_RELOCATE_MAX = 720; // 12s
+let hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
+const REQUIRED_WALL_GAP = PLAYER_R * 2 + 2; // pointer diameter (32) + 2px breathing = 34px exact fit
+function wallGap(a, b) {
+  const dx = Math.max(0, Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w)));
+  const dy = Math.max(0, Math.max(a.y - (b.y + b.h), b.y - (a.y + a.h)));
+  if (dx === 0 && dy === 0) return -1; // overlap (shouldn't happen)
+  if (dx === 0) return dy;
+  if (dy === 0) return dx;
+  return Math.hypot(dx, dy);
+}
 
 function generateRandomWalls() {
   // Outer frame walls - non-overlapping corners so they merge as one piece
@@ -61,7 +88,7 @@ function generateRandomWalls() {
   }
 
   const target = 8 + Math.floor(Math.random() * 4);
-  let placed = 0, attempts = 120;
+  let placed = 0, attempts = 200;
   for(let a = 0; a < attempts && placed < target; a++) {
     const isHoriz = Math.random() < 0.5;
     const len = 2 + Math.floor(Math.random() * 4);
@@ -73,13 +100,21 @@ function generateRandomWalls() {
     const r = 1 + Math.floor(Math.random() * (rMax - 1 + 1));
     const cells = canPlace(c, r, len, isHoriz);
     if(!cells) continue;
-    cells.forEach(([cc, rr]) => occ.add(key(cc, rr)));
     let x, y, w, h;
     if(isHoriz) {
       x = c * GRID; y = r * GRID - 6; w = len * GRID; h = 12;
     } else {
       x = c * GRID - 6; y = r * GRID; w = 12; h = len * GRID;
     }
+    // Enforce exact pointer-width gap: player diameter = 32, require 36px clearance
+    const newWall = {x, y, w, h};
+    let tooClose = false;
+    for (const ew of walls) {
+      const g = wallGap(newWall, ew);
+      if (g !== -1 && g < REQUIRED_WALL_GAP) { tooClose = true; break; }
+    }
+    if (tooClose) continue;
+    cells.forEach(([cc, rr]) => occ.add(key(cc, rr)));
     walls.push({x, y, w, h, rx: 6});
     placed++;
   }
@@ -127,6 +162,67 @@ function isLavaActive(h) {
 function isLavaWarning(h) {
   const mod = h.t % 300;
   return mod < 120;
+}
+
+function findValidHazardPos(ignoreIdx = -1) {
+  // try 60 random cells for a valid hazard spot (not on wall, not on other hazard, not near spawn)
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const c = 1 + Math.floor(Math.random() * (COLS - 2));
+    const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+    const x = c * GRID + 2, y = r * GRID + 2;
+    const cx = x + 18, cy = y + 18;
+    // avoid spawn protects (mirror generateRandomWalls protectedCells)
+    if ((c >= 2 && c <= 5 && r >= 6 && r <= 8) || (c >= 18 && c <= 21 && r >= 6 && r <= 8) || (c >= 10 && c <= 13 && r >= 5 && r <= 9)) continue;
+    if (wallsCollide(cx, cy, 22)) continue;
+    // adjacency to walls: if any wall within 1 cell, skip
+    let nearWall = false;
+    for (const w of wallData) {
+      if (w.isBorder) continue;
+      if (rectCircleCollide(cx, cy, 28, w.x, w.y, w.w, w.h)) { nearWall = true; break; }
+    }
+    if (nearWall) continue;
+    // avoid other hazards (40px gap)
+    let overlap = false;
+    for (let i = 0; i < hazards.length; i++) {
+      if (i === ignoreIdx) continue;
+      const h = hazards[i];
+      if (Math.abs(h.x - x) < 42 && Math.abs(h.y - y) < 42) { overlap = true; break; }
+    }
+    if (overlap) continue;
+    // avoid players (80px) - prevents insta-damage on relocate
+    if (len2(cx, cy, players[0].x, players[0].y) < 88 || len2(cx, cy, players[1].x, players[1].y) < 88) continue;
+    // avoid pickups
+    let nearPickup = false;
+    for (const pu of pickups) if (len2(cx, cy, pu.x, pu.y) < 60) { nearPickup = true; break; }
+    if (nearPickup) continue;
+    // avoid void crush zone when void is active
+    if (safeRadius < 900 && len2(cx, cy, 480, 280) > safeRadius - 32) continue;
+    return { c, r, x, y };
+  }
+  return null;
+}
+
+function relocateRandomHazards() {
+  if (hazards.length === 0 || gameState !== 'playing') return;
+  // relocate 1-2 hazards each trigger for chaos
+  const count = hazards.length <= 3 ? 1 : (Math.random() < 0.5 ? 1 : 2);
+  const indices = [...Array(hazards.length).keys()].sort(() => Math.random() - 0.5).slice(0, count);
+  for (const idx of indices) {
+    const pos = findValidHazardPos(idx);
+    if (!pos) continue;
+    const h = hazards[idx];
+    // poof out
+    for (let k = 0; k < 12; k++) particles.push({ x: h.x + 18, y: h.y + 18, vx: Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*2.5), vy: Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*2.5), life: 16, max: 16, r: 1.8, color: h.kind === 'lava' ? '#fb923c' : '#6ee7b7', type: 'hit' });
+    // optional: randomize kind on relocate 30% chance
+    if (Math.random() < 0.3) h.kind = Math.random() < 0.5 ? 'lava' : 'slime';
+    h.c = pos.c; h.r = pos.r; h.x = pos.x; h.y = pos.y;
+    h.t = Math.random() * 300;
+    h.lavaCd = 0;
+    // poof in
+    for (let k = 0; k < 14; k++) particles.push({ x: h.x + 18, y: h.y + 18, vx: Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*2.2), vy: Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*2.2), life: 18, max: 18, r: 2, color: h.kind === 'lava' ? '#f97316' : '#10b981', type: 'star' });
+  }
+  drawHazards();
+  hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
 }
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -206,10 +302,64 @@ function spawnPickupEffect(x, y, color) {
   }));
 }
 
+// ——— Per-damage distinct minimal FX (small, type-specific) ———
+function spawnHitStandard(x, y, color) { // cyan/pink 10 hit, crisp ring
+  return Array.from({length: 10}, () => ({
+    x, y, vx: Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*3.8), vy: Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*3.8),
+    life: 16, max: 16, r: 1.6 + Math.random()*1.8, color, type:'hit'
+  }));
+}
+function spawnHitNeedleBlock(x, y) { // front graze: tiny violet hex, 6 micro, short
+  return Array.from({length: 6}, (_,i) => ({
+    x, y, vx: Math.cos(i*1.047)*(1+Math.random()*1.2), vy: Math.sin(i*1.047)*(1+Math.random()*1.2),
+    life: 10, max: 10, r: 1.1 + Math.random()*0.8, color:'#a78bfa', type:'hit'
+  })).concat([{x,y,vx:0,vy:-0.7,life:18,max:18,r:0,color:'#a78bfa',type:'healText',text:'BLOCK'}]);
+}
+function spawnHitNeedleCrit(x, y) { // rear crit: violet star burst 12 + 4 core
+  const a = Array.from({length: 12}, () => ({
+    x, y, vx: Math.cos(Math.random()*Math.PI*2)*(1.2+Math.random()*4.2), vy: Math.sin(Math.random()*Math.PI*2)*(1.2+Math.random()*4.2),
+    life: 20, max: 20, r: 1.8 + Math.random()*1.6, color:'#a78bfa', type:'star'
+  }));
+  a.push(...Array.from({length:4},()=>({x,y,vx:(Math.random()-0.5)*1.2,vy:(Math.random()-0.5)*1.2,life:14,max:14,r:3.2,color:'#ede9fe',type:'hit'})));
+  a.push({x,y: y-18, vx:0, vy:-0.9, life:28, max:28, r:0, color:'#a78bfa', type:'healText', text:'CRIT +6'});
+  return a;
+}
+function spawnHitCannon(x, y, color) { // heavy amber ember: 14 big + 4 ember rise
+  const b = Array.from({length: 14}, () => ({
+    x, y, vx: Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*4.6), vy: Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*4.6),
+    life: 22, max: 22, r: 2.2 + Math.random()*1.8, color: color||'#ffb23e', type:'hit'
+  }));
+  b.push(...Array.from({length:4},()=>({x,y,vx:(Math.random()-0.5)*1.6,vy:-1.2 -Math.random()*1.4,life:18,max:18,r:1.4,color:'#fb923c',type:'spark'})));
+  b.push({x, y:y-20, vx:0, vy:-0.8, life:26, max:26, r:0, color:'#ffb23e', type:'healText', text:'BOOM -4'});
+  return b;
+}
+function spawnHitTrick(x, y, color, bounces) { // cyan bounce: 8 + pip count text
+  const c = Array.from({length: 8}, () => ({
+    x, y, vx: Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*3.2), vy: Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*3.2),
+    life: 16, max: 16, r: 1.5 + Math.random()*1.2, color: color||'#58d8ff', type:'hit'
+  }));
+  const dmg = trickDmgAt(bounces);
+  c.push({x, y:y-16, vx:0, vy:-0.7, life:22, max:22, r:0, color:'#58d8ff', type:'healText', text:`-${dmg}`});
+  return c;
+}
+function spawnHitLava(x, y) {
+  return Array.from({length:10},()=>({x,y,vx:Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*3),vy:Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*3),life:18,max:18,r:1.7+Math.random()*1.4,color:'#fb923c',type:'hit'}))
+    .concat([{x,y:y-18,vx:0,vy:-0.6,life:26,max:26,r:0,color:'#fb923c',type:'healText',text:'-2 LAVA'}]);
+}
+function spawnHitVoid(x, y) {
+  return Array.from({length:9},()=>({x,y,vx:Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*2.8),vy:Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*2.8),life:18,max:18,r:1.5+Math.random()*1.2,color:'#c9ff2f',type:'hit'}))
+    .concat([{x,y:y-18,vx:0,vy:-0.6,life:26,max:26,r:0,color:'#c9ff2f',type:'healText',text:'VOID -1'}]);
+}
+function spawnBounceSpark(x, y, color) {
+  return Array.from({length:6},()=>({x,y,vx:Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*2.2),vy:Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*2.2),life:12,max:12,r:1.4,color:color||'#58d8ff',type:'spark'}));
+}
+function trickDmgAt(bounces){ const t=[2.5,2,1.6,1.2,0.8,0.5]; return t[Math.min(bounces,5)]; }
+function damageShake(p, intensity=1){ p.squish = Math.max(p.squish, 6 + intensity*4); }
+
 let globalSpeed = BASE_SPEED;
 const players = [
-  { id: 0, x: 160, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#58d8ff', alive: true },
-  { id: 1, x: 800, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#ff5ca8', alive: true },
+  { id: 0, x: 160, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#58d8ff', alive: true, ammoType:'standard', ammo:Infinity },
+  { id: 1, x: 800, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#ff5ca8', alive: true, ammoType:'standard', ammo:Infinity },
 ];
 // Early event queue so React can trigger start/forfeit even before init finishes
 if (typeof window !== 'undefined') {
@@ -280,6 +430,9 @@ function hardResetInternalState() {
   round = 1;
   timeLeft = ROUND_TIME;
   prevHp[0] = MAX_HP; prevHp[1] = MAX_HP;
+  // reset ammo to standard on full menu reset
+  players.forEach(pl => { pl.ammoType = 'standard'; pl.ammo = Infinity; });
+  hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
   safeRadius = 999;
   voidTick = [0, 0];
   const voidG = document.getElementById('void');
@@ -320,21 +473,45 @@ function isDownCode(code) { return !!keys[code]; }
 
 function shoot(p) {
   if(p.shootCd > 0) return;
-  p.shootCd = p.overcharge > 0 ? 9 : 11;
-  const speed = BULLET_SPEED;
+  // resolve ammo type - revert to standard if empty
+  let active = p.ammoType || 'standard';
+  if (active !== 'standard' && (!p.ammo || p.ammo <= 0)) { p.ammoType = 'standard'; p.ammo = Infinity; active = 'standard'; }
+  const cfg = BULLET_TYPES[active] || BULLET_TYPES.standard;
+  // overcharge shaves 2 ticks off cd, floor 7
+  const baseCd = cfg.cd ?? 11;
+  p.shootCd = p.overcharge > 0 ? Math.max(7, baseCd - 2) : baseCd;
+  const speed = cfg.speed ?? BULLET_SPEED;
+  const r = cfg.r ?? BULLET_R;
+  const life = cfg.life ?? 90;
   const mx = p.x + Math.cos(p.angle) * 18;
   const my = p.y + Math.sin(p.angle) * 18;
   const spread = p.overcharge > 0 ? [-0.22, 0, 0.22] : [0];
+  // ammo counts per trigger, not per spread bullet
+  let fired = 0;
   spread.forEach(s => {
     const ang = p.angle + s + (Math.random() - 0.5) * 0.03;
+    const dmg = active === 'trick' ? trickDmgAt(0) : (cfg.dmg ?? 2);
     bullets.push({
       x: mx, y: my,
       vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
-      owner: p.id, life: 120, trail: []
+      owner: p.id, life, trail: [], type: active, r, dmg, bounces: 0, bouncesMax: cfg.bouncesMax ?? 0
     });
+    fired++;
   });
-  particles.push(...spawnMuzzle(mx, my, p.color, p.angle));
-  if(navigator.vibrate) navigator.vibrate(10);
+  if (active !== 'standard') {
+    if (p.ammo !== Infinity) {
+      p.ammo--;
+      if (p.ammo <= 0) { p.ammoType = 'standard'; p.ammo = Infinity; }
+    }
+  }
+  // typed muzzle: cannon bigger ember, needle thin violet, trick cyan spark
+  const muzzleColor = active === 'needle' ? '#a78bfa' : active === 'cannon' ? '#ffb23e' : active === 'trick' ? '#58d8ff' : p.color;
+  const muzzle = spawnMuzzle(mx, my, muzzleColor, p.angle);
+  // cannon muzzle boost 1.4×
+  if (active === 'cannon') muzzle.forEach(mm => { mm.r = 2.6; mm.life = 14; mm.max = 14; });
+  if (active === 'needle') muzzle.forEach(mm => { mm.r = 1.4; });
+  particles.push(...muzzle);
+  if(navigator.vibrate) navigator.vibrate(active==='cannon'? 20 : active==='needle'? 8 : 10);
 }
 
 function isValidPickupPos(x, y) {
@@ -346,16 +523,20 @@ function isValidPickupPos(x, y) {
 
 function pickRandomPowerKind() {
   const r = Math.random();
-  if(r < 0.35) return 'overcharge';
-  if(r < 0.55) return 'shield';
-  if(r < 0.80) return 'blink';
-  return 'heal';
+  if(r < 0.22) return 'overcharge';
+  if(r < 0.40) return 'shield';
+  if(r < 0.60) return 'blink';
+  if(r < 0.70) return 'heal';
+  if(r < 0.80) return 'ammo_needle';
+  if(r < 0.90) return 'ammo_cannon';
+  return 'ammo_trick';
 }
 
 function spawnPickupSoon(force = false) {
   if(pickups.length > 0 && !force) return;
   const kind = pickRandomPowerKind();
-  const life = POWER_TYPES[kind].life;
+  const cfg = POWER_TYPES[kind] || AMMO_PICKUP_CFG[kind];
+  const life = cfg ? cfg.life : 480;
   const spots = [
     {x: 480, y: 280}, {x: 320, y: 280}, {x: 640, y: 280},
     {x: 480, y: 180}, {x: 480, y: 380}, {x: 240, y: 140},
@@ -399,12 +580,14 @@ function resetRound(regenerateWalls = false) {
   players[0].shield = false; players[0].shieldHp = 0; players[0].speedBoost = 0;
   players[0].extraDash = 0; players[0].squish = 0; players[0].inSlime = false;
   players[0].lavaCd = 0; players[0].voidCd = 0; players[0].baseSpeed = preservedSpeed; players[0].angle = 0;
+  players[0].ammoType = 'standard'; players[0].ammo = Infinity;
 
   players[1].x = 820; players[1].y = 280; players[1].hp = MAX_HP; players[1].alive = true;
   players[1].dash = 0; players[1].dashCd = 0; players[1].inv = 0; players[1].overcharge = 0;
   players[1].shield = false; players[1].shieldHp = 0; players[1].speedBoost = 0;
   players[1].extraDash = 0; players[1].squish = 0; players[1].inSlime = false;
   players[1].lavaCd = 0; players[1].voidCd = 0; players[1].baseSpeed = preservedSpeed; players[1].angle = Math.PI;
+  players[1].ammoType = 'standard'; players[1].ammo = Infinity;
 
   pushOutOfWalls(players[0]); pushOutOfWalls(players[1]);
   let tries = 0;
@@ -424,6 +607,7 @@ function resetRound(regenerateWalls = false) {
   }
   timeLeft = ROUND_TIME;
   prevHp[0] = MAX_HP; prevHp[1] = MAX_HP;
+  hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
   spawnPickupSoon(true);
   updateHUD();
 }
@@ -451,6 +635,9 @@ function update(dt) {
   }
 
   hazards.forEach(h => h.t += 1);
+  if (--hazardRelocateTimer <= 0) {
+    relocateRandomHazards();
+  }
   drawHazards();
 
   const elapsed = ROUND_TIME - timeLeft;
@@ -567,15 +754,16 @@ function update(dt) {
     if(hz && hz.kind === 'lava' && isLavaActive(hz) && p.lavaCd === 0) {
       if(p.shield && p.shieldHp > 0) {
         p.shieldHp--; p.lavaCd = 60; p.inv = Math.max(p.inv, 12);
-        particles.push(...spawnHit(p.x, p.y, '#ffb23e'));
+        particles.push(...spawnHitLava(p.x, p.y));
+        damageShake(p, 0.6);
         if(p.shieldHp <= 0) {
           p.shield = false; p.shieldHp = 0;
           for(let k = 0; k < 10; k++) particles.push({x: p.x, y: p.y, vx: Math.cos(Math.random() * Math.PI * 2) * (2 + Math.random() * 2.5), vy: Math.sin(Math.random() * Math.PI * 2) * (2 + Math.random() * 2.5), life: 18, max: 18, r: 1.9, color: '#ffd9a6', type: 'star'});
         }
       } else if(p.inv === 0) {
-        p.hp--; p.lavaCd = 60; p.inv = 26;
-        particles.push(...spawnHit(p.x, p.y, '#ffb23e'));
-        particles.push({x: p.x, y: p.y - 18, vx: 0, vy: -0.6, life: 30, max: 30, r: 0, color: '#ffb23e', type: 'healText', text: '-1 LAVA'});
+        p.hp = Math.max(0, p.hp - 2); p.lavaCd = 60; p.inv = 26;
+        particles.push(...spawnHitLava(p.x, p.y));
+        damageShake(p, 1);
         if(p.hp <= 0) {
           p.alive = false;
           for(let k = 0; k < 16; k++) particles.push({x: p.x, y: p.y, vx: Math.cos(Math.random() * Math.PI * 2) * (1 + Math.random() * 4), vy: Math.sin(Math.random() * Math.PI * 2) * (1 + Math.random() * 4), life: 20, max: 20, r: 2, color: p.color, type: 'hit'});
@@ -590,12 +778,13 @@ function update(dt) {
         p.voidCd = 54;
         if(p.shield && p.shieldHp > 0) {
           p.shieldHp--; p.inv = Math.max(p.inv, 10);
-          particles.push(...spawnHit(p.x, p.y, '#c9ff2f'));
+          particles.push(...spawnHitVoid(p.x, p.y));
+          damageShake(p, 0.5);
           if(p.shieldHp <= 0) { p.shield = false; p.shieldHp = 0; }
         } else if(p.inv === 0) {
-          p.hp--; p.inv = 22;
-          particles.push(...spawnHit(p.x, p.y, '#c9ff2f'));
-          particles.push({x: p.x, y: p.y - 18, vx: 0, vy: -0.6, life: 30, max: 30, r: 0, color: '#c9ff2f', type: 'healText', text: 'VOID'});
+          p.hp = Math.max(0, p.hp - 1); p.inv = 22;
+          particles.push(...spawnHitVoid(p.x, p.y));
+          damageShake(p, 0.8);
           if(p.hp <= 0) {
             p.alive = false;
             for(let k = 0; k < 16; k++) particles.push({x: p.x, y: p.y, vx: Math.cos(Math.random() * Math.PI * 2) * (1 + Math.random() * 4), vy: Math.sin(Math.random() * Math.PI * 2) * (1 + Math.random() * 4), life: 20, max: 20, r: 2, color: p.color, type: 'hit'});
@@ -608,6 +797,21 @@ function update(dt) {
     for(let idx = pickups.length - 1; idx >= 0; idx--) {
       const pu = pickups[idx];
       if(len2(p.x, p.y, pu.x, pu.y) < 24) {
+        // ammo pickups first
+        if(pu.kind && pu.kind.indexOf('ammo_') === 0) {
+          const cfg = AMMO_PICKUP_CFG[pu.kind];
+          if(cfg){
+            p.ammoType = cfg.bullet;
+            p.ammo = cfg.ammo;
+            particles.push(...spawnPickupEffect(pu.x, pu.y, cfg.color));
+            // ammo icon text
+            particles.push({x: p.x, y: p.y - 22, vx:0, vy:-0.9, life:42, max:42, r:0, color: cfg.color, type:'healText', text: cfg.bullet.toUpperCase()+` ×${cfg.ammo}`});
+            // small dash indicator
+            p.squish = 10;
+          }
+          pickups.splice(idx, 1);
+          continue;
+        }
         const pt = POWER_TYPES[pu.kind];
         if(pu.kind === 'overcharge') {
           p.overcharge = pt.duration;
@@ -628,7 +832,7 @@ function update(dt) {
             p.hp = Math.min(MAX_HP, p.hp + HEAL_AMOUNT);
             const hEl = document.getElementById(p.id === 0 ? 'heartsP1' : 'heartsP2');
             if(hEl) { hEl.classList.add('healed'); setTimeout(() => hEl.classList.remove('healed'), 480); }
-            particles.push({x: p.x, y: p.y - 26, vx: 0, vy: -0.9, life: 42, max: 42, r: 0, color: '#22c55e', type: 'healText', text: '+1'});
+            particles.push({x: p.x, y: p.y - 26, vx: 0, vy: -0.9, life: 42, max: 42, r: 0, color: '#22c55e', type: 'healText', text: `+${HEAL_AMOUNT}`});
           } else {
             if(p.overcharge < 60) p.overcharge = Math.min(240, p.overcharge + 30);
           }
@@ -663,14 +867,52 @@ function update(dt) {
 
   for(let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
+    const br = b.r ?? BULLET_R;
+    const trailLen = b.type === 'cannon' ? 6 : b.type === 'needle' ? 2 : b.type === 'trick' ? 5 : 4;
     b.trail.unshift({x: b.x, y: b.y});
-    if(b.trail.length > 4) b.trail.pop();
+    if(b.trail.length > trailLen) b.trail.pop();
     b.x += b.vx; b.y += b.vy;
     b.life--;
-    let hitWall = false;
-    for(const w of wallData) { if(rectCircleCollide(b.x, b.y, BULLET_R, w.x, w.y, w.w, w.h)) { hitWall = true; break; } }
-    if(hitWall || b.life <= 0 || b.x < 0 || b.x > 960 || b.y < 0 || b.y > 560) {
-      if(hitWall) particles.push(...spawnHit(b.x, b.y, b.owner === 0 ? '#58d8ff' : '#ff5ca8'));
+    // wall collision with typed radius
+    let hitWall = null;
+    for(const w of wallData) { if(rectCircleCollide(b.x, b.y, br, w.x, w.y, w.w, w.h)) { hitWall = w; break; } }
+    if(hitWall) {
+      if(b.type === 'trick' && (b.bounces ?? 0) < (b.bouncesMax ?? 5)) {
+        // reflect: compute normal via closest point
+        const closestX = clamp(b.x, hitWall.x, hitWall.x + hitWall.w);
+        const closestY = clamp(b.y, hitWall.y, hitWall.y + hitWall.h);
+        let nx = b.x - closestX, ny = b.y - closestY;
+        let nlen = Math.hypot(nx, ny);
+        if(nlen < 0.01){
+          // inside wall: push to nearest edge
+          const dl = b.x - hitWall.x;
+          const dr = (hitWall.x + hitWall.w) - b.x;
+          const dt = b.y - hitWall.y;
+          const db = (hitWall.y + hitWall.h) - b.y;
+          const m = Math.min(dl,dr,dt,db);
+          if(m===dl){ nx=-1; ny=0; } else if(m===dr){ nx=1; ny=0; } else if(m===dt){ nx=0; ny=-1; } else { nx=0; ny=1; }
+          nlen = 1;
+        } else { nx/=nlen; ny/=nlen; }
+        const dot = b.vx*nx + b.vy*ny;
+        b.vx = (b.vx - 2*dot*nx) * 0.97;
+        b.vy = (b.vy - 2*dot*ny) * 0.97;
+        b.x += nx * (br + 2);
+        b.y += ny * (br + 2);
+        b.bounces = (b.bounces ?? 0) + 1;
+        // decay dmg per bounce
+        b.dmg = trickDmgAt(b.bounces);
+        particles.push(...spawnBounceSpark(b.x, b.y, '#58d8ff'));
+        // keep trail dim after bounce
+        continue;
+      }
+      // non-trick or max bounces: die with typed wall FX
+      if(b.type === 'cannon') particles.push(...spawnHitCannon(b.x, b.y, '#ffb23e'));
+      else if(b.type === 'needle') particles.push(...spawnHit(b.x, b.y, '#a78bfa'));
+      else if(b.type === 'trick') particles.push(...spawnBounceSpark(b.x,b.y,'#58d8ff'));
+      else particles.push(...spawnHit(b.x, b.y, b.owner === 0 ? '#58d8ff' : '#ff5ca8'));
+      bullets.splice(i, 1); continue;
+    }
+    if(b.life <= 0 || b.x < -20 || b.x > 980 || b.y < -20 || b.y > 580) {
       bullets.splice(i, 1); continue;
     }
     for(const p of players) {
@@ -678,12 +920,32 @@ function update(dt) {
       if(p.inv > 0) continue;
       if(!p.alive) continue;
       const effR = p.squish > 0 ? PLAYER_R * 0.88 : PLAYER_R;
-      if(len2(b.x, b.y, p.x, p.y) < effR + BULLET_R) {
+      if(len2(b.x, b.y, p.x, p.y) < effR + br) {
+        // shield absorbs with typed shield damage
         if(p.shield) {
-          p.shieldHp = (p.shieldHp || SHIELD_MAX_HP) - 1;
-          p.inv = 16;
+          let shieldDmg = 1;
+          if(b.type === 'cannon') shieldDmg = 2;
+          else if(b.type === 'needle') {
+            // needle block does 0 shield, rear does 2
+            const f = Math.cos(p.angle), ff = Math.sin(p.angle);
+            const dnorm = Math.hypot(b.vx,b.vy) || 1;
+            const dnX = b.vx/dnorm, dnY = b.vy/dnorm;
+            const dotN = f*dnX + ff*dnY;
+            shieldDmg = dotN > 0.5 ? 2 : 0;
+          } else if(b.type === 'trick') shieldDmg = 1;
+          else shieldDmg = 1;
+          if(shieldDmg === 0){
+            // needle front graze vs shield == block with no shield loss
+            p.inv = 8;
+            particles.push(...spawnHitNeedleBlock(b.x, b.y));
+            bullets.splice(i, 1); break;
+          }
+          p.shieldHp = (p.shieldHp || SHIELD_MAX_HP) - shieldDmg;
+          if(p.shieldHp < 0) p.shieldHp = 0;
+          p.inv = b.type==='cannon'? 18 : 16;
           particles.push(...spawnHit(b.x, b.y, '#58d8ff'));
-          const crackCount = p.shieldHp === 2 ? 8 : p.shieldHp === 1 ? 10 : 14;
+          damageShake(p, shieldDmg>1?1.2:0.8);
+          const crackCount = p.shieldHp <= 1 ? 10 : p.shieldHp <= 2 ? 8 : 14;
           for(let k = 0; k < crackCount; k++) {
             const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 3.2;
             const shard = p.shieldHp <= 0 ? '#a9e9ff' : '#58d8ff';
@@ -695,8 +957,29 @@ function update(dt) {
           }
           bullets.splice(i, 1); break;
         }
-        p.hp--; p.inv = 28;
-        particles.push(...spawnHit(p.x, p.y, p.color));
+        // direct HP damage per type
+        let dmg = 2; let inv = 28; let fx = null; let shake = 1;
+        if(b.type === 'standard'){ dmg = 2; inv = 28; fx = spawnHitStandard(b.x,b.y,p.color); shake = 1; }
+        else if(b.type === 'needle'){
+          const f = Math.cos(p.angle), ff = Math.sin(p.angle);
+          const dnorm = Math.hypot(b.vx,b.vy) || 1;
+          const dnX = b.vx/dnorm, dnY = b.vy/dnorm;
+          const dot = f*dnX + ff*dnY; // rear if >0.5
+          if(dot > 0.5){
+            dmg = 6; inv = 30; fx = spawnHitNeedleCrit(p.x,p.y); shake = 1.6;
+          } else {
+            // front graze: no dmg, small block FX, brief inv, keep bullet? consume but no hp loss
+            p.inv = 6;
+            particles.push(...spawnHitNeedleBlock(b.x,b.y));
+            damageShake(p, 0.4);
+            bullets.splice(i, 1); break;
+          }
+        } else if(b.type === 'cannon'){ dmg = 4; inv = 34; fx = spawnHitCannon(p.x,p.y,p.color); shake = 1.5; }
+        else if(b.type === 'trick'){ dmg = b.dmg ?? trickDmgAt(b.bounces ?? 0); inv = 26; fx = spawnHitTrick(p.x,p.y,p.color,b.bounces ?? 0); shake = 0.9 + (b.bounces ?? 0)*0.12; }
+        else { dmg = b.dmg ?? 2; fx = spawnHitStandard(b.x,b.y,p.color); }
+        p.hp = Math.max(0, p.hp - dmg); p.inv = inv;
+        damageShake(p, shake);
+        if(fx) particles.push(...fx);
         bullets.splice(i, 1);
         if(p.hp <= 0) {
           p.alive = false;
@@ -953,12 +1236,26 @@ function render() {
     const hpArc = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     hpArc.setAttribute('x', '0'); hpArc.setAttribute('y', '28');
     hpArc.setAttribute('text-anchor', 'middle');
-    hpArc.setAttribute('font-size', '9');
+    hpArc.setAttribute('font-size', p.hp > 8 ? '8' : '9');
     hpArc.setAttribute('font-family', 'JetBrains Mono, monospace');
     hpArc.setAttribute('fill', '#fff'); hpArc.setAttribute('opacity', '0.85');
     hpArc.setAttribute('transform', `rotate(${-p.angle * 180 / Math.PI})`);
-    hpArc.textContent = '♥'.repeat(p.hp);
+    // 12 HP: show hearts up to 6 else numeric to avoid overflow, keep minimal
+    hpArc.textContent = p.hp <= 6 ? '♥'.repeat(p.hp) : `${p.hp}♥`;
     g.appendChild(hpArc);
+    // ammo indicator in arena — tiny text above hp if typed
+    if(p.ammoType && p.ammoType !== 'standard'){
+      const ammoArc = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      ammoArc.setAttribute('x', '0'); ammoArc.setAttribute('y', p.hp > 6 ? '38' : '36');
+      ammoArc.setAttribute('text-anchor', 'middle');
+      ammoArc.setAttribute('font-size', '6');
+      ammoArc.setAttribute('font-family', 'JetBrains Mono, monospace');
+      ammoArc.setAttribute('fill', p.ammoType==='needle'?'#a78bfa':p.ammoType==='cannon'?'#ffb23e':'#58d8ff');
+      ammoArc.setAttribute('opacity', '0.9');
+      ammoArc.setAttribute('transform', `rotate(${-p.angle * 180 / Math.PI})`);
+      ammoArc.textContent = p.ammoType==='needle' ? `◈×${p.ammo}` : p.ammoType==='cannon' ? `■×${p.ammo}` : `◇×${p.ammo}`;
+      g.appendChild(ammoArc);
+    }
 
     if(p.dashCd > 0) {
       const cd = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -981,33 +1278,91 @@ function render() {
 
   bulletsG.innerHTML = '';
   bullets.forEach(b => {
+    const type = b.type || 'standard';
+    const br = b.r ?? BULLET_R;
+    // trail per type color and size
+    const trailColor = type==='needle' ? '#a78bfa' : type==='cannon' ? '#ffb23e' : type==='trick' ? '#58d8ff' : (b.owner === 0 ? '#58d8ff' : '#ff5ca8');
     b.trail.forEach((t, i) => {
       const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       c.setAttribute('cx', t.x); c.setAttribute('cy', t.y);
-      c.setAttribute('r', String(3 - i * 0.5));
-      c.setAttribute('fill', b.owner === 0 ? '#58d8ff' : '#ff5ca8');
-      c.setAttribute('opacity', String(0.35 - i * 0.07));
+      // needle thinner, cannon fatter
+      const rTrail = type==='cannon' ? (4.2 - i*0.5) : type==='needle' ? (2.1 - i*0.4) : (3 - i * 0.5);
+      c.setAttribute('r', String(Math.max(0.6, rTrail)));
+      c.setAttribute('fill', trailColor);
+      c.setAttribute('opacity', String(type==='cannon' ? (0.42 - i*0.06) : (0.35 - i * 0.07)));
       bulletsG.appendChild(c);
     });
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', b.x); circle.setAttribute('cy', b.y);
-    circle.setAttribute('r', String(BULLET_R));
-    circle.setAttribute('fill', '#fff');
-    circle.setAttribute('stroke', b.owner === 0 ? '#58d8ff' : '#ff5ca8');
-    circle.setAttribute('stroke-width', '2');
-    circle.setAttribute('filter', b.owner === 0 ? 'url(#glowCyan)' : 'url(#glowPink)');
-    bulletsG.appendChild(circle);
-    const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    core.setAttribute('cx', b.x); core.setAttribute('cy', b.y);
-    core.setAttribute('r', '2');
-    core.setAttribute('fill', b.owner === 0 ? '#a9e9ff' : '#ff9ec9');
-    bulletsG.appendChild(core);
+    if(type === 'trick'){
+      // diamond shape
+      const dia = document.createElementNS('http://www.w3.org/2000/svg','path');
+      const s = br;
+      dia.setAttribute('d', `M ${b.x} ${b.y - s} L ${b.x + s} ${b.y} L ${b.x} ${b.y + s} L ${b.x - s} ${b.y} Z`);
+      dia.setAttribute('fill', '#fff');
+      dia.setAttribute('stroke', '#58d8ff');
+      dia.setAttribute('stroke-width', '1.6');
+      dia.setAttribute('filter', 'url(#softGlow)');
+      bulletsG.appendChild(dia);
+      const core = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      core.setAttribute('cx', b.x); core.setAttribute('cy', b.y); core.setAttribute('r', '1.2');
+      core.setAttribute('fill', '#a9e9ff');
+      bulletsG.appendChild(core);
+      if((b.bounces ?? 0) > 0){
+        const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+        txt.setAttribute('x', b.x); txt.setAttribute('y', b.y - br - 6);
+        txt.setAttribute('text-anchor','middle'); txt.setAttribute('font-size','7'); txt.setAttribute('font-family','JetBrains Mono, monospace');
+        txt.setAttribute('fill','#58d8ff');
+        txt.textContent = '·'.repeat(b.bounces) + ` ${b.dmg}`;
+        bulletsG.appendChild(txt);
+      }
+    } else if(type === 'cannon'){
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x', String(b.x - br)); rect.setAttribute('y', String(b.y - br*0.7));
+      rect.setAttribute('width', String(br*2)); rect.setAttribute('height', String(br*1.4));
+      rect.setAttribute('rx', '2');
+      rect.setAttribute('fill', '#fff');
+      rect.setAttribute('stroke', '#ffb23e');
+      rect.setAttribute('stroke-width', '2');
+      rect.setAttribute('filter', 'url(#softGlow)');
+      bulletsG.appendChild(rect);
+      const ember = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ember.setAttribute('cx', b.x); ember.setAttribute('cy', b.y); ember.setAttribute('r','2.4');
+      ember.setAttribute('fill','#fb923c');
+      bulletsG.appendChild(ember);
+    } else if(type === 'needle'){
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('cx', b.x); circle.setAttribute('cy', b.y);
+      circle.setAttribute('r', String(br));
+      circle.setAttribute('fill', '#fff');
+      circle.setAttribute('stroke', '#a78bfa');
+      circle.setAttribute('stroke-width', '1.8');
+      circle.setAttribute('filter', 'url(#softGlow)');
+      bulletsG.appendChild(circle);
+      const core = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      core.setAttribute('cx', b.x); core.setAttribute('cy', b.y);
+      core.setAttribute('r', '1.2');
+      core.setAttribute('fill','#ede9fe');
+      bulletsG.appendChild(core);
+    } else {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', b.x); circle.setAttribute('cy', b.y);
+      circle.setAttribute('r', String(br));
+      circle.setAttribute('fill', '#fff');
+      circle.setAttribute('stroke', b.owner === 0 ? '#58d8ff' : '#ff5ca8');
+      circle.setAttribute('stroke-width', '2');
+      circle.setAttribute('filter', b.owner === 0 ? 'url(#glowCyan)' : 'url(#glowPink)');
+      bulletsG.appendChild(circle);
+      const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      core.setAttribute('cx', b.x); core.setAttribute('cy', b.y);
+      core.setAttribute('r', '2');
+      core.setAttribute('fill', b.owner === 0 ? '#a9e9ff' : '#ff9ec9');
+      bulletsG.appendChild(core);
+    }
   });
 
   pickupsG.innerHTML = '';
   pickups.forEach(pu => {
     const kind = pu.kind || 'overcharge';
-    const cfg = POWER_TYPES[kind] || POWER_TYPES.overcharge;
+    const cfg = POWER_TYPES[kind] || AMMO_PICKUP_CFG[kind] || POWER_TYPES.overcharge;
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.setAttribute('transform', `translate(${pu.x},${pu.y})`);
     const pulse = 1 + Math.sin(pu.t) * 0.13;
@@ -1049,7 +1404,8 @@ function render() {
     lab.setAttribute('font-size', '7');
     lab.setAttribute('font-family', 'JetBrains Mono, monospace');
     lab.setAttribute('fill', '#fff'); lab.setAttribute('opacity', '0.7');
-    lab.textContent = kind === 'overcharge' ? 'TRI' : kind === 'shield' ? 'SHLD' : kind === 'heal' ? 'HEAL' : 'BLNK';
+    if(kind.indexOf('ammo_')===0){ lab.textContent = kind === 'ammo_needle' ? 'NEEDLE' : kind === 'ammo_cannon' ? 'CANNON' : 'TRICK'; }
+    else lab.textContent = kind === 'overcharge' ? 'TRI' : kind === 'shield' ? 'SHLD' : kind === 'heal' ? 'HEAL' : 'BLNK';
     g.appendChild(lab);
     pickupsG.appendChild(g);
   });
@@ -1287,7 +1643,7 @@ function updateHUD() {
       const fill = document.createElement('div');
       fill.className = 'hp-fill';
       fill.style.width = pct + '%';
-      if(p.hp === 1) fill.classList.add('low');
+      if(p.hp <= 2) fill.classList.add('low');
       hEl.appendChild(fill);
       const txt = document.createElement('div');
       txt.className = 'hp-text';
@@ -1299,8 +1655,8 @@ function updateHUD() {
         hEl.classList.add('damage');
         setTimeout(() => hEl.classList.remove('damage'), 300);
       }
-      if(p.hp === 1) hEl.style.filter = pi === 0 ? 'brightness(1.15)' : 'brightness(1.12)';
-      else if(p.hp === 2) hEl.style.filter = 'brightness(1.05)';
+      if(p.hp <= 2) hEl.style.filter = pi === 0 ? 'brightness(1.15)' : 'brightness(1.12)';
+      else if(p.hp <= 4) hEl.style.filter = 'brightness(1.05)';
       else hEl.style.filter = 'none';
       prevHp[pi] = p.hp;
     }
@@ -1350,6 +1706,19 @@ function updateHUD() {
       else if(hasDash) { pct = 100; txt = '×' + p.extraDash; }
       if(blF) blF.style.width = pct + '%';
       if(blT) blT.textContent = txt;
+    }
+
+    // ammo chip — per-type minimal
+    const ammoChip = document.getElementById(`ammoP${pi + 1}`);
+    const ammoT = document.getElementById(`ammoT${pi + 1}`);
+    if(ammoChip && ammoT){
+      const t = p.ammoType || 'standard';
+      let label = 'STD ∞'; let cls = 'ammo-chip--standard';
+      if(t==='needle'){ label = `NEEDLE ×${p.ammo}`; cls='ammo-chip--needle'; }
+      else if(t==='cannon'){ label = `CANNON ×${p.ammo}`; cls='ammo-chip--cannon'; }
+      else if(t==='trick'){ label = `TRICK ×${p.ammo} ${'·'.repeat(Math.max(0, 5 - (p.ammo !== Infinity ? (6 - p.ammo) : 0)))}`; cls='ammo-chip--trick'; }
+      ammoChip.className = `ammo-chip ${cls}`;
+      ammoT.textContent = label;
     }
 
     const dashEl = document.getElementById(`dashP${pi + 1}`);
@@ -1581,6 +1950,7 @@ function init() {
       for(let k=0;k<14;k++) particles.push({x: p.x, y: p.y, vx: Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*3), vy: Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*3), life:18, max:18, r:2, color: p.color, type:'hit'});
       p.alive = false; p.hp = 0;
       p.dash=0; p.dashCd=0; p.inv=0; p.overcharge=0; p.shield=false; p.shieldHp=0; p.speedBoost=0; p.extraDash=0; p.squish=0; p.lavaCd=0; p.voidCd=0;
+      p.ammoType='standard'; p.ammo=Infinity;
     }
     // force decisive match win for opponent - not just +1
     scores[other] = WIN_SCORE;
@@ -1599,7 +1969,7 @@ function init() {
     endRound, showGameOver, startCountdown, resetRound, startGame, rematchGame, backToMenu, forfeit,
     getGlobalSpeed: () => globalSpeed, setGlobalSpeed,
     W, H, PLAYER_R, BULLET_R, BULLET_SPEED, MAX_HP, ROUND_TIME, WIN_SCORE,
-    POWER_TYPES, DASH_COOLDOWN, DASH_TIME
+    POWER_TYPES, BULLET_TYPES, AMMO_PICKUP_CFG, DASH_COOLDOWN, DASH_TIME, SHIELD_MAX_HP, HEAL_AMOUNT
   };
 }
 

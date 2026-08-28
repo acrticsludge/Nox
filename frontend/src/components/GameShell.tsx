@@ -83,13 +83,23 @@ export default function GameShell() {
 
         {/* Header */}
         <header className="nox-header">
-          <a href="/" className="header-left" style={{ textDecoration: 'none' }}>
+          <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div className="diamond-mark">
               <span />
             </div>
-            <span className="brand-lockup">NOX</span>
-          </a>
-          <CyberStatus label="NEON VOID // PLAY" />
+            <a href="/" className="brand-lockup" style={{ textDecoration: 'none' }}>
+              NOX
+            </a>
+            <span style={{ color: 'var(--nox-muted)', opacity: 0.5, font: '10px var(--nox-mono)', letterSpacing: '0.1em' }}>//</span>
+            <a href="/play" className="brand-lockup" style={{ textDecoration: 'none' }}>
+              PLAY
+            </a>
+            <span style={{ color: 'var(--nox-muted)', opacity: 0.5, font: '10px var(--nox-mono)', letterSpacing: '0.1em' }}>//</span>
+            <span className="brand-lockup" style={{ color: 'var(--nox-lime)' }}>
+              1V1
+            </span>
+          </div>
+          <CyberStatus label="NEON VOID // 1V1" />
         </header>
 
         <div className="nox-content game-layout">
@@ -140,7 +150,9 @@ export default function GameShell() {
 
         {/* Footer */}
         <footer className="nox-footer">
-          <span>BUILT WITH SVG • NO CANVAS • 60FPS</span>
+          <span>
+            BUILT WITH SVG • NO CANVAS • 60FPS • <a href="/docs" style={{ color: 'var(--nox-lime)', textDecoration: 'none', borderBottom: '1px solid rgba(201,255,47,0.3)' }}>MANUAL // DOCS</a>
+          </span>
           <span>MADE FOR BORED LEGENDS AT 2AM</span>
         </footer>
       </main>
@@ -241,6 +253,10 @@ function PlayerHUD({ player, onExit }: { player: 1 | 2; onExit?: () => void }) {
             timerId={`blT${player}`}
             chipId={`blP${player}`}
           />
+        </div>
+        <div className="ammo-chip ammo-chip--standard" id={`ammoP${player}`}>
+          <span className="ammo-chip__spark" aria-hidden="true"></span>
+          <span id={`ammoT${player}`}>STD ∞</span>
         </div>
         <button className={`cyber-exit cyber-exit--${isP1 ? 'cyan' : 'pink'}`} onClick={onExit} aria-label={`Exit game for player ${player}`}>
           <span className="cyber-exit__icon" aria-hidden="true">
@@ -575,33 +591,50 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                   <strong style={{ color: 'var(--nox-amber)' }}>⚡ OVERCHARGE</strong> // triple shot, 4s
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-cyan)' }}>❄ FROST SHIELD</strong> // 3 HP barrier, cracks
+                  <strong style={{ color: 'var(--nox-cyan)' }}>❄ FROST SHIELD</strong> // 5 HP barrier, cracks
                   on damage
                 </li>
                 <li>
                   <strong style={{ color: 'var(--nox-lime)' }}>✦ BLINK</strong> // dash reset + 22% speed, 3s
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--success)' }}>✚ HEAL</strong> // +1 HP (cap 5), rare
+                  <strong style={{ color: 'var(--success)' }}>✚ HEAL</strong> // +2 HP (cap 12), rare
+                </li>
+                <li style={{ marginTop: 8, opacity: 0.95 }}>
+                  <strong style={{ color: '#a78bfa' }}>◈ NEEDLE</strong> // rear <code>6</code> front <code>0 BLOCK</code> • <strong style={{ color: '#ffb23e' }}>■ CANNON</strong> <code>4 dmg 533ms r7</code> • <strong style={{ color: '#58d8ff' }}>◇ TRICK</strong> <code>2.5→0.8 5 bounces</code>
                 </li>
               </ul>
             </div>
           </section>
 
           <section className="how-section">
+            <h3 className="how-section__title" style={{ color: 'var(--nox-pink)' }}>
+              <span className="how-section__index">03</span> BULLETS
+            </h3>
+            <div className="how-card how-card--pink">
+              <p className="how-desc">
+                <strong>STD</strong> white <code>2 dmg 7.2</code> • <strong style={{ color: '#a78bfa' }}>NEEDLE</strong> violet <code>r3.5 8.5</code> front <code>BLOCK</code> rear <code>CRIT 6</code> (<code>dot&gt;0.5</code>) • <strong style={{ color: '#ffb23e' }}>CANNON</strong> amber <code>4 dmg r7 3.8 slow</code> • <strong style={{ color: '#58d8ff' }}>TRICK</strong> cyan diamond <code>6.2 5 bounces 2.5→0.8</code>
+              </p>
+              <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
+                Orbs grant <code>NEEDLE ×5</code> <code>CANNON ×3</code> <code>TRICK ×6</code> then revert. Default <code>STD ∞</code>. Each hit has distinct FX: <code>STD cyan ring</code> · <code>BLOCK hex</code> · <code>CRIT violet star</code> · <code>CANNON amber ember</code> · <code>TRICK bounce pip</code> · <code>LAVA -2</code> · <code>VOID -1</code>.
+              </p>
+            </div>
+          </section>
+
+          <section className="how-section">
             <h3 className="how-section__title" style={{ color: 'var(--nox-amber)' }}>
-              <span className="how-section__index">03</span> HAZARDS
+              <span className="how-section__index">04</span> HAZARDS
             </h3>
             <div className="how-card how-card--amber">
               <p className="how-desc">
-                <strong>Walls</strong> block movement & bullets (grid-aligned).{' '}
-                <strong style={{ color: '#fb923c' }}>LAVA</strong> pulses // burns 1 HP/s when active.{' '}
+                <strong>Walls</strong> block movement & bullets (grid-aligned, <code>TRICK</code> bounces).{' '}
+                <strong style={{ color: '#fb923c' }}>LAVA</strong> pulses // burns <code>2 HP</code> when active.{' '}
                 <strong style={{ color: '#10b981' }}>SLIME</strong> slows to 55%.{' '}
                 <strong style={{ color: 'var(--nox-lime)' }}>VOID</strong> crushes from edge after 45s // stay
                 central!
               </p>
               <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
-                Orbs never spawn inside hazards. First to <strong>5 wins</strong> claims the void.
+                Orbs never spawn inside hazards. <code>12 HP</code> • First to <strong>5 wins</strong> claims the void.
               </p>
             </div>
           </section>
