@@ -20,13 +20,36 @@ function Keycap({ children, accent = false }: { children: ReactNode; accent?: bo
   return <span className={`keycap${accent ? ' keycap-accent' : ''}`}>{children}</span>
 }
 
-function Orb({ type }: { type: 'dash' | 'shield' | 'gravity' | 'split' }) {
+function Label({ children, color }: { children: ReactNode; color?: string }) {
   return (
-    <span className={`orb orb-${type}`} aria-hidden="true">
-      {type === 'dash' && '»'}
-      {type === 'shield' && '◇'}
-      {type === 'gravity' && '↓'}
-      {type === 'split' && '✦'}
+    <span className="keycap-label" style={color ? { color } : undefined}>
+      {children}
+    </span>
+  )
+}
+
+type OrbType = 'over' | 'shield' | 'blink' | 'heal'
+const ORBS: Record<OrbType, { icon: string; label: string; desc: string; color: string; border: string }> = {
+  over: { icon: '⚡', label: 'OVER', desc: 'Triple shot // 3× bullets for 4s', color: 'var(--nox-amber)', border: 'var(--nox-amber)' },
+  shield: { icon: '❄', label: 'SHLD', desc: 'Frost shield // absorbs 3 hits, cracks', color: 'var(--nox-cyan)', border: 'var(--nox-cyan)' },
+  blink: { icon: '✦', label: 'BLNK', desc: 'Dash reset + 22% speed for 3s', color: 'var(--nox-lime)', border: 'var(--nox-lime)' },
+  heal: { icon: '✚', label: 'HEAL', desc: '+1 HP // rare, contested (cap 5)', color: 'var(--success)', border: 'var(--success)' },
+}
+
+function OrbBubble({ type }: { type: OrbType }) {
+  const o = ORBS[type]
+  return (
+    <span className="orb-wrap" tabIndex={0}>
+      <span className={`orb orb-${type}`} style={{ color: o.color, borderColor: o.border }} aria-hidden="true">
+        {o.icon}
+      </span>
+      <span className="orb-bubble" role="tooltip">
+        <span className="orb-bubble__label" style={{ color: o.color }}>
+          {o.icon} {o.label}
+        </span>
+        <span className="orb-bubble__desc">{o.desc}</span>
+        <span className="orb-bubble__spark" aria-hidden="true" />
+      </span>
     </span>
   )
 }
@@ -34,7 +57,7 @@ function Orb({ type }: { type: 'dash' | 'shield' | 'gravity' | 'split' }) {
 const instructions: {
   number: string
   title: string
-  accent: 'cyan' | 'pink' | 'orange'
+  accent: 'cyan' | 'pink' | 'amber' | 'orange'
   children: ReactNode
 }[] = [
   {
@@ -43,26 +66,49 @@ const instructions: {
     accent: 'cyan',
     children: (
       <div className="instruction-content">
-        <div className="player-row">
-          <span className="player-label">P1</span>
-          <div className="key-group">
-            <Keycap>W</Keycap>
-            <Keycap>A</Keycap>
-            <Keycap>S</Keycap>
-            <Keycap>D</Keycap>
+        <div className="move-grid">
+          <div className="move-row">
+            <span className="move-player" style={{ color: 'var(--nox-cyan)' }}>
+              P1 // CYAN
+            </span>
+            <span className="move-group">
+              <Label>MOVE</Label>
+              <Keycap>W</Keycap>
+              <Keycap>A</Keycap>
+              <Keycap>S</Keycap>
+              <Keycap>D</Keycap>
+            </span>
+            <span className="move-group">
+              <Label color="var(--nox-cyan)">DASH</Label>
+              <Keycap accent>SHIFT</Keycap>
+            </span>
+            <span className="move-group">
+              <Label>SHOOT</Label>
+              <span className="keycap keycap--shoot">SPACE</span>
+            </span>
           </div>
-          <Keycap accent>SHIFT</Keycap>
-        </div>
-        <div className="player-row">
-          <span className="player-label">P2</span>
-          <div className="key-group">
-            <Keycap>↑</Keycap>
-            <Keycap>←</Keycap>
-            <Keycap>↓</Keycap>
-            <Keycap>→</Keycap>
+          <div className="move-row">
+            <span className="move-player" style={{ color: 'var(--nox-pink)' }}>
+              P2 // PINK
+            </span>
+            <span className="move-group">
+              <Label>MOVE</Label>
+              <Keycap>↑</Keycap>
+              <Keycap>←</Keycap>
+              <Keycap>↓</Keycap>
+              <Keycap>→</Keycap>
+            </span>
+            <span className="move-group">
+              <Label color="var(--nox-pink)">DASH</Label>
+              <Keycap accent>/</Keycap>
+            </span>
+            <span className="move-group">
+              <Label>SHOOT</Label>
+              <span className="keycap keycap--shoot">ENTER</span>
+            </span>
           </div>
-          <Keycap accent>ENTER</Keycap>
         </div>
+        <p className="move-hint">Dash = 0.25s invincible burst. Walls block both movement & bullets.</p>
       </div>
     ),
   },
@@ -73,13 +119,13 @@ const instructions: {
     children: (
       <div className="instruction-content orb-content">
         <div className="orb-row">
-          <Orb type="dash" />
-          <Orb type="shield" />
-          <Orb type="gravity" />
-          <Orb type="split" />
+          <OrbBubble type="over" />
+          <OrbBubble type="shield" />
+          <OrbBubble type="blink" />
+          <OrbBubble type="heal" />
         </div>
         <Text type="body" color="secondary">
-          Power up. Break the rules.
+          Hover an orb // see what it does.
           <br />
           <strong>Every orb changes the game.</strong>
         </Text>
@@ -99,7 +145,7 @@ const instructions: {
         <Text type="body" color="secondary">
           Last player standing wins.
           <br />
-          <strong>Survive 45 seconds.</strong>
+          <strong>Survive 45 seconds // the void crushes inward.</strong>
         </Text>
       </div>
     ),
@@ -122,11 +168,13 @@ export default function Landing() {
             NOX
           </Link>
         </HStack>
-        <Badge
-          variant="cyan"
-          icon={<span className="status-dot" aria-hidden="true" />}
-          label="NEON VOID // ONLINE"
-        />
+        <span className="cyber-status" role="status" aria-label="NEON VOID // ONLINE">
+          <span className="cyber-status__dot" aria-hidden="true" />
+          <span className="cyber-status__label">NEON VOID // ONLINE</span>
+          <span className="cyber-status__frame" aria-hidden="true">
+            <i className="cyber-status__spark" />
+          </span>
+        </span>
       </header>
 
       <Section
@@ -184,6 +232,9 @@ export default function Landing() {
               minHeight={280}
               className={`instruction-card card-accent-${item.accent}`}
             >
+              <span className="card-frame" aria-hidden="true">
+                <i className="card-frame__spark" />
+              </span>
               <VStack gap={4}>
                 <HStack gap={3} vAlign="center">
                   <span className="card-number">{item.number}</span>
