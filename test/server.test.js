@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import http from 'node:http';
 import { createServer } from '../server.js';
 
 /** Start the app on an ephemeral port and return { baseUrl, close }. */
@@ -10,6 +11,29 @@ async function start() {
   await once(server, 'listening');
   const { port } = server.address();
   return { baseUrl: `http://127.0.0.1:${port}`, close: () => new Promise((r) => server.close(r)) };
+}
+
+/** Like start(), but exposes the raw http.Server for verbatim-path requests. */
+async function startWithServer() {
+  const server = createServer();
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  return { server };
+}
+
+/** Send a GET with the exact path string (no URL normalization). */
+function rawGet(server, path) {
+  const { port } = server.address();
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, path, method: 'GET' }, (res) => {
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => resolve({ status: res.statusCode, body: async () => data }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
 }
 
 test('GET / serves the game HTML', async () => {
@@ -118,6 +142,22 @@ test('path traversal is blocked and never leaks files', async () => {
     }
   } finally {
     await close();
+  }
+});
+
+test('raw-path internal traversal (/index.html/../server.js) is blocked', async () => {
+  // http.request sends the path verbatim, unlike fetch which URL-normalizes.
+  const { server } = await startWithServer();
+  try {
+    const res = await rawGet(server, '/index.html/../server.js');
+    assert.equal(res.status, 404, 'internal .. traversal must not serve server.js');
+    const body = await res.body();
+    assert.ok(!body.includes('import http from'), 'leaked server.js source');
+    // Same shape for the encoded variant.
+    const res2 = await rawGet(server, '/index.html/..%2fserver.js');
+    assert.ok(res2.status === 404 || res2.status === 400, `got ${res2.status}`);
+  } finally {
+    await server.close();
   }
 });
 

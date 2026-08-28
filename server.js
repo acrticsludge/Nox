@@ -74,50 +74,59 @@ export function createServer() {
     const log = (status) =>
       console.log(`${req.method} ${urlPath} ${status} ${Date.now() - started}ms`);
 
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Method Not Allowed');
-      log(405);
-      return;
-    }
-
-    if (urlPath === '/health') {
-      res.writeHead(200, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'no-store',
-      });
-      res.end(JSON.stringify({ ok: true, service: 'nox' }));
-      log(200);
-      return;
-    }
-
-    const file = resolvePublicFile(urlPath);
-    if (!file) {
-      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Not Found');
-      log(404);
-      return;
-    }
-
-    let data;
     try {
-      data = await readFile(file);
-    } catch {
-      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Not Found');
-      log(404);
-      return;
-    }
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Method Not Allowed');
+        log(405);
+        return;
+      }
 
-    const ext = path.extname(file).toLowerCase();
-    res.writeHead(200, {
-      'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Content-Length': data.length,
-      'X-Content-Type-Options': 'nosniff',
-      'Cache-Control': 'no-cache',
-    });
-    res.end(req.method === 'HEAD' ? undefined : data);
-    log(200);
+      if (urlPath === '/health') {
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(JSON.stringify({ ok: true, service: 'nox' }));
+        log(200);
+        return;
+      }
+
+      const file = resolvePublicFile(urlPath);
+      if (!file) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Not Found');
+        log(404);
+        return;
+      }
+
+      let data;
+      try {
+        data = await readFile(file);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Not Found');
+        log(404);
+        return;
+      }
+
+      const ext = path.extname(file).toLowerCase();
+      res.writeHead(200, {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'Content-Length': data.length,
+        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(req.method === 'HEAD' ? undefined : data);
+      log(200);
+    } catch (err) {
+      // Fail safely: never leak internals to the client.
+      console.error(`ERROR ${req.method} ${urlPath}`, err);
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      }
+      res.end('Internal Server Error');
+    }
   });
 }
 
