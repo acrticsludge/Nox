@@ -1,9 +1,12 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const ROOT = path.dirname(fileURLToPath(import.meta.url));
+// Serves the Astro build output (frontend/dist). Run `npm run build` at the
+// repo root (or `npm --prefix frontend run build`) before starting.
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend', 'dist');
 const PORT = Number(process.env.PORT) || 3000;
 
 const MIME = {
@@ -132,8 +135,11 @@ export function createServer() {
 
 // Auto-start only when run directly (`npm start` / `npm run dev`).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (!existsSync(path.join(ROOT, 'index.html'))) {
+    console.warn('No frontend build found at frontend/dist — run `npm run build` at the repo root first.');
+  }
   const server = createServer();
   server.listen(PORT, () => {
-    console.log(`Nox server listening on http://0.0.0.0:${PORT}`);
+    console.log(`Nox backend listening on http://0.0.0.0:${PORT}`);
   });
 }
