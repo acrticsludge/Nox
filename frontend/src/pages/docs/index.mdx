@@ -1,0 +1,145 @@
+---
+layout: ../../layouts/DocsLayout.astro
+title: "NOX // MANUAL — NEON VOID"
+description: "Complete rules for NEON VOID 1V1: controls, movement, shooting, orbs, hazards, void, rounds and HUD. Clean, same Nox theme."
+---
+
+<h1 class="docs-h1"><span>NEON</span> VOID // MANUAL</h1>
+<p class="docs-lead">
+Same keyboard. Two pointers. First to <strong>5 wins</strong> takes the void. No bots, no ELO — guest only.
+60s rounds on a 24×14 grid (<code>960×560, GRID 40</code>). Built with SVG, 60fps fixed step.
+</p>
+
+<div class="docs-grid">
+  <div class="docs-card docs-card--cyan">
+    <div class="docs-kicker"><i>01</i> CORE LOOP</div>
+    <h3 class="docs-h3">DUEL → ORB → HAZARD → VOID</h3>
+    <p class="docs-p">Spawn at <code>140,280</code> / <code>820,280</code>. Move, dash, shoot. Grab orbs. Avoid lava/slime/void. Round ends on elimination or HP advantage at <code>60s</code>. First to 5 wins the match.</p>
+  </div>
+  <div class="docs-card docs-card--lime">
+    <div class="docs-kicker"><i>02</i> START</div>
+    <h3 class="docs-h3">MENU → COUNTDOWN → FIGHT</h3>
+    <p class="docs-p"><strong>START DUEL</strong> resets <code>scores 0//0 round 1</code>, rebuilds walls, <code>countdown 3→2→1→FIGHT</code> (<code>650ms</code> ticks). <code>EXIT</code> per player forfeits instantly to menu.</p>
+  </div>
+</div>
+
+<hr class="docs-hr" />
+
+<div class="docs-card docs-card--cyan" style="margin-top:0">
+  <div class="docs-kicker"><i>03</i> CONTROLS — SAME KEYBOARD</div>
+  <table class="docs-table">
+    <thead><tr><th>PLAYER</th><th>MOVE</th><th>DASH</th><th>SHOOT</th></tr></thead>
+    <tbody>
+      <tr><td><span class="docs-badge" style="color:var(--nox-cyan);border-color:rgba(88,216,255,0.32);background:rgba(88,216,255,0.07)">P1 // CYAN</span></td><td><code>W</code> <code>A</code> <code>S</code> <code>D</code></td><td><code>SHIFT</code> (L)</td><td><code>SPACE</code> hold to auto-fire</td></tr>
+      <tr><td><span class="docs-badge" style="color:var(--nox-pink);border-color:rgba(255,92,168,0.32);background:rgba(255,92,168,0.07)">P2 // PINK</span></td><td><code>↑</code> <code>←</code> <code>↓</code> <code>→</code></td><td><code>/</code> or <code>SHIFT</code> (R)</td><td><code>ENTER</code> hold to auto-fire</td></tr>
+    </tbody>
+  </table>
+  <p class="docs-p" style="margin-top:10px">Tap on arena: left half fires P1, right half fires P2 (touch).</p>
+</div>
+
+<div class="docs-grid">
+  <div class="docs-card docs-card--lime">
+    <div class="docs-kicker"><i>04</i> MOVEMENT</div>
+    <h3 class="docs-h3">BASE `3.6` + GLOBAL SLIDER `2.5—5.5`</h3>
+    <ul class="docs-list">
+      <li><strong>Speed</strong> — <code>baseSpeed</code> global slider (<code>#speedGlobal</code>, saved <code>nv_speedGlobal</code>). Both players same speed.</li>
+      <li><strong>Dash</strong> — <code>DASH_TIME 16 (0.27s) + inv 20, cd 60 (1s)</code>. Direction = input or facing. <code>BLINK</code> grants extra dash.</li>
+      <li><strong>Collide</strong> — <code>PLAYER_R 16</code> vs walls/hazards. <code>pushOutOfWalls</code> + <code>REQUIRED_WALL_GAP 34</code> keeps pointer-width fit.</li>
+      <li><strong>Slime</strong> — inside → <code>×0.55</code> speed, <code>×0.70</code> dash.</li>
+    </ul>
+  </div>
+  <div class="docs-card docs-card--amber">
+    <div class="docs-kicker"><i>05</i> SHOOTING</div>
+    <h3 class="docs-h3">PROFILES • SEE §10</h3>
+    <p class="docs-p">Default <code>STANDARD</code> is honest: <code>7.2 r5 cd 11 life 90</code>. Ammo orbs grant typed bursts (counted, not timed). Hold to fire, spread on <code>OVERCHARGE</code>.</p>
+    <table class="docs-table">
+      <thead><tr><th>TYPE</th><th>VISUAL</th><th>RATE</th><th>NOTE</th></tr></thead>
+      <tbody>
+        <tr><td>STANDARD</td><td>white + cyan/pink glow</td><td>183ms</td><td>∞ default</td></tr>
+        <tr><td>NEEDLE</td><td>violet needle <code>r3.5 8.5</code></td><td>233ms</td><td>front 0 / rear 6</td></tr>
+        <tr><td>CANNON</td><td>amber brick <code>r7 3.8</code></td><td>533ms</td><td>4 dmg, big</td></tr>
+        <tr><td>TRICK</td><td>cyan diamond <code>r4 6.2</code></td><td>267ms</td><td>5 bounces, decay</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="docs-card docs-card--pink">
+  <div class="docs-kicker"><i>06</i> ORBS // PICKUPS</div>
+  <p class="docs-p">Spawn at 9 anchors then jitter, never in walls/hazards/void, <code>life 480 (8s)</code> flicker at <code>90</code>. Weights: <code>OVER 35% SHIELD 20% BLINK 25% HEAL 20%</code> + ammo for typed bullets.</p>
+  <table class="docs-table">
+    <thead><tr><th>ORB</th><th>FX</th><th>DURATION</th></tr></thead>
+    <tbody>
+      <tr><td><span class="docs-badge" style="color:var(--nox-amber);border-color:rgba(255,178,62,0.32)">⚡ OVERCHARGE</span></td><td>triple shot <code>-0.22/0/0.22</code></td><td><code>240 (4s)</code></td></tr>
+      <tr><td><span class="docs-badge" style="color:var(--nox-cyan);border-color:rgba(88,216,255,0.32)">❄ SHIELD</span></td><td>barrier <code>5 HP</code>, cracks/dims</td><td>until broken</td></tr>
+      <tr><td><span class="docs-badge" style="color:var(--nox-lime);border-color:rgba(201,255,47,0.32)">✦ BLINK</span></td><td>+1 dash stack + <code>×1.22</code> speed</td><td><code>180 (3s)</code></td></tr>
+      <tr><td><span class="docs-badge" style="color:#22c55e;border-color:rgba(34,197,94,0.32)">✚ HEAL</span></td><td><code>+2 / 12</code> else <code>+30 OVER</code></td><td>instant</td></tr>
+      <tr><td><span class="docs-badge" style="color:#a78bfa;border-color:rgba(167,139,250,0.32)">◈ NEEDLE</span> <span class="docs-badge" style="color:var(--nox-amber);border-color:rgba(255,178,62,0.32)">■ CANNON</span> <span class="docs-badge" style="color:var(--nox-cyan);border-color:rgba(88,216,255,0.32)">◇ TRICK</span></td><td>next <code>5/3/6</code> shots typed</td><td>counted</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="docs-card docs-card--amber">
+  <div class="docs-kicker"><i>07</i> HAZARDS</div>
+  <h3 class="docs-h3">WALLS • LAVA / VENT • SLIME • VOID</h3>
+  <table class="docs-table">
+    <thead><tr><th>HAZARD</th><th>BEHAVIOR</th><th>DMG</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Walls</strong> <code>12×</code> thick, <code>GRID 40</code> rand 8-11 len 2-5, border frame merged path</td><td>block move + bullets. <code>TRICK</code> bounces 5× decay <code>2.5→0.8</code>, others die + spark. Gap <code>34px</code> enforced.</td><td>—</td></tr>
+      <tr><td><strong>VENT → LAVA</strong> <code>300 ticks 5s</code> <code>0-119 VENT dashed r18</code> <code>120-227 LAVA r15.6 burn</code> <code>228-299 cool 0.42</code></td><td>Pulses <code>4-6</code> per arena. Burn <code>1 per 60 cd</code>, shield blocks, <code>inv 26</code>.</td><td><code>-2</code> (<code>12 HP</code>)</td></tr>
+      <tr><td><strong>SLIME</strong> <code>36×36 rx8 #6ee7b7</code></td><td>Inside → slow <code>0.55</code> / dash <code>0.70</code>, no dmg.</td><td>—</td></tr>
+      <tr><td><strong>VOID</strong> after <code>45s</code> crush <code>400→110 in 15s</code></td><td>Minecraft blocks <code>24×24</code> + stars <code>48×48</code> + lime <code>2.5</code> + cyan ring, drain <code>cd 54</code>, shield blocks.</td><td><code>-1 per 0.9s</code></td></tr>
+    </tbody>
+  </table>
+  <p class="docs-p" style="margin-top:10px"><strong>Relocate:</strong> every <code>8-12s</code> one or two hazards poof and land on a validated cell (not wall/spawn/pickup/void/player 88px). Kind may reroll 30%.</p>
+</div>
+
+<div class="docs-grid">
+  <div class="docs-card docs-card--lime">
+    <div class="docs-kicker"><i>08</i> ROUNDS & WIN</div>
+    <h3 class="docs-h3"><code>ROUND_TIME 60</code> • FIRST TO 5</h3>
+    <ul class="docs-list">
+      <li>Elimination → <code>scores[winner]++</code> + <code>endRound</code> <code>ROUND X</code> → <code>1.6s</code> next round.</li>
+      <li>Time up → HP advantage wins, else <code>DRAW</code>.</li>
+      <li><code>WIN_SCORE 5</code> → <code>showGameOver</code> <code>1.4s</code> (<code>1.8s</code> forfeit).</li>
+      <li>Forfeit (<code>EXIT</code> or <code>nox:forfeit</code>) → opponent <code>5</code> + <code>FORFEIT // P X EXIT → P Y WINS</code>, 1.8s + <code>CONTINUE // PLAY AGAIN</code>.</li>
+    </ul>
+  </div>
+  <div class="docs-card docs-card--cyan">
+    <div class="docs-kicker"><i>09</i> HUD</div>
+    <h3 class="docs-h3">CYBER — NO PILLS</h3>
+    <ul class="docs-list">
+      <li><strong>Player cards</strong> <code>#cardP1/2</code> — name, <code>#scoreP1/2</code>, <code>#heartsP1/2  X / 12</code> bar <code>.hp-fill low/damage/healed</code> (<code>hpShake 0.22s</code> per hit), dash bar <code>#dashP1/2</code>.</li>
+      <li><strong>Chips</strong> <code>#ov/#sh/#bl</code> — <code>.power-chip.active</code> + <code>.chip-fill</code> + timer. Ammo chip shows <code>NEEDLE ×5</code> etc.</li>
+      <li><strong>Center</strong> <code>#roundLabel</code> + <code>#timer .cyber-timer</code> (<code>timer-warning lime</code> in void, <code>timer-critical amber</code> at <code>10s</code>).</li>
+      <li><strong>Stage</strong> <code>#gameSvg 960×560</code> layers: <code>#walls #hazards #void #pickups #bullets #players #particles</code>.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="docs-card docs-card--lime">
+  <div class="docs-kicker"><i>10</i> HP & BULLETS — NEW</div>
+  <h3 class="docs-h3"><code>MAX_HP 12</code> • SHIELD <code>5</code> • HEAL <code>+2</code> — INT ONLY</h3>
+  <p class="docs-p">Bumped from <code>5</code> so varied damage stays integer and TTK readable. Width = <code>hp/12*100%</code>, <code>low</code> pulse at <code>≤2</code>. Shield 5, heal 2, lava <code>-2</code>, void <code>-1</code>.</p>
+  <table class="docs-table">
+    <thead><tr><th>BULLET</th><th>DMG</th><th>STK</th><th>FEEL</th></tr></thead>
+    <tbody>
+      <tr><td>STANDARD <code>7.2 r5</code></td><td>2</td><td>6</td><td>1.10s honest</td></tr>
+      <tr><td>NEEDLE rear <code>8.5 r3.5</code></td><td>0 front / 6 rear</td><td>2 perfect</td><td>flank or whiff</td></tr>
+      <tr><td>CANNON <code>3.8 r7</code> cd 533ms</td><td>4</td><td>3</td><td>slow, telegraphed</td></tr>
+      <tr><td>TRICK <code>6.2 r4</code> 5 bounces</td><td>2.5→0.8</td><td>~5</td><td>angles win</td></tr>
+    </tbody>
+  </table>
+  <p class="docs-p" style="margin-top:8px"><strong>Distinct hit FX (minimal):</strong> <span style="color:var(--nox-cyan)">STANDARD cyan ring + trail fade</span> · <span style="color:#a78bfa">NEEDLE BLOCK micro-hex vs CRIT violet star burst</span> · <span style="color:var(--nox-amber)">CANNON amber ember + screen nudge</span> · <span style="color:var(--nox-cyan)">TRICK cyan bounce pip + spark</span> · <span style="color:#fb923c">LAVA burn ember</span> · <span style="color:var(--nox-lime)">VOID lime crush ticks</span>. Each keeps <code>hpShake</code> + bar pulse but particles differ.</p>
+</div>
+
+<div class="docs-card docs-card--cyan">
+  <div class="docs-kicker"><i>11</i> WALLS & TECH</div>
+  <p class="docs-p"><code>W 960 H 560 PLAYER_R 16 COLS 24 ROWS 14</code>. Outer frame single path + 10 inner walls <code>GRID 40</code>. <code>W, H, PLAYER_R, BULLET_R</code> exported as <code>window.NOX_GAME</code> (<code>players, bullets, pickups, particles, scores, gameState(), MAX_HP, WIN_SCORE</code>). Sim <code>60Hz</code> <code>requestAnimationFrame</code> + <code>accum 250ms</code>. Events <code>nox:startGame / nox:forfeit / nox:backToMenu / nox:openHow</code>.</p>
+</div>
+
+<div class="docs-callout">
+<strong style="color:var(--nox-lime)">TIPS //</strong> Hold to fire beats tapping. Dash is <code>inv 20</code> — dash <em>through</em> bullets. Needle: get behind. Cannon: pre-aim corners. Trick: bank off 2 walls. Orbs never spawn on hazards — control center before <code>45s</code> void. <code>R</code> rematch on game over.
+</div>
+
+<p class="docs-p" style="margin-top:14px;opacity:0.6">Source of truth: <code>frontend/src/game/game-logic.js</code> + <code>frontend/src/components/GameShell.tsx</code> + <code>frontend/src/styles/global.css</code>. Docs is MDX via <code>@astrojs/mdx</code> (<code>frontend/src/pages/docs/index.mdx</code>) with Nox tokens — no Starlight override.</p>
