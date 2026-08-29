@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export default function GameShell() {
-  const gameReady = React.useRef<Promise<void> | null>(null)
-  const [showHow, setShowHow] = React.useState(false)
+  const gameReady = useRef<Promise<void> | null>(null)
+  const [showHow, setShowHow] = useState(false)
 
   useEffect(() => {
     gameReady.current = import('../game/game-logic.js')
@@ -181,7 +181,7 @@ function CyberBadge({
   variant = 'lime',
   id,
 }: {
-  children: React.ReactNode
+  children: ReactNode
   variant?: 'lime' | 'cyan' | 'amber' | 'pink'
   id?: string
 }) {
@@ -290,7 +290,7 @@ function PowerChip({
   timerId: string
   chipId: string
 }) {
-  const icons: Record<typeof variant, React.ReactNode> = {
+  const icons: Record<typeof variant, ReactNode> = {
     ov: (
       <svg viewBox="0 0 24 24" fill="currentColor">
         <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
