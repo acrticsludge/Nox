@@ -7,6 +7,7 @@ import { Link } from '@astryxdesign/core/Link'
 import { Heading, Text } from '@astryxdesign/core/Text'
 import { HStack, VStack } from '@astryxdesign/core/Layout'
 import { Grid } from '@astryxdesign/core/Grid'
+import HeroArenaPreview from './HeroArenaPreview'
 
 function DiamondMark() {
   return (
@@ -202,30 +203,37 @@ export default function Landing() {
       <Section
         variant="transparent"
         padding={0}
-        minHeight={590}
+        minHeight={0}
         className="nox-content hero-section"
         aria-labelledby="hero-title"
       >
-        <p className="eyebrow">
-          <span className="eyebrow-line" /> TWO PLAYERS. ONE VOID.
-        </p>
-        <h1 className="hero-title" id="hero-title">
-          NEON
-          <br />
-          <em>VOID</em>
-        </h1>
-        <p className="hero-copy">
-          A chaotic local multiplayer arena where the floor is lava
-          <br className="desktop-break" /> and the last one standing wins.
-        </p>
-        <Button label="PLAY NOW ↗" variant="primary" size="lg" onClick={goToGame} />
-        <div className="hero-decoration" aria-hidden="true">
-          <span className="crosshair">+</span>
-          <span className="coordinates">
-            34° 12&apos; 08&quot; N
-            <br />
-            118° 14&apos; 37&quot; W
-          </span>
+        <div className="hero-grid">
+          <div className="hero-left">
+            <p className="eyebrow">
+              <span className="eyebrow-line" /> TWO PLAYERS. ONE VOID.
+            </p>
+            <h1 className="hero-title" id="hero-title">
+              NEON
+              <br />
+              <em>VOID</em>
+            </h1>
+            <p className="hero-copy">
+              A chaotic local multiplayer arena where the floor is lava
+              <br className="desktop-break" /> and the last one standing wins.
+            </p>
+            <Button label="PLAY NOW ↗" variant="primary" size="lg" onClick={goToGame} />
+            <div className="hero-left-meta" aria-hidden="true">
+              <span className="crosshair">+</span>
+              <span className="coordinates">
+                34° 12&apos; 08&quot; N
+                <br />
+                118° 14&apos; 37&quot; W
+              </span>
+            </div>
+          </div>
+          <div className="hero-right">
+            <HeroArenaPreview />
+          </div>
         </div>
       </Section>
 
