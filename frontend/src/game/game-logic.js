@@ -1,6 +1,8 @@
 // NEON VOID // 2P Duel Game Logic + Void Trials Solo
 // Extracted from play.astro to separate concerns
 
+import { updateBotAI } from './bot-ai.js';
+
 const W = 960, H = 560;
 const PLAYER_R = 16;
 const BULLET_R = 5;
@@ -233,6 +235,7 @@ function generateTrialsWalls() {
 
 function generateTrialsHazards() {
   hazards = [];
+  const key = (c, r) => `${c},${r}`;
   const occ = new Set();
   wallData.forEach(w => {
     if (!w.isBorder) {
@@ -292,204 +295,12 @@ function isValidTrialsPickupPos(x, y) {
   return true;
 }
 
-// ============ BOT AI ============
-const BOT_BEHAVIORS = {
-  seekPickup: { weight: 0.35 },
-  engagePlayer: { weight: 0.30 },
-  evadeHazard: { weight: 0.20 },
-  patrol: { weight: 0.10 },
-  retreat: { weight: 0.05 },
-};
+// Bot AI lives in bot-ai.js (imported above)
 
 function distance(ax, ay, bx, by) {
   const dx = ax - bx, dy = ay - by;
   return Math.hypot(dx, dy);
 }
-
-function findNearestPickup(bot, pickups) {
-  let nearest = null, minDist = Infinity;
-  for(const pu of pickups) {
-    const d = distance(bot.x, bot.y, pu.x, pu.y);
-    if(d < minDist) { minDist = d; nearest = pu; }
-  }
-  return nearest ? { target: nearest, dist: minDist } : null;
-}
-
-function findNearestHazard(bot, hazards) {
-  let nearest = null, minDist = Infinity;
-  for(const h of hazards) {
-    const hx = h.x + h.w/2, hy = h.y + h.h/2;
-    const d = distance(bot.x, bot.y, hx, hy);
-    if(d < minDist) { minDist = d; nearest = { hazard: h, centerX: hx, centerY: hy, dist: d }; }
-  }
-  return nearest;
-}
-
-function selectBotBehavior(bot, state) {
-  const { pickups, hazards } = state;
-  const player = players[0];
-  if(!player || !player.alive) return 'patrol';
-  const hpRatio = bot.hp / bot.maxHp;
-
-  const weights = { ...BOT_BEHAVIORS };
-
-  if(hpRatio < 0.3) {
-    weights.retreat = 0.4;
-    weights.engagePlayer = 0.1;
-    weights.seekPickup = 0.3;
-  } else if(hpRatio < 0.6) {
-    weights.retreat = 0.15;
-    weights.seekPickup = 0.4;
-  }
-
-  const hazard = findNearestHazard(bot, hazards);
-  if(hazard && hazard.dist < 100) {
-    weights.evadeHazard = 0.5;
-    weights.engagePlayer = 0.1;
-    weights.seekPickup = 0.1;
-  }
-
-  const pickup = findNearestPickup(bot, pickups);
-  if(pickup && pickup.dist < 300) {
-    weights.seekPickup = Math.max(weights.seekPickup, 0.5);
-  }
-
-  const playerDist = distance(bot.x, bot.y, player.x, player.y);
-  if(playerDist < 800) {
-    weights.engagePlayer = Math.max(weights.engagePlayer, 0.4);
-  }
-
-  const total = Object.values(weights).reduce((a, b) => a + b.weight, 0);
-  let r = Math.random() * total;
-  for(const [name, b] of Object.entries(weights)) {
-    r -= b.weight;
-    if(r <= 0) return name;
-  }
-  return 'patrol';
-}
-
-function executeBotBehavior(bot, behavior, state) {
-  const player = players[0];
-  const { pickups, hazards } = state;
-  let mx = 0, my = 0, shoot = false, dash = false;
-
-  switch(behavior) {
-    case 'seekPickup': {
-      const pickup = findNearestPickup(bot, pickups);
-      if(pickup) {
-        const dx = pickup.target.x - bot.x;
-        const dy = pickup.target.y - bot.y;
-        const dist = Math.hypot(dx, dy);
-        if(dist > 0) { mx = dx / dist; my = dy / dist; }
-      } else {
-        mx = Math.cos(bot.angle); my = Math.sin(bot.angle);
-      }
-      break;
-    }
-    case 'engagePlayer': {
-      if(player) {
-        const bulletSpeed = 7.2;
-        const travelTime = distance(bot.x, bot.y, player.x, player.y) / bulletSpeed;
-        const predX = player.x + player.vx * travelTime;
-        const predY = player.y + player.vy * travelTime;
-
-        const dx = predX - bot.x;
-        const dy = predY - bot.y;
-        const dist = Math.hypot(dx, dy);
-
-        if(dist > 0) {
-          bot.targetAngle = Math.atan2(dy, dx);
-          bot.aimError = (Math.random() - 0.5) * 0.15;
-          bot.angle = bot.targetAngle + bot.aimError;
-        }
-
-        if(dist > 200 && dist < 500) {
-          const strafeAngle = bot.angle + Math.PI/2 * (Math.random() < 0.5 ? 1 : -1);
-          mx = Math.cos(strafeAngle) * 0.7;
-          my = Math.sin(strafeAngle) * 0.7;
-        } else if(dist < 200) {
-          mx = -Math.cos(bot.angle) * 0.5;
-          my = -Math.sin(bot.angle) * 0.5;
-        }
-
-        if(bot.shootCd === 0) {
-          const now = Date.now();
-          if(now - bot.lastShotTime >= bot.reactionDelay) {
-            shoot = true;
-            bot.lastShotTime = now;
-            bot.reactionDelay = 80 + Math.random() * 40;
-          }
-        }
-      }
-      break;
-    }
-    case 'evadeHazard': {
-      const hazard = findNearestHazard(bot, hazards);
-      if(hazard) {
-        const dx = bot.x - hazard.centerX;
-        const dy = bot.y - hazard.centerY;
-        const dist = Math.hypot(dx, dy);
-        if(dist > 0) { mx = dx / dist; my = dy / dist; }
-        if(dist < 60 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
-          dash = true;
-        }
-      }
-      break;
-    }
-    case 'patrol': {
-      if(bot.behaviorTimer <= 0 || distance(bot.x, bot.y, bot.targetX, bot.targetY) < 50) {
-        bot.targetX = 100 + Math.random() * (TRIALS_W - 200);
-        bot.targetY = 100 + Math.random() * (TRIALS_H - 200);
-        bot.behaviorTimer = 60 + Math.random() * 120;
-      }
-      bot.behaviorTimer--;
-      const dx = bot.targetX - bot.x;
-      const dy = bot.targetY - bot.y;
-      const dist = Math.hypot(dx, dy);
-      if(dist > 0) { mx = dx / dist; my = dy / dist; }
-      break;
-    }
-    case 'retreat': {
-      if(player) {
-        const dx = bot.x - player.x;
-        const dy = bot.y - player.y;
-        const dist = Math.hypot(dx, dy);
-        if(dist > 0) { mx = dx / dist; my = dy / dist; }
-        if(dist < 300 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
-          dash = true;
-        }
-      }
-      break;
-    }
-  }
-  return { mx, my, shoot, dash, targetAngle: bot.targetAngle };
-}
-
-function updateBotAI(bot, state) {
-  if(!bot.alive) return { mx: 0, my: 0, shoot: false, dash: false };
-
-  if(bot.dashCd > 0) bot.dashCd--;
-  if(bot.inv > 0) bot.inv--;
-  if(bot.shootCd > 0) bot.shootCd--;
-  if(bot.overcharge > 0) bot.overcharge--;
-  if(bot.speedBoost > 0) bot.speedBoost--;
-  if(bot.lavaCd > 0) bot.lavaCd--;
-  if(bot.voidCd > 0) bot.voidCd--;
-
-  if(bot.dash > 0) {
-    bot.dash--;
-    if(bot.dash === 0) bot.inv = 6;
-  }
-
-  if(!bot.behaviorTimer || bot.behaviorTimer <= 0) {
-    bot.behavior = selectBotBehavior(bot, state);
-    bot.behaviorTimer = 10 + Math.floor(Math.random() * 20);
-  }
-  bot.behaviorTimer--;
-
-  return executeBotBehavior(bot, bot.behavior, state);
-}
-// ============ END BOT AI ============
 
 function hazardAt(x, y) {
   for(const h of hazards) if(x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h;
@@ -1440,46 +1251,67 @@ function updateTrials(dt) {
       trialHighScore = finalPoints;
       try { localStorage.setItem('nv_trials_highscore', String(trialHighScore)); } catch {}
     }
+    clearTrialsState();
     if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(finalPoints);
+    showTrialsGameOver(finalPoints, 'TIME SURVIVED', true);
     return;
   }
 
-  // Void shrink logic - starts at VOID_START_TIME (450s), shrinks over VOID_SHRINK_DURATION (30s)
+  // Void shrink logic - rectangular border, starts at VOID_START_TIME (450s),
+  // shrinks from 2x arena edges toward the 1x center safe zone over VOID_SHRINK_DURATION (30s)
   const elapsed = TRIAL_DURATION - timeLeft;
   if(elapsed >= VOID_START_TIME) {
     const shrinkProgress = Math.min(1, (elapsed - VOID_START_TIME) / VOID_SHRINK_DURATION);
-    const maxRect = Math.max(TRIALS_W, TRIALS_H) * 0.5;
-    const minRect = 480; // 1x center safe zone
-    const currentRect = maxRect - shrinkProgress * (maxRect - minRect);
-    safeRadius = Math.max(minRect, currentRect);
+    const startRect = { x: 0, y: 0, w: TRIALS_W, h: TRIALS_H };
+    const endRect = { x: (TRIALS_W - 960) / 2, y: (TRIALS_H - 560) / 2, w: 960, h: 560 };
+    voidRect = {
+      x: startRect.x + (endRect.x - startRect.x) * shrinkProgress,
+      y: startRect.y + (endRect.y - startRect.y) * shrinkProgress,
+      w: startRect.w + (endRect.w - startRect.w) * shrinkProgress,
+      h: startRect.h + (endRect.h - startRect.h) * shrinkProgress,
+    };
+    safeRadius = Math.max(480, Math.min(TRIALS_W, TRIALS_H) * 0.5 - shrinkProgress * (Math.min(TRIALS_W, TRIALS_H) * 0.5 - 480));
 
-    // Draw void border (rectangular, not circular)
+    // Draw void border (rectangular)
     const voidG = document.getElementById('void');
     if(voidG) voidG.setAttribute('opacity', '1');
 
     // Update void rect visuals
-    const rect = Math.max(10, currentRect);
-    const voidHole = document.getElementById('voidHole');
-    const voidRing = document.getElementById('voidRing');
-    const voidInner = document.getElementById('voidInner');
-    const voidRing2 = document.getElementById('voidRing2');
-    const voidCore = document.getElementById('voidCore');
-    if(voidHole) voidHole.setAttribute('r', rect);
-    if(voidRing) voidRing.setAttribute('r', rect);
-    if(voidInner) voidInner.setAttribute('r', rect);
-    if(voidRing2) voidRing2.setAttribute('r', rect);
-    if(voidCore) voidCore.setAttribute('r', rect);
-
-    // Exponential damage outside safe zone
-    // Damage increases exponentially as player gets further from safe edge
+    const vr = voidRect;
+    const vHole = document.getElementById('voidHole');
+    const vRing = document.getElementById('voidRing');
+    const vRing2 = document.getElementById('voidRing2');
+    const vInner = document.getElementById('voidInner');
+    const vCore = document.getElementById('voidCore');
+    [vHole, vRing, vRing2, vInner, vCore].forEach(el => {
+      if(el) {
+        el.setAttribute('x', vr.x);
+        el.setAttribute('y', vr.y);
+        el.setAttribute('width', vr.w);
+        el.setAttribute('height', vr.h);
+      }
+    });
+    const vBlock = document.getElementById('voidBlocksRect');
+    if(vBlock) vBlock.setAttribute('mask', 'url(#voidMaskRect)');
+    const vStars = document.getElementById('voidStarsRect');
+    if(vStars) vStars.setAttribute('mask', 'url(#voidMaskRect)');
+    const vEdge = document.getElementById('voidEdgeRect');
+    if(vEdge) vEdge.setAttribute('mask', 'url(#voidMaskRect)');
+    const vPurple = document.getElementById('voidPurpleRect');
+    if(vPurple) vPurple.setAttribute('mask', 'url(#voidMaskRect)');
   } else {
     safeRadius = 999;
+    voidRect = null;
     const voidG = document.getElementById('void');
     if(voidG) voidG.setAttribute('opacity', '0');
-    [voidHole, voidRing, voidInner, voidRing2, voidCore].forEach(id => {
-      const el = document.getElementById(id);
-      if(el) el.setAttribute('r', '420');
-    });
+    const vBlock = document.getElementById('voidBlocksRect');
+    if(vBlock) vBlock.setAttribute('mask', 'url(#voidMask)');
+    const vStars = document.getElementById('voidStarsRect');
+    if(vStars) vStars.setAttribute('mask', 'url(#voidMask)');
+    const vEdge = document.getElementById('voidEdgeRect');
+    if(vEdge) vEdge.setAttribute('mask', 'url(#voidMask)');
+    const vPurple = document.getElementById('voidPurpleRect');
+    if(vPurple) vPurple.setAttribute('mask', 'url(#voidMask)');
   }
 
   // Point accrual: +1 per second (survival)
@@ -1536,14 +1368,13 @@ function updateTrials(dt) {
     if(bot.hp <= 0) {
       bot.alive = false;
       gameState = 'gameOver';
-      if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT LAVA');
+      clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT LAVA'); showTrialsGameOver(Math.floor(trialPoints), 'BOT BURNED IN LAVA', false);
       return;
     }
   }
 
   // Void damage to bot (bot doesn't know about void, but still takes damage)
-  const dVoidBot = Math.hypot(bot.x - TRIALS_W/2, bot.y - TRIALS_H/2);
-  if(safeRadius < 900 && dVoidBot > safeRadius - PLAYER_R && bot.inv === 0) {
+  if(voidRect && (bot.x < voidRect.x || bot.x > voidRect.x + voidRect.w || bot.y < voidRect.y || bot.y > voidRect.y + voidRect.h) && bot.inv === 0) {
     bot.voidCd = 54;
     bot.hp = Math.max(0, bot.hp - 1);
     particles.push(...spawnHitVoid(bot.x, bot.y));
@@ -1551,7 +1382,7 @@ function updateTrials(dt) {
     if(bot.hp <= 0) {
       bot.alive = false;
       gameState = 'gameOver';
-      if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT VOID');
+      clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT VOID'); showTrialsGameOver(Math.floor(trialPoints), 'BOT LOST TO THE VOID', false);
       return;
     }
   }
@@ -1636,34 +1467,41 @@ function updateTrials(dt) {
         if(p.hp <= 0) {
           p.alive = false;
           gameState = 'gameOver';
-          if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'LAVA BURNED');
+          clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'LAVA BURNED'); showTrialsGameOver(Math.floor(trialPoints), 'LAVA BURNED', false);
           return;
         }
       }
     }
 
-    // Void damage to player
-    const dVoid = Math.hypot(p.x - TRIALS_W/2, p.y - TRIALS_H/2);
-    if(safeRadius < 900 && dVoid > safeRadius - PLAYER_R) {
-      if(p.voidCd === 0) {
-        p.voidCd = 54;
-        const dmg = elapsedTotal >= VOID_START_TIME ? 3 : 1; // 3x after 7:30
-        if(p.shield && p.shieldHp > 0) {
-          p.shieldHp--; p.inv = Math.max(p.inv, 10);
-          particles.push(...spawnHitVoid(p.x, p.y));
-          damageShake(p, 0.5);
-          if(p.shieldHp <= 0) { p.shield = false; p.shieldHp = 0; }
-        } else if(p.inv === 0) {
-          p.hp = Math.max(0, p.hp - dmg); p.inv = 22;
-          const penalty = dmg * (elapsedTotal >= VOID_START_TIME ? 3 : 1);
-          trialPoints = Math.max(0, trialPoints - penalty);
-          particles.push(...spawnHitVoid(p.x, p.y));
-          damageShake(p, 0.8);
-          if(p.hp <= 0) {
-            p.alive = false;
-            gameState = 'gameOver';
-            if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'VOID CRUSHED');
-            return;
+    // Void damage to player (rectangular, exponential with distance from safe edge)
+    if(voidRect) {
+      const inSafeX = p.x + PLAYER_R > voidRect.x && p.x - PLAYER_R < voidRect.x + voidRect.w;
+      const inSafeY = p.y + PLAYER_R > voidRect.y && p.y - PLAYER_R < voidRect.y + voidRect.h;
+      if(!inSafeX || !inSafeY) {
+        if(p.voidCd === 0) {
+          p.voidCd = 54;
+          // Exponential: deeper into the void = more damage
+          const dx = Math.max(voidRect.x - (p.x - PLAYER_R), (p.x + PLAYER_R) - (voidRect.x + voidRect.w), 0);
+          const dy = Math.max(voidRect.y - (p.y - PLAYER_R), (p.y + PLAYER_R) - (voidRect.y + voidRect.h), 0);
+          const depth = Math.max(dx, dy);
+          const dmg = Math.min(6, Math.floor(Math.pow(2, depth / 150))); // 1 at edge, lethal deeper
+          if(p.shield && p.shieldHp > 0) {
+            p.shieldHp--; p.inv = Math.max(p.inv, 10);
+            particles.push(...spawnHitVoid(p.x, p.y));
+            damageShake(p, 0.5);
+            if(p.shieldHp <= 0) { p.shield = false; p.shieldHp = 0; }
+          } else if(p.inv === 0) {
+            p.hp = Math.max(0, p.hp - dmg); p.inv = 22;
+            const penalty = dmg * (elapsedTotal >= VOID_START_TIME ? 3 : 1);
+            trialPoints = Math.max(0, trialPoints - penalty);
+            particles.push(...spawnHitVoid(p.x, p.y));
+            damageShake(p, 0.8);
+            if(p.hp <= 0) {
+              p.alive = false;
+              gameState = 'gameOver';
+              clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'VOID CRUSHED'); showTrialsGameOver(Math.floor(trialPoints), 'VOID CRUSHED', false);
+              return;
+            }
           }
         }
       }
@@ -1719,7 +1557,7 @@ function updateTrials(dt) {
       if(p.hp <= 0) {
         p.alive = false;
         gameState = 'gameOver';
-        if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT HIT');
+        clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT HIT'); showTrialsGameOver(Math.floor(trialPoints), 'KILLED BY THE BOT', false);
         return;
       }
       continue;
@@ -1749,7 +1587,7 @@ function updateTrials(dt) {
           bot.alive = false;
           gameState = 'gameOver';
           trialPoints += 500; // Bot killed bonus
-          if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(Math.floor(trialPoints));
+          clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(Math.floor(trialPoints)); showTrialsGameOver(Math.floor(trialPoints), 'BOT DESTROYED', true);
           return;
         }
       } else {
@@ -1758,10 +1596,13 @@ function updateTrials(dt) {
     }
   }
 
-  // Save state every SAVE_INTERVAL frames
-  if(Math.floor(timeLeft) % SAVE_INTERVAL === 0 && lastSaveTime !== Math.floor(timeLeft)) {
-    lastSaveTime = Math.floor(timeLeft);
-    saveTrialsState();
+  // Save state every 2 seconds (120 frames) - only while actively playing
+  if(gameState === 'playing') {
+    const frameNum = Math.floor((TRIAL_DURATION - timeLeft) * 60);
+    if(frameNum > 0 && frameNum % SAVE_INTERVAL === 0 && lastSaveTime !== frameNum) {
+      lastSaveTime = frameNum;
+      saveTrialsState();
+    }
   }
 
   // Particles
@@ -1772,17 +1613,12 @@ function updateTrials(dt) {
     if(window.NOX_GAME) { window.NOX_GAME.particles.length = 0; kept.forEach(v => window.NOX_GAME.particles.push(v)); }
   }
 
-  // Save state periodically
-  const frameNum = Math.floor((TRIAL_DURATION - timeLeft) * 60);
-  if(frameNum > 0 && frameNum % (SAVE_INTERVAL * 60) < 1) {
-    saveTrialsState();
-  }
-
   updateHUD();
 }
 
 // Pause/resume for trials
 window.addEventListener('keydown', e => {
+  if(gameMode !== 'trials') return;
   if(gameState === 'playing' && (e.key === 'p' || e.key === 'P' || e.key === 'Escape')) {
     gameState = 'paused';
     try { localStorage.setItem('nv_trials_paused', '1'); } catch {}
@@ -1802,6 +1638,11 @@ function forfeitTrials() {
   if(Math.floor(trialPoints) > hs) {
     try { localStorage.setItem('nv_trials_highscore', String(Math.floor(trialPoints))); } catch {}
   }
+  // Show start overlay again
+  document.getElementById('gameOverOverlay')?.classList.add('hidden');
+  document.getElementById('roundOverlay')?.classList.add('hidden');
+  document.getElementById('startOverlay')?.classList.remove('hidden');
+  updateHUD();
 }
 
 function tryMoveBot(bot, nx, ny) {
@@ -1862,15 +1703,17 @@ function saveTrialsState() {
   try {
     const state = {
       gameMode, timeLeft, trialPoints, trialHighScore,
+      wallData: wallData.map(w => ({...w})),
+      hazards: hazards.map(h => ({...h})),
       players: players.map(p => ({...p})),
       bot: {...bot},
       bullets: bullets.map(b => ({...b})),
       pickups: pickups.map(p => ({...p})),
-      hazards: hazards.map(h => ({...h})),
       particles: particles.map(p => ({...p})),
-      voidRect, voidShrinkStart, safeRadius,
+      voidRect, voidShrinkStart, safeRadius, lastSaveTime,
     };
     localStorage.setItem('nv_trials_state', JSON.stringify(state));
+    window.dispatchEvent(new CustomEvent('nox:trialsStateChanged'));
   } catch {}
 }
 
@@ -1883,8 +1726,69 @@ function loadTrialsState() {
   } catch { return null; }
 }
 
+function hasTrialsState() {
+  try { return !!localStorage.getItem('nv_trials_state'); } catch { return false; }
+}
+
+function resumeTrials() {
+  const state = loadTrialsState();
+  if(!state) return false;
+  gameMode = 'trials';
+  gameState = 'playing';
+  timeLeft = state.timeLeft;
+  trialPoints = state.trialPoints || 0;
+  trialHighScore = state.trialHighScore || 0;
+  voidRect = state.voidRect || null;
+  voidShrinkStart = state.voidShrinkStart || 0;
+  safeRadius = state.safeRadius != null ? state.safeRadius : 999;
+  lastSaveTime = state.lastSaveTime || 0;
+
+  // Restore walls + hazards (randomly generated at start, must match saved run)
+  wallData = state.wallData || [];
+  hazards = state.hazards || [];
+  drawWalls();
+  drawHazards();
+
+  // Restore entities
+  const restorePlayer = (src, dst) => {
+    if(!src) return;
+    Object.assign(dst, src);
+  };
+  restorePlayer(state.players && state.players[0], players[0]);
+  restorePlayer(state.bot, bot);
+  bot.isBot = true;
+
+  bullets.length = 0; state.bullets && state.bullets.forEach(b => bullets.push(b));
+  pickups.length = 0; state.pickups && state.pickups.forEach(p => pickups.push(p));
+  particles.length = 0; state.particles && state.particles.forEach(p => particles.push(p));
+  if(window.NOX_GAME) {
+    window.NOX_GAME.bullets.length = 0; state.bullets && state.bullets.forEach(b => window.NOX_GAME.bullets.push(b));
+    window.NOX_GAME.pickups.length = 0; state.pickups && state.pickups.forEach(p => window.NOX_GAME.pickups.push(p));
+    window.NOX_GAME.particles.length = 0; state.particles && state.particles.forEach(p => window.NOX_GAME.particles.push(p));
+  }
+
+  // Redraw pickups
+  const pickupsG = document.getElementById('pickups');
+  if(pickupsG) pickupsG.innerHTML = '';
+  pickups.forEach(pu => {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    el.setAttribute('cx', pu.x); el.setAttribute('cy', pu.y);
+    el.setAttribute('r', '8');
+    el.setAttribute('fill', '#c9ff2f');
+    pickupsG.appendChild(el);
+  });
+
+  // Restore void visual state
+  const voidG = document.getElementById('void');
+  if(voidG) voidG.setAttribute('opacity', voidRect ? '1' : '0');
+
+  updateHUD();
+  return true;
+}
+
 function clearTrialsState() {
   try { localStorage.removeItem('nv_trials_state'); } catch {}
+  window.dispatchEvent(new CustomEvent('nox:trialsStateChanged'));
 }
 
 function drawWalls() {
@@ -1894,16 +1798,18 @@ function drawWalls() {
   // Outer frame as single merged path so corners don't overlap
   const hasBorder = wallData.some(d => d.isBorder);
   if (hasBorder) {
+    const fw = gameMode === 'trials' ? TRIALS_W : 960;
+    const fh = gameMode === 'trials' ? TRIALS_H : 560;
     const frame = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    // outer 960x560 with 10px thick frame (inner hole 10 inset)
-    frame.setAttribute('d', 'M0 0 H960 V560 H0 Z M10 10 H950 V550 H10 Z');
+    // outer frame with 10px thick border (inner hole 10 inset)
+    frame.setAttribute('d', `M0 0 H${fw} V${fh} H0 Z M10 10 H${fw - 10} V${fh - 10} H10 Z`);
     frame.setAttribute('fill', '#0f172a');
     frame.setAttribute('fill-rule', 'evenodd');
     frame.setAttribute('stroke', 'rgba(27,36,39,0.9)');
     frame.setAttribute('stroke-width', '1');
     wallsG.appendChild(frame);
     const frameHi = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    frameHi.setAttribute('d', 'M10 11 H950 M10 549 H950 M11 10 V550 M949 10 V550');
+    frameHi.setAttribute('d', `M10 11 H${fw - 10} M10 ${fh - 11} H${fw - 10} M11 10 V${fh - 10} M${fw - 11} 10 V${fh - 10}`);
     frameHi.setAttribute('fill', 'none');
     frameHi.setAttribute('stroke', 'rgba(255,255,255,0.07)');
     frameHi.setAttribute('stroke-width', '1');
@@ -2162,6 +2068,46 @@ function render() {
     playersG.appendChild(g);
   });
 
+  // Render bot in trials mode (bot is a separate object from players)
+  if(gameMode === 'trials' && bot.alive) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('transform', `translate(${bot.x},${bot.y}) rotate(${bot.angle * 180 / Math.PI})`);
+    g.setAttribute('opacity', bot.inv > 0 && Math.floor(bot.inv / 4) % 2 === 0 ? '0.35' : '1');
+
+    const sh = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    sh.setAttribute('cx', '2'); sh.setAttribute('cy', '10');
+    sh.setAttribute('rx', '14'); sh.setAttribute('ry', '6');
+    sh.setAttribute('fill', 'rgba(0,0,0,0.35)'); sh.setAttribute('filter', 'url(#softGlow)');
+    g.appendChild(sh);
+
+    const body = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    body.setAttribute('d', 'M 18 0 L -12 -11 L -8 0 L -12 11 Z');
+    body.setAttribute('fill', '#ffb23e');
+    body.setAttribute('stroke', '#fff'); body.setAttribute('stroke-width', '1.6');
+    body.setAttribute('stroke-linejoin', 'round');
+    body.setAttribute('filter', 'url(#glowPink)');
+    g.appendChild(body);
+
+    const cock = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    cock.setAttribute('cx', '0'); cock.setAttribute('cy', '0'); cock.setAttribute('r', '5.5');
+    cock.setAttribute('fill', '#fff'); cock.setAttribute('opacity', '0.95');
+    g.appendChild(cock);
+    const cock2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    cock2.setAttribute('cx', '0.8'); cock2.setAttribute('cy', '-1'); cock2.setAttribute('r', '2');
+    cock2.setAttribute('fill', bot.color);
+    g.appendChild(cock2);
+
+    if(bot.dash > 0) {
+      const flame = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      flame.setAttribute('d', 'M -12 0 L -22 -6 L -26 0 L -22 6 Z');
+      flame.setAttribute('fill', '#ffd8a8');
+      flame.setAttribute('opacity', '0.9');
+      g.appendChild(flame);
+    }
+
+    playersG.appendChild(g);
+  }
+
   bulletsG.innerHTML = '';
   bullets.forEach(b => {
     const type = b.type || 'standard';
@@ -2387,8 +2333,35 @@ function endRound(winner, reason, forfeitPid) {
   }
 }
 
-function showGameOver(forfeitReason, forfeitPid) {
+function showTrialsGameOver(points, reason, won) {
   clearPendingTimeouts();
+  clearInputState();
+  const roundOverlay = document.getElementById('roundOverlay');
+  const ov = document.getElementById('gameOverOverlay');
+  if(roundOverlay) roundOverlay.classList.add('hidden');
+  if(ov) ov.classList.remove('hidden');
+  document.getElementById('startOverlay')?.classList.add('hidden');
+  bullets.length = 0;
+  pickups.length = 0;
+  const wt = document.getElementById('winnerText');
+  const ws = document.getElementById('winnerSub');
+  const m = Math.floor(Math.max(0, timeLeft) / 60).toString().padStart(2, '0');
+  const s = Math.floor(Math.max(0, timeLeft) % 60).toString().padStart(2, '0');
+  if(wt) {
+    wt.textContent = won ? 'TRIAL SURVIVED' : 'TRIAL FAILED';
+    wt.className = 'result-score ' + (won ? 'winner-p1' : 'winner-p2');
+  }
+  if(ws) ws.textContent = `${points.toLocaleString()} PTS • ${reason || (won ? 'VOID CONQUERED' : 'VOID CLAIMED YOU')} • ${m}:${s} LEFT`;
+  // save high score
+  if(points > trialHighScore) {
+    trialHighScore = points;
+    try { localStorage.setItem('nv_trials_highscore', String(trialHighScore)); } catch {}
+  }
+  const govBadge = document.querySelector('#gameOverOverlay .cyber-badge');
+  if(govBadge) setCyberBadgeText(govBadge, won ? '⬢ TRIAL COMPLETE' : '⬢ TRIAL FAILED');
+}
+
+function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();
   clearInputState();
   const roundOverlay = document.getElementById('roundOverlay');
   const ov = document.getElementById('gameOverOverlay');
@@ -2489,9 +2462,12 @@ function updateHUD() {
     if(ptsEl) ptsEl.textContent = Math.floor(trialPoints).toLocaleString();
     const botHpEl = document.getElementById('botHp');
     if(botHpEl) {
-      const pct = (bot.hp / bot.maxHp) * 100;
       botHpEl.textContent = `${bot.hp} / ${bot.maxHp}`;
-      botHpEl.style.width = pct + '%';
+    }
+    const botHpBar = document.getElementById('botHpBar');
+    if(botHpBar) {
+      const pct = (bot.hp / bot.maxHp) * 100;
+      botHpBar.style.width = pct + '%';
     }
     const rl = document.getElementById('roundLabel');
     if(rl) {
@@ -2669,9 +2645,12 @@ function updateTrialsHUD() {
   // Bot HP display
   const botHpEl = document.getElementById('botHp');
   if(botHpEl) {
-    const pct = (bot.hp / bot.maxHp) * 100;
     botHpEl.textContent = `${bot.hp} / ${bot.maxHp}`;
-    botHpEl.style.width = pct + '%';
+  }
+  const botHpBar = document.getElementById('botHpBar');
+  if(botHpBar) {
+    const pct = (bot.hp / bot.maxHp) * 100;
+    botHpBar.style.width = pct + '%';
   }
 
   // Timer with void warning at 7:30
@@ -2921,8 +2900,9 @@ function init() {
     scores, gameState: () => gameState,
     endRound, showGameOver, startCountdown, resetRound, startGame, rematchGame, backToMenu, forfeit,
     startTrials, onTrialsWin: null, onTrialsLose: null, onTrialsPause: null,
-    forfeitTrials,
+    forfeitTrials, resumeTrials, hasTrialsState, loadTrialsState, saveTrialsState, clearTrialsState,
     getGlobalSpeed: () => globalSpeed, setGlobalSpeed,
+    getTimeLeft: () => timeLeft, getTrialPoints: () => Math.floor(trialPoints), getGameMode: () => gameMode,
     W, H, PLAYER_R, BULLET_R, BULLET_SPEED, MAX_HP, ROUND_TIME, WIN_SCORE,
     POWER_TYPES, BULLET_TYPES, AMMO_PICKUP_CFG, DASH_COOLDOWN, DASH_TIME, SHIELD_MAX_HP, HEAL_AMOUNT
   };

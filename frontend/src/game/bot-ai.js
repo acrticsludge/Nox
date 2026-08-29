@@ -241,8 +241,4 @@ function updateBotAI(bot, state, dt) {
 }
 
 // Export for use in game-logic.js
-if(typeof module !== 'undefined') {
-  module.exports = { updateBotAI, selectBehavior, executeBehavior };
-} else if(typeof window !== 'undefined') {
-  window.BOT_AI = { updateBotAI, selectBehavior, executeBehavior };
-}
+export { updateBotAI, selectBehavior, executeBehavior };

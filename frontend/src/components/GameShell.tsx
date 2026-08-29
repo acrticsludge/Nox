@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-export default function GameShell() {
+export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' }) {
+  const isTrials = mode === 'trials'
   const gameReady = useRef<Promise<void> | null>(null)
   const [showHow, setShowHow] = useState(false)
   const [showPause, setShowPause] = useState(false)
@@ -14,8 +15,9 @@ export default function GameShell() {
       .catch((e) => console.error('[NOX] game-logic load failed', e))
   }, [])
 
-  // Pause/Resume key handler
+  // Pause/Resume key handler (trials only)
   useEffect(() => {
+    if (!isTrials) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
         const g = (window as unknown as { NOX_GAME?: { gameState?: () => string } }).NOX_GAME
@@ -32,7 +34,7 @@ export default function GameShell() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [isTrials])
 
   // Listen for pause state changes from game logic
   useEffect(() => {
@@ -129,25 +131,25 @@ export default function GameShell() {
               PLAY
             </a>
             <span style={{ color: 'var(--nox-muted)', opacity: 0.5, font: '10px var(--nox-mono)', letterSpacing: '0.1em' }}>//</span>
-            <span className="brand-lockup" style={{ color: 'var(--nox-lime)' }}>
-              1V1
+            <span className="brand-lockup" style={{ color: isTrials ? 'var(--nox-amber)' : 'var(--nox-lime)' }}>
+              {isTrials ? 'TRIALS' : '1V1'}
             </span>
           </div>
-          <CyberStatus label="NEON VOID // 1V1" />
+          <CyberStatus label={isTrials ? 'NEON VOID // TRIALS' : 'NEON VOID // 1V1'} />
         </header>
 
         <div className="nox-content game-layout">
           {/* Top bar: player HUD + round info */}
           <div className="game-top-bar">
             <PlayerHUD player={1} onExit={() => handleExit(1)} />
-            <CenterHUD />
-            <PlayerHUD player={2} onExit={() => handleExit(2)} />
+            <CenterHUD mode={mode} />
+            {isTrials ? <TrialsHUD /> : <PlayerHUD player={2} onExit={() => handleExit(2)} />}
           </div>
 
           <div className="controls-strip" aria-label="Controls">
             <div className="controls-group">
-              <span className="controls-label" style={{ color: 'var(--nox-cyan)' }}>
-                P1 // CYAN
+              <span className="controls-label" style={{ color: isTrials ? 'var(--nox-amber)' : 'var(--nox-cyan)' }}>
+                {isTrials ? 'P1 // CYAN' : 'P1 // CYAN'}
               </span>
               <span className="keycap">W</span>
               <span className="keycap">A</span>
@@ -158,23 +160,38 @@ export default function GameShell() {
                 SPACE
               </span>
             </div>
-            <div className="controls-group">
-              <span className="controls-label" style={{ color: 'var(--nox-pink)' }}>
-                P2 // PINK
-              </span>
-              <span className="keycap">↑</span>
-              <span className="keycap">←</span>
-              <span className="keycap">↓</span>
-              <span className="keycap">→</span>
-              <span className="keycap keycap-accent">/</span>
-              <span className="keycap" style={{ background: '#fff', color: '#07090b', borderColor: '#fff' }}>
-                ENTER
-              </span>
-            </div>
+            {isTrials ? (
+              <div className="controls-group">
+                <span className="controls-label" style={{ color: 'var(--nox-pink)' }}>
+                  BOT // AI
+                </span>
+                <span className="keycap">PREDICTS</span>
+                <span className="keycap">DASHES</span>
+                <span className="keycap">AVOIDS LAVA</span>
+                <span className="keycap" style={{ borderColor: 'rgba(255,92,168,0.4)', color: 'var(--nox-pink)' }}>
+                  NO VOID SENSE
+                </span>
+              </div>
+            ) : (
+              <div className="controls-group">
+                <span className="controls-label" style={{ color: 'var(--nox-pink)' }}>
+                  P2 // PINK
+                </span>
+                <span className="keycap">↑</span>
+                <span className="keycap">←</span>
+                <span className="keycap">↓</span>
+                <span className="keycap">→</span>
+                <span className="keycap keycap-accent">/</span>
+                <span className="keycap" style={{ background: '#fff', color: '#07090b', borderColor: '#fff' }}>
+                  ENTER
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Game stage */}
           <GameStage
+            mode={mode}
             onPlay={handlePlay}
             onHow={handleHow}
             onRematch={handleRematch}
@@ -191,8 +208,8 @@ export default function GameShell() {
         </footer>
       </main>
 
-      {/* Pause overlay */}
-      {showPause && (
+      {/* Pause overlay (trials only) */}
+      {isTrials && showPause && (
         <div className="overlay" style={{ zIndex: 100 }}>
           <div className="menu-card" style={{ padding: 30 }}>
             <CyberBadge variant="amber">⏸ PAUSED</CyberBadge>
@@ -212,8 +229,8 @@ export default function GameShell() {
         </div>
       )}
 
-      {/* Exit confirmation */}
-      {showExitConfirm && (
+      {/* Exit confirmation (trials only) */}
+      {isTrials && showExitConfirm && (
         <div className="overlay" style={{ zIndex: 101 }}>
           <div className="menu-card" style={{ padding: 30, borderColor: 'var(--nox-amber)' }}>
             <CyberBadge variant="amber">⚠ FORFEIT</CyberBadge>
@@ -399,33 +416,56 @@ function PowerChip({
   )
 }
 
-function CenterHUD() {
+function CenterHUD({ mode = '1v1' }: { mode?: '1v1' | 'trials' }) {
   return (
     <div className="center-hud">
       <div className="round-label" id="roundLabel">
-        FIRST TO 5 • ROUND 1
+        {mode === 'trials' ? 'VOID TRIALS // 10:00' : 'FIRST TO 5 • ROUND 1'}
       </div>
       <CyberTimer />
     </div>
   )
 }
 
+function TrialsHUD() {
+  return (
+    <div className="trials-hud" aria-label="Trial status">
+      <div className="trials-hud__points" id="trialPoints">0</div>
+      <div className="trials-hud__label">PTS</div>
+      <div className="trials-hud__bot">
+        <span className="trials-hud__bot-name">BOT</span>
+        <div className="trials-hud__bot-bar"><div className="trials-hud__bot-fill" id="botHpBar" /></div>
+        <span className="trials-hud__bot-hp" id="botHp">12 / 12</span>
+      </div>
+      <div className="trials-hud__void" id="voidWarn">⚠ VOID CRUSHING</div>
+    </div>
+  )
+}
+
 function GameStage({
+  mode = '1v1',
   onPlay,
   onHow,
   onRematch,
   onMenu,
 }: {
+  mode?: '1v1' | 'trials'
   onPlay: () => void
   onHow: () => void
   onRematch: () => void
   onMenu: () => void
 }) {
+  const isTrials = mode === 'trials'
+  const arenaW = isTrials ? 1920 : 960
+  const arenaH = isTrials ? 1120 : 560
+  const cx = arenaW / 2
+  const cy = arenaH / 2
+  const voidR = isTrials ? 900 : 420
   return (
     <div className="stage" id="stage">
       <svg
         id="gameSvg"
-        viewBox="0 0 960 560"
+        viewBox={`0 0 ${arenaW} ${arenaH}`}
         xmlns="http://www.w3.org/2000/svg"
         role="img"
         aria-label="Game arena"
@@ -497,58 +537,147 @@ function GameStage({
             <feGaussianBlur stdDeviation="4" result="b" />
             <feColorMatrix type="matrix" values="1 0.9 0 0 0  0 1 0.9 0 0  0 0 1 0 0  0 0 0 1 0" />
           </filter>
-          <mask id="voidMask">
-            <rect x="0" y="0" width="960" height="560" rx="18" fill="white" />
-            <circle id="voidHole" cx="480" cy="280" r="420" fill="black" />
-          </mask>
+          {isTrials ? (
+            <mask id="voidMaskRect">
+              <rect x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="white" />
+              <rect id="voidHole" x="480" y="280" width="960" height="560" fill="black" />
+            </mask>
+          ) : (
+            <mask id="voidMask">
+              <rect x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="white" />
+              <circle id="voidHole" cx={cx} cy={cy} r={voidR} fill="black" />
+            </mask>
+          )}
         </defs>
 
-        <rect x="0" y="0" width="960" height="560" rx="18" fill="url(#arenaGrad)" />
-        <rect x="0" y="0" width="960" height="560" rx="18" fill="url(#gridPat)" opacity="0.9" />
-        <rect x="0" y="0" width="960" height="560" rx="18" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+        <rect x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="url(#arenaGrad)" />
+        <rect x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="url(#gridPat)" opacity="0.9" />
+        <rect x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
 
         <g opacity="0.25">
-          <circle cx="480" cy="280" r="120" fill="none" stroke="#c9ff2f" strokeWidth="1" strokeDasharray="6 8" />
-          <circle cx="480" cy="280" r="190" fill="none" stroke="#58d8ff" strokeWidth="1" strokeDasharray="2 10" opacity="0.5" />
+          <circle cx={cx} cy={cy} r={isTrials ? 240 : 120} fill="none" stroke="#c9ff2f" strokeWidth="1" strokeDasharray="6 8" />
+          <circle cx={cx} cy={cy} r={isTrials ? 380 : 190} fill="none" stroke="#58d8ff" strokeWidth="1" strokeDasharray="2 10" opacity="0.5" />
         </g>
 
         <g id="walls" />
         <g id="hazards" />
         <g id="void" opacity="0" pointerEvents="none">
           {/* Minecraft void - block / purple mix, transparent so arena behind shows */}
-          <rect id="voidBlocksRect" x="0" y="0" width="960" height="560" rx="18" fill="url(#voidBlocks)" mask="url(#voidMask)" opacity="0.72" />
+          <rect id="voidBlocksRect" x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="url(#voidBlocks)" mask={isTrials ? 'url(#voidMaskRect)' : 'url(#voidMask)'} opacity="0.72" />
           {/* Subtle star drift */}
-          <rect id="voidStarsRect" x="0" y="0" width="960" height="560" rx="18" fill="url(#voidStars)" mask="url(#voidMask)" opacity="0.38" />
+          <rect id="voidStarsRect" x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="url(#voidStars)" mask={isTrials ? 'url(#voidMaskRect)' : 'url(#voidMask)'} opacity="0.38" />
           {/* Purple void matter - transparent */}
-          <rect x="0" y="0" width="960" height="560" rx="18" fill="rgba(18,8,32,0.28)" mask="url(#voidMask)" />
+          <rect id="voidPurpleRect" x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="rgba(18,8,32,0.28)" mask={isTrials ? 'url(#voidMaskRect)' : 'url(#voidMask)'} />
           {/* Edge glow - void rim */}
-          <rect x="0" y="0" width="960" height="560" rx="18" fill="url(#voidEdgeGrad)" mask="url(#voidMask)" opacity="0.92" />
+          <rect id="voidEdgeRect" x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="url(#voidEdgeGrad)" mask={isTrials ? 'url(#voidMaskRect)' : 'url(#voidMask)'} opacity="0.92" />
           {/* Primary electric ring */}
-          <circle id="voidRing" cx="480" cy="280" r="420" fill="none" stroke="#c9ff2f" strokeWidth="2.5" strokeDasharray="10 7" opacity="0.95" filter="url(#voidGlow)" />
-          {/* Secondary cyan tracer */}
-          <circle id="voidRing2" cx="480" cy="280" r="420" fill="none" stroke="#58d8ff" strokeWidth="1" strokeDasharray="2 11" opacity="0.45" />
-          {/* Inner soft glow */}
-          <circle id="voidInner" cx="480" cy="280" r="420" fill="none" stroke="#c9ff2f" strokeWidth="14" opacity="0.08" />
-          {/* Core pulse */}
-          <circle id="voidCore" cx="480" cy="280" r="420" fill="none" stroke="#c9ff2f" strokeWidth="1" opacity="0.0" />
+          {isTrials ? (
+            <>
+              <rect id="voidRing" x="480" y="280" width="960" height="560" fill="none" stroke="#c9ff2f" strokeWidth="2.5" strokeDasharray="10 7" opacity="0.95" filter="url(#voidGlow)" />
+              <rect id="voidRing2" x="480" y="280" width="960" height="560" fill="none" stroke="#58d8ff" strokeWidth="1" strokeDasharray="2 11" opacity="0.45" />
+              <rect id="voidInner" x="480" y="280" width="960" height="560" fill="none" stroke="#c9ff2f" strokeWidth="14" opacity="0.08" />
+              <rect id="voidCore" x="480" y="280" width="960" height="560" fill="none" stroke="#c9ff2f" strokeWidth="1" opacity="0.0" />
+            </>
+          ) : (
+            <>
+              <circle id="voidRing" cx={cx} cy={cy} r={voidR} fill="none" stroke="#c9ff2f" strokeWidth="2.5" strokeDasharray="10 7" opacity="0.95" filter="url(#voidGlow)" />
+              <circle id="voidRing2" cx={cx} cy={cy} r={voidR} fill="none" stroke="#58d8ff" strokeWidth="1" strokeDasharray="2 11" opacity="0.45" />
+              <circle id="voidInner" cx={cx} cy={cy} r={voidR} fill="none" stroke="#c9ff2f" strokeWidth="14" opacity="0.08" />
+              <circle id="voidCore" cx={cx} cy={cy} r={voidR} fill="none" stroke="#c9ff2f" strokeWidth="1" opacity="0.0" />
+            </>
+          )}
         </g>
         <g id="pickups" />
         <g id="bullets" />
         <g id="players" />
         <g id="particles" />
         <g id="centerMark" opacity="0.35">
-          <circle cx="480" cy="280" r="3" fill="#fff" />
+          <circle cx={cx} cy={cy} r="3" fill="#fff" />
         </g>
       </svg>
 
-      <StartOverlay onPlay={onPlay} onHow={onHow} />
-      <RoundOverlay />
-      <GameOverOverlay onRematch={onRematch} onMenu={onMenu} />
+      <StartOverlay mode={mode} onPlay={onPlay} onHow={onHow} />
+      <RoundOverlay mode={mode} />
+      <GameOverOverlay mode={mode} onRematch={onRematch} onMenu={onMenu} />
     </div>
   )
 }
 
-function StartOverlay({ onPlay, onHow }: { onPlay: () => void; onHow: () => void }) {
+function StartOverlay({ mode = '1v1', onPlay, onHow }: { mode?: '1v1' | 'trials'; onPlay: () => void; onHow: () => void }) {
+  const [hasSaved, setHasSaved] = useState(false)
+  const [highScore, setHighScore] = useState(0)
+
+  useEffect(() => {
+    const check = () => {
+      try {
+        setHasSaved(!!localStorage.getItem('nv_trials_state'))
+        setHighScore(parseInt(localStorage.getItem('nv_trials_highscore') || '0', 10))
+      } catch {}
+    }
+    check()
+    window.addEventListener('storage', check)
+    window.addEventListener('nox:trialsStateChanged', check as EventListener)
+    return () => {
+      window.removeEventListener('storage', check)
+      window.removeEventListener('nox:trialsStateChanged', check as EventListener)
+    }
+  }, [])
+
+  const handleResume = () => {
+    document.getElementById('startOverlay')?.classList.add('hidden')
+    window.dispatchEvent(new CustomEvent('nox:resumeTrial'))
+  }
+
+  if (mode === 'trials') {
+    return (
+      <div className="overlay" id="startOverlay">
+        <div className="menu-card" style={{ borderColor: 'rgba(255,178,62,0.35)' }}>
+          <CyberBadge variant="amber">⬢ 1 PLAYER • VS AI • 10:00</CyberBadge>
+          <h2 className="menu-title">
+            <span style={{ color: 'var(--nox-amber)' }}>VOID</span> TRIALS
+          </h2>
+          <p className="menu-copy">
+            Solo survival. You vs the <strong>AI bot</strong> on a 2x arena. Survive <strong>10 minutes</strong> or kill
+            the bot. The <strong style={{ color: 'var(--nox-amber)' }}>void crushes at 7:30</strong> - stay inside or burn.
+          </p>
+
+          <div className="trials-score-board">
+            <div className="trials-score-board__row">
+              <span>HIGH SCORE</span>
+              <strong id="trialsHighScore">{highScore.toLocaleString()}</strong>
+            </div>
+            {hasSaved && (
+              <div className="trials-score-board__row trials-score-board__row--saved">
+                <span>SAVED TRIAL FOUND</span>
+                <strong style={{ color: 'var(--nox-lime)' }}>READY TO RESUME</strong>
+              </div>
+            )}
+          </div>
+
+          <GlobalSpeedControl />
+
+          <div className="btn-row">
+            <button className="btn btn-primary" id="playBtn" onClick={onPlay}>
+              ▶ ENTER THE TRIAL
+            </button>
+            {hasSaved && (
+              <button className="btn btn-ghost" id="resumeBtn" style={{ borderColor: 'var(--nox-lime)', color: 'var(--nox-lime)' }} onClick={handleResume}>
+                ↻ RESUME TRIAL
+              </button>
+            )}
+            <button className="btn btn-ghost" id="howBtn" onClick={onHow}>
+              How to play
+            </button>
+          </div>
+
+          <div className="hint" style={{ color: 'var(--nox-muted)' }}>
+            WASD move • SHIFT dash • SPACE shoot • P / ESC pause • Bot has NO void sense - use it
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="overlay" id="startOverlay">
       <div className="menu-card">
@@ -731,18 +860,18 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function RoundOverlay() {
+function RoundOverlay({ mode = '1v1' }: { mode?: '1v1' | 'trials' }) {
   return (
     <div className="overlay hidden" id="roundOverlay">
       <div className="menu-card" style={{ padding: 22 }}>
-        <CyberBadge variant="cyan" id="roundBadge">
-          ROUND 1
+        <CyberBadge variant={mode === 'trials' ? 'amber' : 'cyan'} id="roundBadge">
+          {mode === 'trials' ? 'TRIAL // RUN' : 'ROUND 1'}
         </CyberBadge>
         <div className="result-score" id="roundTitle" style={{ fontSize: 28 }}>
           GET READY
         </div>
         <p id="roundSub" style={{ margin: 0 }}>
-          First to 5 • Dash is invincible
+          {mode === 'trials' ? 'Survive 10:00 or kill the bot' : 'First to 5 • Dash is invincible'}
         </p>
       </div>
     </div>
@@ -750,12 +879,35 @@ function RoundOverlay() {
 }
 
 function GameOverOverlay({
+  mode = '1v1',
   onRematch,
   onMenu,
 }: {
+  mode?: '1v1' | 'trials'
   onRematch: () => void
   onMenu: () => void
 }) {
+  if (mode === 'trials') {
+    return (
+      <div className="overlay hidden" id="gameOverOverlay">
+        <div className="menu-card" style={{ borderColor: 'rgba(255,178,62,0.35)' }}>
+          <CyberBadge variant="amber">⬢ TRIAL COMPLETE</CyberBadge>
+          <div className="result-score" id="winnerText">
+            SURVIVED THE VOID
+          </div>
+          <p id="winnerSub">10:00 // The void never breaks you</p>
+          <div className="btn-row">
+            <button className="btn btn-primary" id="rematchBtn" onClick={onRematch}>
+              ↻ RUN AGAIN
+            </button>
+            <button className="btn btn-ghost" id="menuBtn" onClick={onMenu}>
+              Menu
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="overlay hidden" id="gameOverOverlay">
       <div className="menu-card">
