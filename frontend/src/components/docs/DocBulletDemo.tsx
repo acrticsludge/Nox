@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-// 1:1 bullet demos — same ship + bullet as game (M 18 0 L -12 ... + r5/3.5/7/4 speeds 7.2/8.5/3.8/6.2 cd 11/14/32/16)
+// 1:1 — same ship + bullet as game-logic.js (ship M 18 0 ..., r5/3.5/7/4 speeds 7.2/8.5/3.8/6.2 cd 11/14/32/16) — fixed 60Hz step so not 3x on high-refresh
 export default function DocBulletDemo() {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [type, setType] = useState<'standard' | 'needle' | 'cannon' | 'trick'>('standard')
@@ -13,79 +13,59 @@ export default function DocBulletDemo() {
     const gBul = svg.querySelector('#bd-bullets') as SVGGElement
     const gShip = svg.querySelector('#bd-ship') as SVGGElement
     const gWall = svg.querySelector('#bd-wall') as SVGGElement
-    const gTrail = svg.querySelector('#bd-trail') as SVGGElement
     if (!gBul || !gShip || !gWall) return
 
-    // wall for trick bounce at center
     gWall.innerHTML = `<rect x="228" y="28" width="12" height="84" rx="6" fill="url(#bd-wallGrad)" stroke="rgba(27,36,39,0.85)" stroke-width="1"/><rect x="229.5" y="29" width="9" height="1.5" rx="1" fill="rgba(255,255,255,0.09)"/>`
 
     const cfg = {
-      standard: { r: 5, speed: 7.2, color: '#58d8ff', label: 'STANDARD • 2 DMG' },
-      needle: { r: 3.5, speed: 8.5, color: '#a78bfa', label: 'NEEDLE • 0 front / 6 rear' },
-      cannon: { r: 7, speed: 3.8, color: '#ffb23e', label: 'CANNON • 4 DMG' },
-      trick: { r: 4, speed: 6.2, color: '#58d8ff', label: 'TRICK • BOUNCES 5×' },
+      standard: { r: 5, speed: 7.2 },
+      needle: { r: 3.5, speed: 8.5 },
+      cannon: { r: 7, speed: 3.8 },
+      trick: { r: 4, speed: 6.2 },
     } as const
-
+    const cds: Record<string, number> = { standard: 11, needle: 14, cannon: 32, trick: 16 }
     const order: ('standard' | 'needle' | 'cannon' | 'trick')[] = ['standard', 'needle', 'cannon', 'trick']
     let idx = 0
-    let bullets: { x: number; y: number; vx: number; vy: number; r: number; type: string; trail: { x: number; y: number }[]; bounces: number }[] = []
+    let bullets: { x: number; y: number; vx: number; vy: number; r: number; type: string; trail: { x: number; y: number }[]; bounces: number; life: number }[] = []
     let raf = 0
-    let lastFire = 0
     let t0 = performance.now()
-
-    const ship = { x: 44, y: 70, ang: 0 }
+    let lastFire = t0
+    let last = performance.now()
+    let accum = 0
+    const SIM_STEP = 1000 / 60
+    const ship = { x: 44, y: 70 }
 
     const fire = (tp: string) => {
       const c = cfg[tp as keyof typeof cfg]
-      const ang = 0 + (Math.random() - 0.5) * 0.02
+      const ang = (Math.random() - 0.5) * 0.02
       const mx = ship.x + 18, my = ship.y
-      bullets.push({ x: mx, y: my, vx: Math.cos(ang) * c.speed, vy: Math.sin(ang) * c.speed, r: c.r, type: tp, trail: [], bounces: 0 })
+      const life = tp === 'cannon' ? 120 : tp === 'trick' ? 180 : 90
+      bullets.push({ x: mx, y: my, vx: Math.cos(ang) * c.speed, vy: Math.sin(ang) * c.speed, r: c.r, type: tp, trail: [], bounces: 0, life })
     }
 
-    const loop = (now: number) => {
-      raf = requestAnimationFrame(loop)
-      const elapsed = now - t0
-      // cycle type every 2200ms
-      const newIdx = Math.floor(elapsed / 2200) % order.length
-      if (newIdx !== idx) {
-        idx = newIdx
-        setType(order[idx])
-        bullets = []
-      }
+    const step = () => {
       const cur = order[idx]
-
-      // fire at game cadence: use cd scaled to preview tick (60fps)
-      // cd: 11=183ms, 14=233ms, 32=533ms, 16=267ms
-      const cds: Record<string, number> = { standard: 11, needle: 14, cannon: 32, trick: 16 }
-      const cdMs = (cds[cur] / 60) * 1000
-      if (now - lastFire > cdMs) {
-        fire(cur)
-        lastFire = now
-      }
-
-      // update bullets
+      // update bullets at 60Hz
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i]
         b.trail.unshift({ x: b.x, y: b.y })
         if (b.trail.length > (cur === 'cannon' ? 6 : cur === 'needle' ? 2 : cur === 'trick' ? 5 : 4)) b.trail.pop()
-        b.x += b.vx; b.y += b.vy
-        // wall bounce only for trick at x228 wall (12 wide, 28-112)
+        b.x += b.vx; b.y += b.vy; b.life--
         const hitWall = b.x + b.r > 228 && b.x - b.r < 240 && b.y > 28 - b.r && b.y < 112 + b.r
         if (hitWall) {
           if (b.type === 'trick' && b.bounces < 5) {
-            b.vx *= -1
+            b.vx *= -0.97
             b.x += b.vx > 0 ? 3 : -3
             b.bounces++
           } else {
             bullets.splice(i, 1); continue
           }
         }
-        if (b.x > 360 || b.life !== undefined) {
-          if (b.x > 360 || b.y < -20 || b.y > 180) { bullets.splice(i, 1) }
-        }
+        if (b.life <= 0 || b.x > 360 || b.y < -20 || b.y > 180) bullets.splice(i, 1)
       }
+    }
 
-      // draw ship — same as game
+    const draw = () => {
       if (gShip) {
         gShip.setAttribute('transform', `translate(${ship.x},${ship.y})`)
         gShip.innerHTML = `
@@ -94,12 +74,10 @@ export default function DocBulletDemo() {
           <circle cx="0" cy="0" r="5.5" fill="#fff" opacity="0.95"/><circle cx="0.8" cy="-1" r="2" fill="#58d8ff"/>
         `
       }
-      // draw bullets 1:1
-      if (gTrail) gTrail.innerHTML = ''
       if (gBul) {
         let h = ''
         for (const b of bullets) {
-          const col = cfg[b.type as keyof typeof cfg]?.color || '#58d8ff'
+          const col = b.type === 'needle' ? '#a78bfa' : b.type === 'cannon' ? '#ffb23e' : b.type === 'trick' ? '#58d8ff' : '#58d8ff'
           for (let k = 0; k < b.trail.length; k++) {
             const pt = b.trail[k]
             const op = (1 - k / b.trail.length) * 0.35
@@ -118,6 +96,30 @@ export default function DocBulletDemo() {
         }
         gBul.innerHTML = h
       }
+    }
+
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop)
+      const elapsed = now - t0
+      const newIdx = Math.floor(elapsed / 2200) % order.length
+      if (newIdx !== idx) {
+        idx = newIdx
+        setType(order[idx])
+        bullets = []
+      }
+      const cur = order[idx]
+      const cdMs = (cds[cur] / 60) * 1000
+      if (now - lastFire > cdMs) {
+        fire(cur)
+        lastFire = now
+      }
+      accum += now - last; last = now
+      if (accum > 250) accum = 250
+      while (accum >= SIM_STEP) {
+        step()
+        accum -= SIM_STEP
+      }
+      draw()
     }
     loop(performance.now())
     return () => cancelAnimationFrame(raf)
@@ -140,8 +142,8 @@ export default function DocBulletDemo() {
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
           <defs>
-            <filter id="bd-glowCyan" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b1"/><feColorMatrix type="matrix" values="0 0.6 1 0 0  0 0.7 1 0 0  1 1 1 0 0  0 0 0 1 0"/><feMerge><feMergeNode in="b1"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-            <filter id="bd-softGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5"/></filter>
+            <filter id="bd-glowCyan" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b1"/><feColorMatrix type="matrix" values="0 0.6 1 0 0  0 0.7 1 0 0  1 1 1 0 0  0 0 0 1 0"/><feMerge><feMergeNode in="b1"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <filter id="bd-softGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
             <linearGradient id="bd-wallGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#334155"/><stop offset="100%" stopColor="#0f172a"/></linearGradient>
             <pattern id="bd-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(23,32,36,0.12)" strokeWidth="1"/></pattern>
           </defs>
@@ -149,7 +151,6 @@ export default function DocBulletDemo() {
           <rect x="0" y="0" width="360" height="140" rx="10" fill="url(#bd-grid)" opacity="0.5" />
           <rect x="0" y="0" width="360" height="140" rx="10" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
           <g id="bd-wall" />
-          <g id="bd-trail" />
           <g id="bd-bullets" />
           <g id="bd-ship" />
         </svg>

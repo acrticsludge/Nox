@@ -187,12 +187,14 @@ export default function HeroArenaPreview() {
     const phaseFor=(ms:number)=>{ for(let i=phases.length-1;i>=0;i--) if(ms>=phases[i].t) return phases[i].label; return phases[0].label }
     let shootCd=[0,0], dashCd=[0,0]; let voidR=420, safeR=999
     let voidTick=0
-
-    const frame = () => {
+    let last=performance.now(), accum=0
+    const SIM_STEP=1000/60
+    const frame = (now: number) => {
       raf=requestAnimationFrame(frame)
-      const now=performance.now(); const loopT=(now-start)%LOOP
+      const loopT=(now-start)%LOOP
       if(phaseEl) phaseEl.textContent=phaseFor(loopT)
       if(barEl) barEl.style.transform=`scaleX(${loopT/LOOP})`
+      // wall-time events (not sim-step) — reset / pickups spawn
       if(loopT<16){
         players[0].x=140; players[0].y=280; players[0].ang=0; players[0].shield=false; players[0].shieldHp=0; players[0].dash=0; players[0].inv=0; players[0].overcharge=0
         players[1].x=820; players[1].y=280; players[1].ang=Math.PI; players[1].shield=true; players[1].shieldHp=5; players[1].dash=0; players[1].inv=0
@@ -207,8 +209,12 @@ export default function HeroArenaPreview() {
           pickups.push({x:a.x+(Math.random()*20-10),y:a.y+(Math.random()*20-10),kind,t:0})
         }
       }
-      hazards.forEach(h=>{ h.t+=1 })
-      voidTick+=0.6
+      // fixed 60Hz sim — so speed is regular, not 3× on 144Hz
+      accum += now - last; last = now
+      if (accum > 250) accum = 250
+      while (accum >= SIM_STEP) {
+        hazards.forEach(h=>{ h.t+=1 })
+        voidTick+=0.6
       if(loopT>22000){ const p=(loopT-22000)/8000; voidR=420-p*(420-110); safeR=voidR; if(gVoid) gVoid.setAttribute('opacity','1') } else { voidR=420; safeR=999; if(gVoid) gVoid.setAttribute('opacity', loopT>20000?'0.7':'0') }
       if(hole) hole.setAttribute('r',String(voidR))
       if(ring){ ring.setAttribute('r',String(voidR)); ring.setAttribute('stroke-dashoffset',String((now/14)%17)); ring.setAttribute('transform',`rotate(${(now/28)%360} 480 280)`) }
@@ -241,10 +247,8 @@ export default function HeroArenaPreview() {
           const dot=Math.cos(p.ang - Math.atan2(other.y-p.y, other.x-p.x))
           if(dot>0.2 || Math.random()<0.18){
             shoot(i,bType); shootCd[i]=cfg.cd + (Math.random()*3|0)
-            // needle/cannon/trick shoot slower already via cd, keep exact game cd
           }
         }
-        // overcharge demo 22-24s
         if(loopT>22000 && loopT<24000 && i===0 && p.overcharge===0 && Math.random()<0.015){
           p.overcharge=90; spawnParticles(p.x,p.y,'#ffb23e',10)
         }
@@ -292,6 +296,8 @@ export default function HeroArenaPreview() {
       }
       for(let i=particles.length-1;i>=0;i--){ const pt=particles[i]; pt.x+=pt.vx; pt.y+=pt.vy; pt.vx*=0.96; pt.vy*=0.96; pt.life--; if(pt.life<=0) particles.splice(i,1) }
       pickups.forEach(p=>{ (p as any).t = ((p as any).t || 0) + 0.14 })
+        accum -= SIM_STEP
+      }
 
       // DRAW hazards — same as game (slime + lava VENT/LAVA)
       if(gHaz){
