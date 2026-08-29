@@ -24,19 +24,19 @@ const POWER_TYPES = {
   heal:       { color:'#22c55e', bg:'#16a34a', icon:'✚', life:480, heal:2 }
 };
 
-// Bullet archetypes — balanced for MAX_HP 12, guest only, no ELO
+// Bullet archetypes - balanced for MAX_HP 12, guest only, no ELO
 // dmg integer (except trick decay uses 0.5 steps via table), speed / r / cd / life / ammo tuned
 const BULLET_TYPES = {
-  standard: { id:'standard', label:'STD', color:'#f1f4f3', bg:'#f1f4f3', icon:'●', speed:7.2, r:5,   dmg:2, cd:11, life:90,  ammo: Infinity, bouncesMax:0, lifeDecay:false },
-  needle:   { id:'needle',   label:'NEEDLE', color:'#a78bfa', bg:'#7c3aed', icon:'◈', speed:8.5, r:3.5, dmgFront:0, dmgRear:6, cd:14, life:90,  ammo:5, bouncesMax:0 },
-  cannon:   { id:'cannon',   label:'CANNON', color:'#ffb23e', bg:'#ff9d2e', icon:'■', speed:3.8, r:7,   dmg:4, cd:32, life:120, ammo:3, bouncesMax:0 },
-  trick:    { id:'trick',    label:'TRICK',  color:'#58d8ff', bg:'#3ec5f2', icon:'◇', speed:6.2, r:4,   dmg:2.5, cd:16, life:180, ammo:6, bouncesMax:5, decay:0.82 }
+  standard: { id:'standard', label:'STD', color:'#f1f4f3', bg:'#f1f4f3', icon:'o', speed:7.2, r:5,   dmg:2, cd:11, life:90,  ammo: Infinity, bouncesMax:0, lifeDecay:false },
+  needle:   { id:'needle',   label:'NEEDLE', color:'#a78bfa', bg:'#7c3aed', icon:'N', speed:8.5, r:3.5, dmgFront:0, dmgRear:6, cd:14, life:90,  ammo:5, bouncesMax:0 },
+  cannon:   { id:'cannon',   label:'CANNON', color:'#ffb23e', bg:'#ff9d2e', icon:'C', speed:3.8, r:7,   dmg:4, cd:32, life:120, ammo:3, bouncesMax:0 },
+  trick:    { id:'trick',    label:'TRICK',  color:'#58d8ff', bg:'#3ec5f2', icon:'T', speed:6.2, r:4,   dmg:2.5, cd:16, life:180, ammo:6, bouncesMax:5, decay:0.82 }
 };
 const AMMO_KINDS = ['ammo_needle','ammo_cannon','ammo_trick'];
 const AMMO_PICKUP_CFG = {
-  ammo_needle: { color:'#a78bfa', bg:'#7c3aed', icon:'◈', life:480, ammo:5, bullet:'needle' },
-  ammo_cannon: { color:'#ffb23e', bg:'#ff9d2e', icon:'■', life:480, ammo:3, bullet:'cannon' },
-  ammo_trick:  { color:'#58d8ff', bg:'#3ec5f2', icon:'◇', life:480, ammo:6, bullet:'trick' }
+  ammo_needle: { color:'#a78bfa', bg:'#7c3aed', icon:'N', life:480, ammo:5, bullet:'needle' },
+  ammo_cannon: { color:'#ffb23e', bg:'#ff9d2e', icon:'C', life:480, ammo:3, bullet:'cannon' },
+  ammo_trick:  { color:'#58d8ff', bg:'#3ec5f2', icon:'T', life:480, ammo:6, bullet:'trick' }
 };
 
 let wallData = [];
@@ -302,7 +302,7 @@ function spawnPickupEffect(x, y, color) {
   }));
 }
 
-// ——— Per-damage distinct minimal FX (small, type-specific) ———
+// --- Per-damage distinct minimal FX (small, type-specific) ---
 function spawnHitStandard(x, y, color) { // cyan/pink 10 hit, crisp ring
   return Array.from({length: 10}, () => ({
     x, y, vx: Math.cos(Math.random()*Math.PI*2)*(1+Math.random()*3.8), vy: Math.sin(Math.random()*Math.PI*2)*(1+Math.random()*3.8),
@@ -507,7 +507,7 @@ function shoot(p) {
   // typed muzzle: cannon bigger ember, needle thin violet, trick cyan spark
   const muzzleColor = active === 'needle' ? '#a78bfa' : active === 'cannon' ? '#ffb23e' : active === 'trick' ? '#58d8ff' : p.color;
   const muzzle = spawnMuzzle(mx, my, muzzleColor, p.angle);
-  // cannon muzzle boost 1.4×
+  // cannon muzzle boost 1.4x
   if (active === 'cannon') muzzle.forEach(mm => { mm.r = 2.6; mm.life = 14; mm.max = 14; });
   if (active === 'needle') muzzle.forEach(mm => { mm.r = 1.4; });
   particles.push(...muzzle);
@@ -805,7 +805,7 @@ function update(dt) {
             p.ammo = cfg.ammo;
             particles.push(...spawnPickupEffect(pu.x, pu.y, cfg.color));
             // ammo icon text
-            particles.push({x: p.x, y: p.y - 22, vx:0, vy:-0.9, life:42, max:42, r:0, color: cfg.color, type:'healText', text: cfg.bullet.toUpperCase()+` ×${cfg.ammo}`});
+            particles.push({x: p.x, y: p.y - 22, vx:0, vy:-0.9, life:42, max:42, r:0, color: cfg.color, type:'healText', text: cfg.bullet.toUpperCase()+` x${cfg.ammo}`});
             // small dash indicator
             p.squish = 10;
           }
@@ -1243,7 +1243,7 @@ function render() {
     // 12 HP: show hearts up to 6 else numeric to avoid overflow, keep minimal
     hpArc.textContent = p.hp <= 6 ? '♥'.repeat(p.hp) : `${p.hp}♥`;
     g.appendChild(hpArc);
-    // ammo indicator in arena — tiny text above hp if typed
+    // ammo indicator in arena - tiny text above hp if typed
     if(p.ammoType && p.ammoType !== 'standard'){
       const ammoArc = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       ammoArc.setAttribute('x', '0'); ammoArc.setAttribute('y', p.hp > 6 ? '38' : '36');
@@ -1253,7 +1253,7 @@ function render() {
       ammoArc.setAttribute('fill', p.ammoType==='needle'?'#a78bfa':p.ammoType==='cannon'?'#ffb23e':'#58d8ff');
       ammoArc.setAttribute('opacity', '0.9');
       ammoArc.setAttribute('transform', `rotate(${-p.angle * 180 / Math.PI})`);
-      ammoArc.textContent = p.ammoType==='needle' ? `◈×${p.ammo}` : p.ammoType==='cannon' ? `■×${p.ammo}` : `◇×${p.ammo}`;
+      ammoArc.textContent = p.ammoType==='needle' ? `Nx${p.ammo}` : p.ammoType==='cannon' ? `Cx${p.ammo}` : `Tx${p.ammo}`;
       g.appendChild(ammoArc);
     }
 
@@ -1311,7 +1311,7 @@ function render() {
         txt.setAttribute('x', b.x); txt.setAttribute('y', b.y - br - 6);
         txt.setAttribute('text-anchor','middle'); txt.setAttribute('font-size','7'); txt.setAttribute('font-family','JetBrains Mono, monospace');
         txt.setAttribute('fill','#58d8ff');
-        txt.textContent = '·'.repeat(b.bounces) + ` ${b.dmg}`;
+        txt.textContent = '.'.repeat(b.bounces) + ` ${b.dmg}`;
         bulletsG.appendChild(txt);
       }
     } else if(type === 'cannon'){
@@ -1470,7 +1470,7 @@ function endRound(winner, reason, forfeitPid) {
     if(sub) sub.textContent = reason + ' • No points';
   } else if (isForfeit) {
     const loser = forfeitPid != null ? forfeitPid + 1 : (winner === 0 ? 2 : 1);
-    setCyberBadgeText(badge, `FORFEIT // P${loser} EXIT → P${winner+1} WINS`);
+    setCyberBadgeText(badge, `FORFEIT // P${loser} EXIT -> P${winner+1} WINS`);
     if (badge) setCyberBadgeVariant(badge, winner === 0 ? 'cyan' : 'pink');
     title.textContent = `PLAYER ${winner + 1} WINS BY FORFEIT!`;
     title.className = 'result-score ' + (winner === 0 ? 'winner-p1' : 'winner-p2');
@@ -1537,7 +1537,7 @@ function showGameOver(forfeitReason, forfeitPid) {
     setCyberBadgeVariant(govBadge, w === 0 ? 'cyan' : 'pink');
     // explicit winner vs exiter
     const loser = forfeitPid != null ? forfeitPid + 1 : (w === 0 ? 2 : 1);
-    setCyberBadgeText(govBadge, `FORFEIT // P${loser} EXIT → P${w+1} WINS`);
+    setCyberBadgeText(govBadge, `FORFEIT // P${loser} EXIT -> P${w+1} WINS`);
   } else if (govBadge && isForfeit === false) {
     // restore default badge on normal win
     setCyberBadgeVariant(govBadge, 'amber');
@@ -1703,20 +1703,20 @@ function updateHUD() {
       bl.classList.toggle('active', active);
       let pct = 0, txt = '';
       if(hasBoost) { pct = p.speedBoost / 180 * 100; txt = (p.speedBoost / 60).toFixed(1) + 's'; }
-      else if(hasDash) { pct = 100; txt = '×' + p.extraDash; }
+      else if(hasDash) { pct = 100; txt = 'x' + p.extraDash; }
       if(blF) blF.style.width = pct + '%';
       if(blT) blT.textContent = txt;
     }
 
-    // ammo chip — per-type minimal
+    // ammo chip - per-type minimal
     const ammoChip = document.getElementById(`ammoP${pi + 1}`);
     const ammoT = document.getElementById(`ammoT${pi + 1}`);
     if(ammoChip && ammoT){
       const t = p.ammoType || 'standard';
-      let label = 'STD ∞'; let cls = 'ammo-chip--standard';
-      if(t==='needle'){ label = `NEEDLE ×${p.ammo}`; cls='ammo-chip--needle'; }
-      else if(t==='cannon'){ label = `CANNON ×${p.ammo}`; cls='ammo-chip--cannon'; }
-      else if(t==='trick'){ label = `TRICK ×${p.ammo} ${'·'.repeat(Math.max(0, 5 - (p.ammo !== Infinity ? (6 - p.ammo) : 0)))}`; cls='ammo-chip--trick'; }
+      let label = 'STD INF'; let cls = 'ammo-chip--standard';
+      if(t==='needle'){ label = `NEEDLE x${p.ammo}`; cls='ammo-chip--needle'; }
+      else if(t==='cannon'){ label = `CANNON x${p.ammo}`; cls='ammo-chip--cannon'; }
+      else if(t==='trick'){ label = `TRICK x${p.ammo} ${'.'.repeat(Math.max(0, 5 - (p.ammo !== Infinity ? (6 - p.ammo) : 0)))}`; cls='ammo-chip--trick'; }
       ammoChip.className = `ammo-chip ${cls}`;
       ammoT.textContent = label;
     }
@@ -1959,7 +1959,7 @@ function init() {
     bullets.length=0; pickups.length=0;
     if (window.NOX_GAME) { window.NOX_GAME.bullets.length=0; window.NOX_GAME.pickups.length=0; }
     updateHUD();
-    try { console.log(`[NOX] forfeit P${pid+1} → P${other+1} wins ${scores[0]}//${scores[1]}`); } catch {}
+    try { console.log(`[NOX] forfeit P${pid+1} -> P${other+1} wins ${scores[0]}//${scores[1]}`); } catch {}
     // show who won + who left via round win (1.8s) then full gameOver with CONTINUE/RETURN buttons - not instant menu
     endRound(other, `P${pid+1} EXIT // FORFEIT`, pid);
   }

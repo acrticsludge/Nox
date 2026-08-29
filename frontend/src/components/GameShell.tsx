@@ -256,7 +256,7 @@ function PlayerHUD({ player, onExit }: { player: 1 | 2; onExit?: () => void }) {
         </div>
         <div className="ammo-chip ammo-chip--standard" id={`ammoP${player}`}>
           <span className="ammo-chip__spark" aria-hidden="true"></span>
-          <span id={`ammoT${player}`}>STD ∞</span>
+          <span id={`ammoT${player}`}>STD INF</span>
         </div>
         <button className={`cyber-exit cyber-exit--${isP1 ? 'cyan' : 'pink'}`} onClick={onExit} aria-label={`Exit game for player ${player}`}>
           <span className="cyber-exit__icon" aria-hidden="true">
@@ -510,7 +510,7 @@ function GlobalSpeedControl() {
         <span className="global-speed__value" id="speedValGlobal">
           3.6
         </span>
-        <span className="global-speed__unit">×</span>
+        <span className="global-speed__unit">x</span>
       </div>
       <input type="range" id="speedGlobal" min="2.5" max="5.5" step="0.1" defaultValue="3.6" />
       <div className="global-speed__scale">
@@ -601,7 +601,7 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                   <strong style={{ color: 'var(--success)' }}>✚ HEAL</strong> // +2 HP (cap 12), rare
                 </li>
                 <li style={{ marginTop: 8, opacity: 0.95 }}>
-                  <strong style={{ color: '#a78bfa' }}>◈ NEEDLE</strong> // rear <code>6</code> front <code>0 BLOCK</code> • <strong style={{ color: '#ffb23e' }}>■ CANNON</strong> <code>4 dmg 533ms r7</code> • <strong style={{ color: '#58d8ff' }}>◇ TRICK</strong> <code>2.5→0.8 5 bounces</code>
+                  <strong style={{ color: '#a78bfa' }}>N NEEDLE</strong> // rear <code>6</code> front <code>0 BLOCK</code> • <strong style={{ color: '#ffb23e' }}>C CANNON</strong> <code>4 dmg 533ms r7</code> • <strong style={{ color: '#58d8ff' }}>T TRICK</strong> <code>2.5→0.8 5 bounces</code>
                 </li>
               </ul>
             </div>
@@ -616,7 +616,7 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                 <strong>STD</strong> white <code>2 dmg 7.2</code> • <strong style={{ color: '#a78bfa' }}>NEEDLE</strong> violet <code>r3.5 8.5</code> front <code>BLOCK</code> rear <code>CRIT 6</code> (<code>dot&gt;0.5</code>) • <strong style={{ color: '#ffb23e' }}>CANNON</strong> amber <code>4 dmg r7 3.8 slow</code> • <strong style={{ color: '#58d8ff' }}>TRICK</strong> cyan diamond <code>6.2 5 bounces 2.5→0.8</code>
               </p>
               <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
-                Orbs grant <code>NEEDLE ×5</code> <code>CANNON ×3</code> <code>TRICK ×6</code> then revert. Default <code>STD ∞</code>. Each hit has distinct FX: <code>STD cyan ring</code> · <code>BLOCK hex</code> · <code>CRIT violet star</code> · <code>CANNON amber ember</code> · <code>TRICK bounce pip</code> · <code>LAVA -2</code> · <code>VOID -1</code>.
+                Orbs grant <code>NEEDLE x5</code> <code>CANNON x3</code> <code>TRICK x6</code> then revert. Default <code>STD INF</code>. Each hit has distinct FX: <code>STD cyan ring</code> . <code>BLOCK hex</code> . <code>CRIT violet star</code> . <code>CANNON amber ember</code> . <code>TRICK bounce pip</code> . <code>LAVA -2</code> . <code>VOID -1</code>.
               </p>
             </div>
           </section>

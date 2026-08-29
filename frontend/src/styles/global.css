@@ -1391,7 +1391,7 @@ input[type='range']::-webkit-slider-thumb {
 }
 .cyber-timer.timer-critical .bracket { border-color: var(--nox-amber); }
 
-/* Cyber Exit — per player */
+/* Cyber Exit - per player */
 .cyber-exit {
   position: relative;
   display: inline-flex;
