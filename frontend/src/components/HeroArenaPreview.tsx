@@ -205,7 +205,7 @@ export default function HeroArenaPreview() {
         pickupIdx=Math.floor(loopT/5000)
         const kind=puKinds[pickupIdx%puKinds.length]
         const a=anchors[(pickupIdx*3)%anchors.length]
-        if(pickups.length<4 && !pickups.some(p=>Math.abs(p.x-a.x)<30)){
+        if(a && pickups.length<4 && !pickups.some(p=>p && typeof (p as any).x==='number' && Math.abs((p as any).x - a.x)<30)){
           pickups.push({x:a.x+(Math.random()*20-10),y:a.y+(Math.random()*20-10),kind,t:0})
         }
       }
@@ -231,7 +231,7 @@ export default function HeroArenaPreview() {
         const spd=p.dash>0 ? 3.6*2.35 : 3.6
         let dx=tgt.x-p.x, dy=tgt.y-p.y; const d=Math.hypot(dx,dy)
         if(d>2){ dx/=d; dy/=d; p.x+=dx*spd; p.y+=dy*spd }
-        const inSlime=hazards.some(h=>h.kind==='slime' && p.x>=h.x && p.x<=h.x+h.w && p.y>=h.y && p.y<=h.y+h.h)
+        const inSlime=hazards.some(h=>h && h.kind==='slime' && p && typeof p.x==='number' && p.x>=h.x && p.x<=h.x+h.w && p.y>=h.y && p.y<=h.y+h.h)
         if(inSlime){ p.x-=dx*spd*0.45; p.y-=dy*spd*0.45 }
         const dVoid=Math.hypot(p.x-480,p.y-280)
         if(dVoid>safeR-PLAYER_R){ const ang=Math.atan2(p.y-280,p.x-280); p.x=480+Math.cos(ang)*(safeR-PLAYER_R-1); p.y=280+Math.sin(ang)*(safeR-PLAYER_R-1); if(Math.random()<0.04) spawnParticles(p.x,p.y,'#c9ff2f',5) }
