@@ -81,8 +81,9 @@ import SEO from '../../components/SEO.astro';
         tryStart();
       });
       window.addEventListener('nox:forfeit', (e) => {
-        const g = (window as unknown as { NOX_GAME?: { forfeit?: (p: number) => void } }).NOX_GAME;
-        if (g?.forfeit) g.forfeit(0);
+        const g = (window as unknown as { NOX_GAME?: { forfeitTrials?: () => void } }).NOX_GAME;
+        if (g?.forfeitTrials) g.forfeitTrials();
+        else { const g2 = (window as unknown as { NOX_GAME?: { forfeit?: (p: number) => void } }).NOX_GAME; if (g2?.forfeit) g2.forfeit(0); }
       });
       window.addEventListener('nox:backToMenu', () => {
         const tryMenu = () => {

@@ -1772,7 +1772,36 @@ function updateTrials(dt) {
     if(window.NOX_GAME) { window.NOX_GAME.particles.length = 0; kept.forEach(v => window.NOX_GAME.particles.push(v)); }
   }
 
+  // Save state periodically
+  const frameNum = Math.floor((TRIAL_DURATION - timeLeft) * 60);
+  if(frameNum > 0 && frameNum % (SAVE_INTERVAL * 60) < 1) {
+    saveTrialsState();
+  }
+
   updateHUD();
+}
+
+// Pause/resume for trials
+window.addEventListener('keydown', e => {
+  if(gameState === 'playing' && (e.key === 'p' || e.key === 'P' || e.key === 'Escape')) {
+    gameState = 'paused';
+    try { localStorage.setItem('nv_trials_paused', '1'); } catch {}
+    if(window.NOX_GAME && window.NOX_GAME.onTrialsPause) window.NOX_GAME.onTrialsPause();
+  } else if(gameState === 'paused' && (e.key === 'p' || e.key === 'P' || e.key === 'Escape')) {
+    gameState = 'playing';
+    try { localStorage.removeItem('nv_trials_paused'); } catch {}
+  }
+});
+
+function forfeitTrials() {
+  gameState = 'menu';
+  clearTrialsState();
+  try { localStorage.removeItem('nv_trials_paused'); } catch {}
+  // Save high score before clearing
+  const hs = parseInt(localStorage.getItem('nv_trials_highscore') || '0', 10);
+  if(Math.floor(trialPoints) > hs) {
+    try { localStorage.setItem('nv_trials_highscore', String(Math.floor(trialPoints))); } catch {}
+  }
 }
 
 function tryMoveBot(bot, nx, ny) {
@@ -2891,7 +2920,8 @@ function init() {
     players, bullets, pickups, particles,
     scores, gameState: () => gameState,
     endRound, showGameOver, startCountdown, resetRound, startGame, rematchGame, backToMenu, forfeit,
-    startTrials, onTrialsWin: null, onTrialsLose: null,
+    startTrials, onTrialsWin: null, onTrialsLose: null, onTrialsPause: null,
+    forfeitTrials,
     getGlobalSpeed: () => globalSpeed, setGlobalSpeed,
     W, H, PLAYER_R, BULLET_R, BULLET_SPEED, MAX_HP, ROUND_TIME, WIN_SCORE,
     POWER_TYPES, BULLET_TYPES, AMMO_PICKUP_CFG, DASH_COOLDOWN, DASH_TIME, SHIELD_MAX_HP, HEAL_AMOUNT

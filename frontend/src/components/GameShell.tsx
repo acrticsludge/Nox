@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 export default function GameShell() {
   const gameReady = useRef<Promise<void> | null>(null)
   const [showHow, setShowHow] = useState(false)
+  const [showPause, setShowPause] = useState(false)
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
 
   useEffect(() => {
     gameReady.current = import('../game/game-logic.js')
@@ -10,6 +12,38 @@ export default function GameShell() {
         console.log('[NOX] game-logic loaded')
       })
       .catch((e) => console.error('[NOX] game-logic load failed', e))
+  }, [])
+
+  // Pause/Resume key handler
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+        const g = (window as unknown as { NOX_GAME?: { gameState?: () => string } }).NOX_GAME
+        if (!g || !g.gameState) return
+        const state = g.gameState()
+        if (state === 'playing') {
+          setShowPause(true)
+          window.dispatchEvent(new CustomEvent('nox:pause'))
+        } else if (state === 'paused') {
+          setShowPause(false)
+          window.dispatchEvent(new CustomEvent('nox:resume'))
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Listen for pause state changes from game logic
+  useEffect(() => {
+    const onPause = () => setShowPause(true)
+    const onResume = () => setShowPause(false)
+    window.addEventListener('nox:pause', onPause)
+    window.addEventListener('nox:resume', onResume)
+    return () => {
+      window.removeEventListener('nox:pause', onPause)
+      window.removeEventListener('nox:resume', onResume)
+    }
   }, [])
 
   // Lock body scroll when modal open + ESC to close
@@ -156,6 +190,48 @@ export default function GameShell() {
           <span>MADE FOR BORED LEGENDS AT 2AM</span>
         </footer>
       </main>
+
+      {/* Pause overlay */}
+      {showPause && (
+        <div className="overlay" style={{ zIndex: 100 }}>
+          <div className="menu-card" style={{ padding: 30 }}>
+            <CyberBadge variant="amber">⏸ PAUSED</CyberBadge>
+            <h2 className="menu-title" style={{ marginTop: 18 }}>VOID TRIALS // PAUSED</h2>
+            <p style={{ color: 'var(--nox-muted)', font: '12px var(--nox-mono)', lineHeight: 1.6 }}>
+              Press <strong style={{ color: 'var(--nox-fg)' }}>P</strong> or <strong style={{ color: 'var(--nox-fg)' }}>Esc</strong> to resume. Your state is saved locally.
+            </p>
+            <div className="btn-row" style={{ marginTop: 20 }}>
+              <button className="btn btn-primary" onClick={() => { setShowPause(false); window.dispatchEvent(new CustomEvent('nox:resume')) }}>
+                ▶ RESUME
+              </button>
+              <button className="btn btn-ghost" onClick={() => setShowExitConfirm(true)}>
+                EXIT TRIAL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Exit confirmation */}
+      {showExitConfirm && (
+        <div className="overlay" style={{ zIndex: 101 }}>
+          <div className="menu-card" style={{ padding: 30, borderColor: 'var(--nox-amber)' }}>
+            <CyberBadge variant="amber">⚠ FORFEIT</CyberBadge>
+            <h2 className="menu-title" style={{ marginTop: 18, color: 'var(--nox-amber)' }}>EXIT VOID TRIAL?</h2>
+            <p style={{ color: 'var(--nox-muted)', font: '12px var(--nox-mono)', lineHeight: 1.6 }}>
+              Your progress and high score will be saved. Are you sure you want to leave the trial?
+            </p>
+            <div className="btn-row" style={{ marginTop: 20 }}>
+              <button className="btn btn-primary" style={{ background: 'var(--nox-amber)', color: 'var(--nox-bg)' }} onClick={() => { setShowExitConfirm(false); window.dispatchEvent(new CustomEvent('nox:forfeit', { detail: { playerId: 0 } })) }}>
+                YES // EXIT
+              </button>
+              <button className="btn btn-ghost" onClick={() => setShowExitConfirm(false)}>
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showHow && <HowToPlayModal onClose={handleCloseHow} />}
     </>
