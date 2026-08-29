@@ -126,10 +126,10 @@ export default function DocBulletDemo() {
   }, [])
 
   const meta: Record<string, { label: string; note: string }> = {
-    standard: { label: 'STANDARD', note: 'Balanced • 183ms • never runs out' },
-    needle: { label: 'NEEDLE', note: 'Tiny, very fast • 0 front / 6 rear' },
-    cannon: { label: 'CANNON', note: 'Big & slow • 4 damage • 533ms' },
-    trick: { label: 'TRICK', note: 'Bounces off walls • gets weaker' },
+    standard: { label: 'STANDARD', note: 'Steady and reliable — never runs out' },
+    needle: { label: 'NEEDLE', note: 'Tiny and very fast — strong from behind' },
+    cannon: { label: 'CANNON', note: 'Big and slow — hits really hard' },
+    trick: { label: 'TRICK', note: 'Bounces off walls — first hit is strongest' },
   }
 
   return (
@@ -154,7 +154,7 @@ export default function DocBulletDemo() {
           <g id="bd-bullets" />
           <g id="bd-ship" />
         </svg>
-        <div className="docs-demo__cap">Fired from pointer • same speed + size as the real arena</div>
+        <div className="docs-demo__cap">Shoots straight from the ship's nose</div>
       </div>
     </div>
   )

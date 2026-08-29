@@ -55,7 +55,7 @@ export function DocWallDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge">WALLS</span>
-          <span className="docs-demo__note">Blocks most • trick bounces 0.97</span>
+          <span className="docs-demo__note">Blocks shots — trick shots bounce</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
           <defs>
@@ -101,7 +101,7 @@ export function DocLavaDemo() {
         ${warn ? `<circle cx="180" cy="70" r="18" fill="none" stroke="#fb923c" stroke-width="1" stroke-dasharray="3 4" opacity="0.55"/>` : ''}
         <text x="180" y="${active ? 102 : 103}" text-anchor="middle" font-size="7" font-family="JetBrains Mono, monospace" fill="${active ? '#fff' : 'rgba(255,255,255,0.55)'}">${active ? 'LAVA' : 'VENT'}</text>
         ${active ? `<circle cx="${180 + Math.sin(t * 0.18) * 2}" cy="${70 + Math.cos(t * 0.2) * 2}" r="2.1" fill="#fff" opacity="0.9"/>` : ''}
-        <g transform="translate(180,118)"><text text-anchor="middle" font-size="7" font-family="JetBrains Mono, monospace" fill="${active ? '#fb923c' : warn ? '#ffb23e' : 'rgba(255,255,255,0.45)'}">${active ? 'BURNS • 2 HP' : warn ? 'BLINKS • WARNING' : 'COOLS 0.42'}</text></g>
+        <g transform="translate(180,118)"><text text-anchor="middle" font-size="7" font-family="JetBrains Mono, monospace" fill="${active ? '#fb923c' : warn ? '#ffb23e' : 'rgba(255,255,255,0.45)'}">${active ? 'STAY OFF • BURNS' : warn ? 'WATCH OUT • BLINKS' : 'COOLING...'}</text></g>
       `
     }
     loop(performance.now())
@@ -112,7 +112,7 @@ export function DocLavaDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge" style={{ background: '#fb923c', borderColor: '#fb923c', color: '#07090b' }}>LAVA VENT</span>
-          <span className="docs-demo__note">warn 0-119 • burn 120-227</span>
+          <span className="docs-demo__note">Blinks first, then burns</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
           <defs>
@@ -156,10 +156,10 @@ export function DocSlimeDemo() {
         <ellipse cx="2" cy="10" rx="14" ry="6" fill="rgba(0,0,0,0.35)" filter="url(#sd-soft)"/>
         <path d="M 18 0 L -12 -11 L -8 0 L -12 11 Z" fill="${inSlime ? '#6ee7b7' : '#3ec5f2'}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" filter="url(#sd-glow)"/>
         <circle cx="0" cy="0" r="5.5" fill="#fff"/><circle cx="0.8" cy="-1" r="2" fill="${inSlime ? '#10b981' : '#58d8ff'}"/>
-        ${inSlime ? `<text x="0" y="28" text-anchor="middle" font-size="7" font-family="JetBrains Mono, monospace" fill="#6ee7b7">SLOW ×0.55</text>` : ''}
+        ${inSlime ? `<text x="0" y="28" text-anchor="middle" font-size="7" font-family="JetBrains Mono, monospace" fill="#6ee7b7">SLOW</text>` : ''}
       `
       const txt = el.querySelector('#sd-label') as HTMLDivElement | null
-      if (txt) txt.textContent = inSlime ? 'INSIDE SLIME → SLOW 0.55' : 'OUTSIDE → NORMAL'
+      if (txt) txt.textContent = inSlime ? 'INSIDE SLIME — YOU ARE SLOW' : 'Move freely'
     }
     loop(performance.now())
     return () => cancelAnimationFrame(raf)
@@ -169,7 +169,7 @@ export function DocSlimeDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge" style={{ background: '#6ee7b7', borderColor: '#6ee7b7', color: '#07090b' }}>SLIME</span>
-          <span id="sd-label" className="docs-demo__note">OUTSIDE → NORMAL</span>
+          <span id="sd-label" className="docs-demo__note">Move freely</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
           <defs>
@@ -226,7 +226,7 @@ export function DocVoidDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge" style={{ background: '#c9ff2f', borderColor: '#c9ff2f', color: '#07090b' }}>THE VOID</span>
-          <span className="docs-demo__note">After 45s • 420→110 in 15s</span>
+          <span className="docs-demo__note">Closes in — stay in the middle</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
           <defs>

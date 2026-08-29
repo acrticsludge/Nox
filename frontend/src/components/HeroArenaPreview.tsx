@@ -444,7 +444,7 @@ export default function HeroArenaPreview() {
           <g id="pv-pickups"/><g id="pv-bullets"/><g id="pv-players"/><g id="pv-particles"/>
         </svg>
         <div className="hero-preview-bar" aria-hidden="true"><div ref={barRef} className="hero-preview-bar__fill"/></div>
-        <div className="hero-preview-caption"><span>1:1 ARENA // 960×560 • 12 HEALTH • 4 BULLETS</span><span style={{opacity:0.7}}>DASH • WALLS • LAVA • SLIME • VOID</span></div>
+        <div className="hero-preview-caption"><span>Real match — no bots, just you vs a friend</span><span style={{opacity:0.7}}>Watch the dash, shots and hazards</span></div>
       </div>
       <div className="hero-preview-legend"><span style={{color:'#a78bfa'}}>◈ NEEDLE</span><span style={{color:'var(--nox-amber)'}}>■ CANNON</span><span style={{color:'var(--nox-cyan)'}}>◇ TRICK</span><span style={{color:'#d6e2e4'}}>● STANDARD</span></div>
     </div>

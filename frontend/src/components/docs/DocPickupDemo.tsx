@@ -73,7 +73,7 @@ export default function DocPickupDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge">ORBS</span>
-          <span className="docs-demo__note">Floats + glows • 1:1 pickup</span>
+          <span className="docs-demo__note">Floats and glows — touch to collect</span>
           <span className="docs-demo__live">● LIVE</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
@@ -88,7 +88,7 @@ export default function DocPickupDemo() {
           <g id="pd-orbs" />
           <g id="pd-ship" />
         </svg>
-        <div className="docs-demo__cap">Same glow + 3 orbiting dots as the arena — bob 0.14 / tick</div>
+        <div className="docs-demo__cap">Shiny and easy to spot — grab it fast</div>
       </div>
     </div>
   )

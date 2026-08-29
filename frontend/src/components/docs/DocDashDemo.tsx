@@ -57,7 +57,7 @@ export default function DocDashDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge">DASH</span>
-          <span className="docs-demo__note">Flash forward • cannot be hit for 16 ticks</span>
+          <span className="docs-demo__note">Flash forward — can't be hit for a moment</span>
           <span className="docs-demo__live">● LIVE</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
@@ -73,7 +73,7 @@ export default function DocDashDemo() {
           <g id="dd-ghost" />
           <g id="dd-ship" />
         </svg>
-        <div className="docs-demo__cap">Same invincibility + flame as the arena — 16 ticks • 60 cd</div>
+        <div className="docs-demo__cap">Use it to dodge shots or slip through a tight gap</div>
       </div>
     </div>
   )
