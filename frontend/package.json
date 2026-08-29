@@ -11,6 +11,7 @@
     "preview": "astro preview"
   },
   "dependencies": {
+    "@astrojs/mdx": "^7.0.8",
     "@astrojs/react": "^6.0.4",
     "@astryxdesign/core": "^0.5.0",
     "@astryxdesign/theme-neutral": "^0.5.0",

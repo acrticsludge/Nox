@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export default function GameShell() {
-  const gameReady = React.useRef<Promise<void> | null>(null)
-  const [showHow, setShowHow] = React.useState(false)
+  const gameReady = useRef<Promise<void> | null>(null)
+  const [showHow, setShowHow] = useState(false)
 
   useEffect(() => {
     gameReady.current = import('../game/game-logic.js')
@@ -83,13 +83,23 @@ export default function GameShell() {
 
         {/* Header */}
         <header className="nox-header">
-          <a href="/" className="header-left" style={{ textDecoration: 'none' }}>
+          <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div className="diamond-mark">
               <span />
             </div>
-            <span className="brand-lockup">NOX</span>
-          </a>
-          <CyberStatus label="NEON VOID // PLAY" />
+            <a href="/" className="brand-lockup" style={{ textDecoration: 'none' }}>
+              NOX
+            </a>
+            <span style={{ color: 'var(--nox-muted)', opacity: 0.5, font: '10px var(--nox-mono)', letterSpacing: '0.1em' }}>//</span>
+            <a href="/play" className="brand-lockup" style={{ textDecoration: 'none' }}>
+              PLAY
+            </a>
+            <span style={{ color: 'var(--nox-muted)', opacity: 0.5, font: '10px var(--nox-mono)', letterSpacing: '0.1em' }}>//</span>
+            <span className="brand-lockup" style={{ color: 'var(--nox-lime)' }}>
+              1V1
+            </span>
+          </div>
+          <CyberStatus label="NEON VOID // 1V1" />
         </header>
 
         <div className="nox-content game-layout">
@@ -140,7 +150,9 @@ export default function GameShell() {
 
         {/* Footer */}
         <footer className="nox-footer">
-          <span>BUILT WITH SVG • NO CANVAS • 60FPS</span>
+          <span>
+            BUILT WITH SVG • NO CANVAS • 60FPS • <a href="/docs" style={{ color: 'var(--nox-lime)', textDecoration: 'none', borderBottom: '1px solid rgba(201,255,47,0.3)' }}>MANUAL // DOCS</a>
+          </span>
           <span>MADE FOR BORED LEGENDS AT 2AM</span>
         </footer>
       </main>
@@ -169,7 +181,7 @@ function CyberBadge({
   variant = 'lime',
   id,
 }: {
-  children: React.ReactNode
+  children: ReactNode
   variant?: 'lime' | 'cyan' | 'amber' | 'pink'
   id?: string
 }) {
@@ -242,6 +254,10 @@ function PlayerHUD({ player, onExit }: { player: 1 | 2; onExit?: () => void }) {
             chipId={`blP${player}`}
           />
         </div>
+        <div className="ammo-chip ammo-chip--standard" id={`ammoP${player}`}>
+          <span className="ammo-chip__spark" aria-hidden="true"></span>
+          <span id={`ammoT${player}`}>STD INF</span>
+        </div>
         <button className={`cyber-exit cyber-exit--${isP1 ? 'cyan' : 'pink'}`} onClick={onExit} aria-label={`Exit game for player ${player}`}>
           <span className="cyber-exit__icon" aria-hidden="true">
             ✕
@@ -274,7 +290,7 @@ function PowerChip({
   timerId: string
   chipId: string
 }) {
-  const icons: Record<typeof variant, React.ReactNode> = {
+  const icons: Record<typeof variant, ReactNode> = {
     ov: (
       <svg viewBox="0 0 24 24" fill="currentColor">
         <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
@@ -494,7 +510,7 @@ function GlobalSpeedControl() {
         <span className="global-speed__value" id="speedValGlobal">
           3.6
         </span>
-        <span className="global-speed__unit">×</span>
+        <span className="global-speed__unit">x</span>
       </div>
       <input type="range" id="speedGlobal" min="2.5" max="5.5" step="0.1" defaultValue="3.6" />
       <div className="global-speed__scale">
@@ -517,15 +533,15 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
         <div className="how-modal__header">
           <CyberBadge variant="cyan">HOW TO PLAY</CyberBadge>
           <h2 id="how-modal-title" className="how-modal__title">
-            NEON VOID // MANUAL
+            NEON VOID // QUICK GUIDE
           </h2>
-          <p className="how-modal__subtitle">Master the arena. Own the void.</p>
+          <p className="how-modal__subtitle">Same keyboard, two players — first to 5 wins.</p>
         </div>
 
         <div className="how-modal__body">
           <section className="how-section">
             <h3 className="how-section__title" style={{ color: 'var(--nox-cyan)' }}>
-              <span className="how-section__index">01</span> MOVEMENT
+              <span className="how-section__index">01</span> MOVE & SHOOT
             </h3>
             <div className="how-card how-card--cyan">
               <div className="how-row">
@@ -553,15 +569,14 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                 </span>
               </div>
               <p className="how-desc">
-                Hold <strong>SHIFT / /</strong> to <strong>dash</strong> // 0.25s invincible + speed burst (1s
-                cooldown). Hold <strong>SPACE / ENTER</strong> for auto-fire.
+                Use the move keys to run around. Hold <strong>Shift</strong> or <strong>/</strong> to <strong>dash</strong> — you flash forward and cannot get hit for a moment. Hold <strong>Space</strong> or <strong>Enter</strong> to keep shooting.
               </p>
             </div>
           </section>
 
           <section className="how-section">
             <h3 className="how-section__title" style={{ color: 'var(--nox-pink)' }}>
-              <span className="how-section__index">02</span> ORBS
+              <span className="how-section__index">02</span> POWER-UPS
             </h3>
             <div className="how-card how-card--pink">
               <div className="orb-grid">
@@ -572,36 +587,59 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
               </div>
               <ul className="how-list">
                 <li>
-                  <strong style={{ color: 'var(--nox-amber)' }}>⚡ OVERCHARGE</strong> // triple shot, 4s
+                  <strong style={{ color: 'var(--nox-amber)' }}>⚡ Triple shot</strong> — shoots three bullets at once for a little while.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-cyan)' }}>❄ FROST SHIELD</strong> // 3 HP barrier, cracks
-                  on damage
+                  <strong style={{ color: 'var(--nox-cyan)' }}>❄ Shield</strong> — puts a bubble around you. It cracks when hit and breaks after a few hits.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-lime)' }}>✦ BLINK</strong> // dash reset + 22% speed, 3s
+                  <strong style={{ color: 'var(--nox-lime)' }}>✦ Dash boost</strong> — lets you dash again right away and makes you a bit faster.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--success)' }}>✚ HEAL</strong> // +1 HP (cap 5), rare
+                  <strong style={{ color: 'var(--success)' }}>✚ Heart</strong> — heals you a little.
+                </li>
+                <li style={{ marginTop: 8, opacity: 0.95 }}>
+                  <strong style={{ color: '#a78bfa' }}>Needle</strong> — tiny and very fast. Weak from the front, super strong from behind. &nbsp;•&nbsp; <strong style={{ color: '#ffb23e' }}>Cannon</strong> — big and slow but hits really hard. &nbsp;•&nbsp; <strong style={{ color: '#58d8ff' }}>Trick</strong> — bounces off walls.
+                </li>
+              </ul>
+              <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
+                Special bullets come from pickups. You get a few shots, then you go back to your normal bullet.
+              </p>
+            </div>
+          </section>
+
+          <section className="how-section">
+            <h3 className="how-section__title" style={{ color: 'var(--nox-amber)' }}>
+              <span className="how-section__index">03</span> WATCH OUT
+            </h3>
+            <div className="how-card how-card--amber">
+              <ul className="how-list">
+                <li>
+                  <strong>Walls</strong> — dark blocks. They stop you and stop most bullets. Trick bullets bounce off them.
+                </li>
+                <li>
+                  <strong style={{ color: '#fb923c' }}>Lava</strong> — orange circle on the floor. It blinks first to warn you, then turns red and burns you if you stay on it.
+                </li>
+                <li>
+                  <strong style={{ color: '#10b981' }}>Slime</strong> — green goo that makes you move slow while you are inside. It does not hurt you.
+                </li>
+                <li>
+                  <strong style={{ color: 'var(--nox-lime)' }}>The Void</strong> — after a while the edge of the arena starts closing in. Green blocks crumble at the border. Stay in the middle or you will lose health.
                 </li>
               </ul>
             </div>
           </section>
 
           <section className="how-section">
-            <h3 className="how-section__title" style={{ color: 'var(--nox-amber)' }}>
-              <span className="how-section__index">03</span> HAZARDS
+            <h3 className="how-section__title" style={{ color: 'var(--nox-lime)' }}>
+              <span className="how-section__index">04</span> HOW TO WIN
             </h3>
-            <div className="how-card how-card--amber">
+            <div className="how-card how-card--lime">
               <p className="how-desc">
-                <strong>Walls</strong> block movement & bullets (grid-aligned).{' '}
-                <strong style={{ color: '#fb923c' }}>LAVA</strong> pulses // burns 1 HP/s when active.{' '}
-                <strong style={{ color: '#10b981' }}>SLIME</strong> slows to 55%.{' '}
-                <strong style={{ color: 'var(--nox-lime)' }}>VOID</strong> crushes from edge after 45s // stay
-                central!
+                Knock out the other player to win a round. If no one is knocked out when the timer runs out, the player with more health wins. Tied health is a draw.
               </p>
-              <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
-                Orbs never spawn inside hazards. First to <strong>5 wins</strong> claims the void.
+              <p className="how-desc" style={{ marginTop: 8 }}>
+                First to <strong>5 round wins</strong> wins the whole game.
               </p>
             </div>
           </section>

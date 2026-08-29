@@ -638,8 +638,8 @@ body {
   inset: 0;
   background: repeating-linear-gradient(
     90deg,
-    transparent 0 19%,
-    rgba(0, 0, 0, 0.22) 19% 20%
+    transparent 0 7.6%,
+    rgba(0, 0, 0, 0.22) 7.6% 8.33%
   );
   opacity: 0.55;
   pointer-events: none;
@@ -731,6 +731,25 @@ body {
   align-items: stretch;
   flex-wrap: nowrap;
 }
+.ammo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font: 10px var(--nox-mono);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  border: 1px solid;
+  clip-path: polygon(6px 0,100% 0,100% calc(100% - 6px), calc(100% - 6px) 100%,0 100%,0 6px);
+  background: rgba(255,255,255,0.04);
+  margin-top: 6px;
+  align-self: flex-start;
+}
+.ammo-chip--standard{color:var(--nox-muted);border-color:var(--nox-border);opacity:0.6}
+.ammo-chip--needle{color:#a78bfa;border-color:rgba(167,139,250,0.35);background:rgba(167,139,250,0.08);box-shadow:0 0 10px rgba(167,139,250,0.18)}
+.ammo-chip--cannon{color:var(--nox-amber);border-color:rgba(255,178,62,0.35);background:rgba(255,178,62,0.08);box-shadow:0 0 10px rgba(255,178,62,0.18)}
+.ammo-chip--trick{color:var(--nox-cyan);border-color:rgba(88,216,255,0.35);background:rgba(88,216,255,0.08);box-shadow:0 0 10px rgba(88,216,255,0.18)}
+.ammo-chip__spark{width:7px;height:7px;transform:rotate(45deg);background:currentColor;box-shadow:0 0 6px currentColor;flex-shrink:0}
 .power-chip {
   flex: 1;
   display: flex;
@@ -1372,7 +1391,7 @@ input[type='range']::-webkit-slider-thumb {
 }
 .cyber-timer.timer-critical .bracket { border-color: var(--nox-amber); }
 
-/* Cyber Exit — per player */
+/* Cyber Exit - per player */
 .cyber-exit {
   position: relative;
   display: inline-flex;

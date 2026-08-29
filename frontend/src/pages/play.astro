@@ -1,6 +1,45 @@
 ---
 import '../styles/global.css';
-import GameShell from '../components/GameShell';
+
+// Mode registry — add entry + create src/pages/play/<slug>.astro for a new arena
+const modes = [
+  {
+    slug: '1v1',
+    href: '/play/1v1',
+    title: '1V1 // SAME KEYBOARD',
+    badge: 'LIVE // 2 PLAYERS • 60s',
+    badgeVariant: 'cyan',
+    accent: 'cyan',
+    desc: 'Dash through walls, grab orbs. First to 5 wins. No bots — you vs friend, one keyboard.',
+    meta: ['2P', 'LOCAL', '60S', 'FIRST TO 5'],
+    cta: 'ENTER ARENA →',
+    live: true,
+  },
+  {
+    slug: 'trials',
+    href: '/play/trials',
+    title: 'VOID TRIALS // SOLO',
+    badge: 'COMING SOON',
+    badgeVariant: 'amber',
+    accent: 'amber',
+    desc: 'Survive the crush solo. Endless waves, shifting hazards, high-score chase.',
+    meta: ['1P', 'ENDLESS', 'VOID', 'SCORE'],
+    cta: 'LOCKED',
+    live: false,
+  },
+  {
+    slug: '2v2',
+    href: '/play/2v2',
+    title: '2V2 // SQUAD VOID',
+    badge: 'COMING SOON',
+    badgeVariant: 'pink',
+    accent: 'pink',
+    desc: 'Two keyboards, four players. Team orbs, shared void. Coordination wins.',
+    meta: ['4P', 'TEAMS', '2 KEYBOARDS', 'FIRST TO 7'],
+    cta: 'LOCKED',
+    live: false,
+  },
+];
 ---
 
 <!doctype html>
@@ -8,13 +47,83 @@ import GameShell from '../components/GameShell';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NOX // Neon Void</title>
-    <meta
-      name="description"
-      content="A chaotic local multiplayer arena where the floor is lava and the last one standing wins."
-    />
+    <title>NOX // Select Mode</title>
+    <meta name="description" content="Select your void — 1V1 duel live, more modes incoming." />
   </head>
   <body>
-    <GameShell client:load />
+    <div class="nox-shell">
+      <div class="grid-noise" aria-hidden="true"></div>
+
+      <header class="nox-header">
+        <div class="header-left" style="display:flex; align-items:center; gap:10px">
+          <div class="diamond-mark"><span></span></div>
+          <a href="/" class="brand-lockup" style="text-decoration:none">NOX</a>
+          <span style="color:var(--nox-muted); opacity:0.5; font:10px var(--nox-mono); letter-spacing:0.1em">//</span>
+          <a href="/play" class="brand-lockup" style="text-decoration:none; color:var(--nox-lime)">PLAY</a>
+        </div>
+        <span class="cyber-status" role="status" aria-label="NEON VOID // SELECT MODE">
+          <span class="cyber-status__dot" aria-hidden="true"></span>
+          <span class="cyber-status__label">NEON VOID // SELECT MODE</span>
+          <span class="cyber-status__frame" aria-hidden="true"><i class="cyber-status__spark"></i></span>
+        </span>
+      </header>
+
+      <div class="nox-content" style="padding-top:42px; padding-bottom:48px">
+        <section style="padding-bottom:28px">
+          <div class="eyebrow"><span class="eyebrow-line"></span> CHOOSE YOUR VOID</div>
+          <h1 class="hero-title" style="font-size:clamp(44px,8vw,84px); margin:18px 0 12px; line-height:0.85">SELECT<br/><em>MODE</em></h1>
+          <p class="hero-copy" style="max-width:58ch">Two players, one keyboard, one void. Jump into <strong style="color:var(--nox-fg)">1V1</strong> — more arenas opening soon.</p>
+        </section>
+
+        <div class="mode-grid">
+          {modes.map((m) => (
+            <a href={m.live ? m.href : undefined} aria-disabled={!m.live} class={`mode-card card-accent-${m.accent} ${!m.live ? 'mode-card--locked' : ''}`}>
+              <span class="card-frame" aria-hidden="true"><i class="card-frame__spark"></i></span>
+              <div class={`cyber-badge cyber-badge--${m.badgeVariant}`} style="align-self:flex-start"><span class="cyber-badge__text">{m.badge}</span><span class="cyber-badge__spark"></span></div>
+              <h2 class="mode-title">{m.title}</h2>
+              <p class="mode-desc">{m.desc}</p>
+              <div class="mode-meta">
+                {m.meta.map((tag) => <span class="mode-tag">{tag}</span>)}
+              </div>
+              <span class={`mode-cta ${m.live ? 'mode-cta--live' : ''}`}>{m.cta}</span>
+            </a>
+          ))}
+        </div>
+
+        <div class="mode-footer">
+          <div>
+            <div style="font:11px var(--nox-mono); font-weight:800; letter-spacing:0.12em; color:var(--nox-lime)">1V1 IS LIVE</div>
+            <div style="font:11px var(--nox-mono); color:var(--nox-muted); margin-top:6px; line-height:1.6">Jump in now — squad and trials are warming up. Check back soon.</div>
+          </div>
+          <a href="/play/1v1" class="btn btn-primary">▶ PLAY 1V1 NOW</a>
+        </div>
+      </div>
+
+      <footer class="nox-footer"><span>NOX // NEON VOID</span><span>CHOOSE YOUR VOID</span></footer>
+    </div>
+
+    <style>
+      .mode-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; }
+      .mode-card {
+        position:relative; display:flex; flex-direction:column; gap:12px;
+        background: var(--nox-card); border:1px solid var(--nox-border); border-top-width:2px;
+        padding:18px; text-decoration:none; color:inherit; overflow:visible; isolation:isolate;
+        transition: transform 0.16s, border-color 0.16s, box-shadow 0.16s;
+      }
+      .mode-card:hover { transform: translateY(-2px); }
+      .mode-card.card-accent-cyan { border-top-color: var(--nox-cyan); }
+      .mode-card.card-accent-amber { border-top-color: var(--nox-amber); }
+      .mode-card.card-accent-pink { border-top-color: var(--nox-pink); }
+      .mode-card--locked { opacity:0.55; pointer-events:none; filter:saturate(0.7); }
+      .mode-title { margin:0; font: 16px var(--nox-mono); font-weight:800; letter-spacing:-0.02em; line-height:1.1; color:var(--nox-fg); }
+      .mode-desc { margin:0; font:12px var(--nox-mono); line-height:1.6; color:var(--nox-muted); }
+      .mode-meta { display:flex; flex-wrap:wrap; gap:6px; }
+      .mode-tag { font:9px var(--nox-mono); letter-spacing:0.08em; padding:4px 6px; border:1px solid var(--nox-border); background:rgba(255,255,255,0.03); color:var(--nox-muted); }
+      .mode-cta { margin-top:auto; font:11px var(--nox-mono); font-weight:800; letter-spacing:0.1em; padding:8px 10px; border:1px solid var(--nox-border); text-align:center; background:rgba(255,255,255,0.04); }
+      .mode-cta--live { background: var(--nox-lime); color: var(--nox-bg); border-color: var(--nox-lime); box-shadow: 0 8px 20px rgba(201,255,47,0.25); }
+      .mode-card:hover .mode-cta--live { box-shadow: 0 12px 28px rgba(201,255,47,0.35); }
+      .mode-footer { margin-top:18px; display:flex; gap:14px; align-items:center; justify-content:space-between; padding:14px; background:rgba(255,255,255,0.03); border:1px solid var(--nox-border); flex-wrap:wrap; }
+      @media (max-width: 900px) { .mode-grid { grid-template-columns: 1fr; } }
+    </style>
   </body>
 </html>
