@@ -31,11 +31,11 @@ Header links: `NOX` to `/`, `PLAY` to `/play`, `DOCS` to `/docs`. Footer links r
 
 ## Open Graph
 
-OG image is not a generic gradient. It is the real arena SVG rendered to PNG, so the share card looks exactly like the game.
+OG image is not a generic gradient. It is your real arena screenshot composited with the cyber title, so the share card looks exactly like the game.
 
-- Source SVG built by `frontend/scripts/generate-og.mjs` from true game tokens: `--nox-bg #07090b`, lime `#c9ff2f`, cyan `#58d8ff`, pink `#ff5ca8`, amber `#ffb23e`, grid `40x40 #213035`, walls `#0f172a` with `wallGrad`, arena `960x560` with 4 walls, slime, lava vent, 3 ammo pickups plus overcharge orb, 4 bullets with trails, 2 razor darts `M 18 0 L -12 -11 L -8 0 L -12 11 Z` with cockpit rings, shield rings, void corner brackets.
-- Title overlay inside same SVG: eyebrow `TWO PLAYERS. ONE VOID.` in lime, big `NOX` with lime to cyan to pink gradient, `NEON VOID` below, meta `SAME KEYBOARD • FIRST TO 5 • 60S ROUNDS`, bottom bar with diamond `NOX // NEON VOID`, center `BUILT WITH SVG • NO CANVAS • 60FPS`, right coords. Top hairline lime. All mono `Courier New`.
-- Output size `1200x630` for `summary_large_image`. File `frontend/public/og.png` plus `og.svg` source. Generated before every build via `prebuild` hook and via `sharp` resize. If `sharp` missing, fallback copies SVG so `/og.png` never 404s. Verified PNG is `83KB`.
+- Base is `frontend/public/og-bg.png` which is the screenshot you supplied `631x379` of the live arena with void ring, walls, ships, orbs and trails. The script resizes it with `sharp cover 1200x630 center` and `modulate brightness 1.08` so it fills the OG without stretching.
+- Overlay SVG `4072 bytes` built by `frontend/scripts/generate-og.mjs` contains only scrims plus text: eyebrow `TWO PLAYERS. ONE VOID.` lime, big `NOX` with lime to cyan to pink gradient, `NEON VOID` below, meta `SAME KEYBOARD • FIRST TO 5 • 60S ROUNDS`, top right `ONLINE // 60S` badge, bottom bar with diamond `NOX // NEON VOID`, center `BUILT WITH SVG • NO CANVAS • 60FPS`, right coords. Top and bottom scrims keep text legible while the screenshot shows through. All mono `Courier New`, top hairline lime `1.6`.
+- Output size `1200x630` for `summary_large_image`. File `frontend/public/og.png` about `408KB` plus `og.svg` overlay source. Generated before every build via `prebuild` hook and via `sharp` composite. If `sharp` missing, fallback copies bg so `/og.png` never 404s. Verified PNG is the screenshot plus title.
 - Every page emits via `frontend/src/components/SEO.astro`: `og:title`, `og:description`, `og:url`, `og:type`, `og:locale`, `og:image` absolute `https://nox-void.vercel.app/og.png` plus `og:image:width 1200`, `og:image:height 630`, `og:image:alt`, `twitter:card summary_large_image`, `twitter:title`, `twitter:description`, `twitter:image`, `canonical` link, `theme-color #07090b`, `color-scheme dark`, favicon links, manifest, plus JSON-LD `VideoGame` or `BreadcrumbList` where relevant.
 - Pages: `/` VideoGame, `/play` BreadcrumbList, `/play/1v1` VideoGame, `/docs` BreadcrumbList article, `/mockup` noindex.
 

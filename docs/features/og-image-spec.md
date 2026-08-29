@@ -12,36 +12,27 @@ When the link is pasted in Discord, X, iMessage or Slack, the card must instantl
 ## Canvas
 
 - Dimensions `1200x630` ratio `1.904` for `summary_large_image`. Recommended by X and OG spec.
-- Background `#07090b` with grid pattern `40x40 #213035` at `0.9` opacity, large outer rings lime `420` and cyan `520` dashed for depth.
+- Background is the real arena screenshot you supplied, not a synthetic draw. File `frontend/public/og-bg.png` `631x379` is resized with `sharp cover 1200x630 center` plus `modulate brightness 1.08` so the void wall, ships, orbs and trails fill the frame.
 
-## Arena snapshot - true 1 to 1
+## Arena snapshot - user supplied
 
-Arena drawn at `translate(120,78)` size `960x514` with same rendering as `frontend/src/game/game-logic.js` and `frontend/src/components/HeroArenaPreview.tsx`:
-
-- Container path `M 8 0 H 960 V 506 H 952 V 514 H 0 V 8 H 8 Z` with `arenaGrad #020617 to #0f1218`, inner `gridPat` and `grid dot 0.9`, void corners `120 dash 4 7` lime at `32`.
-- Walls 4 blocks `x y w h` at `280 140 14 110`, `260 340 110 14`, `640 300 14 130`, `520 170 140 14`, fill `#0f172a` stroke `rgba(255,255,255,0.07)` plus `wallGrad` highlight `2.2` high.
-- Slime puddle `340 320 to 520 400` green `#065f46` stroke `#10b981` plus white highlights.
-- Lava vent at `700 152` triple ring `18 warn dash`, `11 inner`, `7.5 core #7c2d12`.
-- Pickups: needle `500 122` violet `#7c3aed` with `N` and 3 dots, cannon `340 208` amber `#ff9d2e` with `C`, trick `620 402` cyan `#22c5e0` with `T`, plus overcharge `480 267` amber with lightning bolt.
-- Bullets with trails: cyan `242 258 r5` with 2 trailing dots, lime diamond `318 242`, pink `720 268 r7`, pink `680 382 r5`, plus spark at `294 164` star rays cyan and white ring.
-- Players: razor `M 18 0 L -12 -11 L -8 0 L -12 11 Z` at `210 258 rotate 14` cyan `#3ec5f2` plus cockpit `r5 #fff` and `r1.8 cyan` and dash glow, shield ring `r13 dash`, and at `740 268 rotate -168` pink `#f43f5e`.
+Screenshot is the live game capture you provided. It already contains the true 1 to 1 rendering: `960x560` arena with `arenaGrad #020617`, grid, 4 walls, slime, lava, pickups `N SHIELD plus HEAL plus SLIME`, bullets with trails, 2 razor darts `M 18 0 L -12 -11 L -8 0 L -12 11 Z` cyan `#3ec5f2` and pink `#f43f5e`, void dashed ring `120 plus 190`, and the lime void edge on the left. The script does not redraw the arena. It uses the screenshot as base so the OG is pixel perfect with what players see. If you update the arena, replace `frontend/public/og-bg.png` and rebuild.
 
 ## Title overlay
 
-- Top scrim gradient `linear #07090b 0.96 to 0` height `118` for legibility.
+- Top scrim gradient `linear #07090b 0.96 to 0` height `160` for legibility without hiding the arena.
 - Bottom scrim `470 to 630` gradient to `#07090b 1`.
-- Eyebrow `TWO PLAYERS. ONE VOID.` lime `10px tracking 3.2`.
-- Center `NOX` `84px 800 tracking -6` fill `linear lime to cyan to pink` plus slight stroke `rgba(255,255,255,0.08)`.
-- `//` `11px` at `88 -14` muted white.
-- `NEON VOID` `30px 800 tracking 9` `#f1f4f3`.
-- `SAME KEYBOARD • FIRST TO 5 • 60S ROUNDS` `9.5 tracking 2.8` muted.
-- Top right status `ONLINE // 60S` cyan box with lime diamond `6` rotated.
-- Bottom bar `24 590`: left diamond `14 stroke lime plus fill`, `NOX` `10 tracking 2.6`, `// NEON VOID` muted, center `BUILT WITH SVG • NO CANVAS • 60FPS` `8.5 tracking 1.6`, right coords `34° ...`.
-- Top hairline `1.5 lime 0.95`.
+- Eyebrow `TWO PLAYERS. ONE VOID.` lime `10px tracking 3.2` at `24 22`.
+- Center `NOX` `86px 800 tracking -6` fill `linear lime to cyan to pink` plus `stroke 0.7 rgba(255,255,255,0.10)` and soft drop shadow, `//` `11px` at `88 -14` muted white.
+- `NEON VOID` `30px 800 tracking 9` `#f1f4f3` with `drop shadow 0 2px 10px rgba(0,0,0,0.68)`.
+- `SAME KEYBOARD • FIRST TO 5 • 60S ROUNDS` `9.5 tracking 2.8` `rgba(241,244,243,0.74)`.
+- Top right status `ONLINE // 60S` cyan box `96x18` with lime diamond `6` rotated.
+- Bottom bar `24 590`: left diamond `14 stroke lime plus fill`, `NOX` `10 tracking 2.6` `#f1f4f3`, `// NEON VOID` `rgba(241,244,243,0.78)`, center `BUILT WITH SVG • NO CANVAS • 60FPS` `rgba(241,244,243,0.82)`, right coords `rgba(241,244,243,0.68)`.
+- Top hairline `1.6 lime 0.96` and bottom hairline `1 rgba(255,255,255,0.06)`.
 
 ## Generation
 
-- Script `frontend/scripts/generate-og.mjs` writes SVG string with tokens from `global.css`, then tries `sharp(svg).resize(1200,630).png().toFile(og.png)`. On success PNG is `~83KB`. On failure copies SVG to `og.png` path so build never breaks and crawlers still get an image. Run via `prebuild` before `astro build` and also on Vercel via same npm script.
+- Script `frontend/scripts/generate-og.mjs` finds `og-bg-clipboard.png` plus `og-bg.png`, copies to `og-bg.png` if needed, writes a transparent overlay SVG `4072 bytes` with only text and scrims, then composites with `sharp(base).resize(1200,630 cover center).composite(overlay).png(compressionLevel 9)` to `og.png` about `408KB`. If `sharp` missing, copies bg to `og.png` so build never breaks. Run via `prebuild` before `astro build` and on Vercel via same npm script.
 - Icons generated by `frontend/scripts/make-icons.mjs` from `favicon.svg` to `apple-touch-icon.png 180` plus `favicon-32.png` and `favicon.ico 32`.
 
 ## Usage
