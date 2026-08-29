@@ -3,6 +3,10 @@ layout: ../../layouts/DocsLayout.astro
 title: "NOX // HOW TO PLAY"
 description: "Learn how to play NOX — controls, pickups, dangers and how to win. Same keyboard, two friends, first to 5 wins."
 ---
+import DocBulletDemo from '../../components/docs/DocBulletDemo.tsx'
+import DocDashDemo from '../../components/docs/DocDashDemo.tsx'
+import DocPickupDemo from '../../components/docs/DocPickupDemo.tsx'
+import { DocWallDemo, DocLavaDemo, DocSlimeDemo, DocVoidDemo } from '../../components/docs/DocHazardDemo.tsx'
 
 <h1 class="docs-h1"><span>NOX</span> // HOW TO PLAY</h1>
 <p class="docs-lead">
@@ -42,6 +46,7 @@ Same keyboard. Two players. First to <strong>5 round wins</strong> takes the cro
     <h3 class="docs-h3">DASH TO STAY ALIVE</h3>
     <p class="docs-p"><strong>Dash</strong> makes you flash forward really fast and you cannot get hit while flashing. Use it to dodge bullets or slip through a tight gap. You need to wait a moment before you can dash again.</p>
     <p class="docs-p" style="margin-top:8px">You both move at the same base speed. There is a speed slider at the start screen if you want the whole game slower or faster.</p>
+    <div style="margin-top:12px"><DocDashDemo client:visible /></div>
   </div>
   <div class="docs-card docs-card--amber">
     <div class="docs-kicker"><i>05</i> SHOOTING</div>
@@ -53,6 +58,7 @@ Same keyboard. Two players. First to <strong>5 round wins</strong> takes the cro
       <li><strong>Trick</strong> — bounces off walls. First bounce hits hardest, then it gets weaker each time it bounces.</li>
     </ul>
     <p class="docs-p" style="margin-top:8px">Special bullets come from pickups. You get a few shots, then you go back to normal.</p>
+    <div style="margin-top:12px"><DocBulletDemo client:visible /></div>
   </div>
 </div>
 
@@ -69,6 +75,7 @@ Same keyboard. Two players. First to <strong>5 round wins</strong> takes the cro
       <tr><td><span class="docs-badge" style="color:#a78bfa;border-color:rgba(167,139,250,0.32)">◈ Needle</span> <span class="docs-badge" style="color:var(--nox-amber);border-color:rgba(255,178,62,0.32)">■ Cannon</span> <span class="docs-badge" style="color:var(--nox-cyan);border-color:rgba(88,216,255,0.32)">◇ Trick</span></td><td>Gives you a handful of special bullets (needle / cannon / trick).</td></tr>
     </tbody>
   </table>
+  <div style="margin-top:12px"><DocPickupDemo client:visible /></div>
 </div>
 
 <div class="docs-card docs-card--amber">
@@ -83,6 +90,13 @@ Same keyboard. Two players. First to <strong>5 round wins</strong> takes the cro
       <tr><td><strong>The Void</strong></td><td>After about 45 seconds the edge of the arena starts closing in. Green blocks crumble around you. If you stand outside you slowly lose health. Stay near the center.</td></tr>
     </tbody>
   </table>
+  <div style="margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:10px">
+    <DocWallDemo client:visible />
+    <DocLavaDemo client:visible />
+    <DocSlimeDemo client:visible />
+    <DocVoidDemo client:visible />
+  </div>
+  <p class="docs-p" style="margin-top:10px; opacity:0.7">Each one looks and moves just like in a real match.</p>
 </div>
 
 <div class="docs-grid">

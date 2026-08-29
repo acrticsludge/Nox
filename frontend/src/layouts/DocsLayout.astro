@@ -72,6 +72,15 @@ const { title = 'NOX // MANUAL', description = 'NEON VOID — complete rules, co
       .docs-hr{margin:22px 0;border:none;border-top:1px solid var(--nox-border)}
       .keycap{font-size:11px}
       code{font-family:var(--nox-mono);background:rgba(255,255,255,0.06);padding:1px 5px;border:1px solid var(--nox-border)}
+      .docs-demo{margin:0}
+      .docs-demo__frame{border:1px solid var(--nox-border);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px), calc(100% - 8px) 100%,0 100%,0 8px);overflow:hidden;background:#07090b;box-shadow:0 12px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)}
+      .docs-demo__top{display:flex;align-items:center;gap:8px;padding:7px 8px;background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015));border-bottom:1px solid var(--nox-border);font:9px var(--nox-mono);letter-spacing:0.1em;font-weight:800}
+      .docs-demo__badge{background:var(--nox-lime);color:#07090b;border:1px solid var(--nox-lime);padding:2px 6px;letter-spacing:0.08em;line-height:1}
+      .docs-demo__note{flex:1;color:#a9e9ff;opacity:0.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .docs-demo__live{color:#22c55e;font-size:8px;letter-spacing:0.08em}
+      .docs-demo__svg{display:block;width:100%;height:auto;background:#020617}
+      .docs-demo__cap{padding:6px 8px;font:9px var(--nox-mono);letter-spacing:0.06em;color:var(--nox-muted);background:rgba(255,255,255,0.02);border-top:1px solid var(--nox-border);text-align:center}
+      @media(max-width:600px){ .docs-demo__top{flex-wrap:wrap} }
     </style>
   </body>
 </html>
