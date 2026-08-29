@@ -1,4 +1,4 @@
-// NEON VOID // 2P Duel Game Logic
+// NEON VOID // 2P Duel Game Logic + Void Trials Solo
 // Extracted from play.astro to separate concerns
 
 const W = 960, H = 560;
@@ -16,6 +16,18 @@ const HEAL_AMOUNT = 2;
 const GRID = 40;
 const COLS = 24;
 const ROWS = 14;
+
+// Void Trials constants
+const TRIALS_W = 1920;
+const TRIALS_H = 1120;
+const TRIALS_COLS = 48;
+const TRIALS_ROWS = 28;
+const TRIAL_DURATION = 600;
+const VOID_START_TIME = 450;
+const VOID_SHRINK_DURATION = 30;
+const BOT_MAX_HP = 12;
+const TRIALS_HAZARD_COUNT = 10;
+const TRIALS_WALL_TARGET = 16;
 
 const POWER_TYPES = {
   overcharge: { color:'#ffb23e', bg:'#ff9d2e', icon:'⚡', duration:240, life:480 },
@@ -148,6 +160,336 @@ function generateRandomWalls() {
     hPlaced++;
   }
 }
+
+function generateTrialsWalls() {
+  const walls = [
+    {x:0, y:0, w:TRIALS_W, h:10, isBorder: true}, {x:0, y:TRIALS_H-10, w:TRIALS_W, h:10, isBorder: true},
+    {x:0, y:10, w:10, h:TRIALS_H-20, isBorder: true}, {x:TRIALS_W-10, y:10, w:10, h:TRIALS_H-20, isBorder: true},
+  ];
+  const occ = new Set();
+  const key = (c, r) => `${c},${r}`;
+  const protectedCells = new Set();
+  [[6,14],[7,14],[40,14],[41,14],[23,14],[24,14],[23,13],[24,13],[24,15],[23,15]].forEach(([c, r]) => {
+    for(let dc = -1; dc <= 1; dc++) for(let dr = -1; dr <= 1; dr++) protectedCells.add(key(c + dc, r + dr));
+  });
+
+  function canPlace(c, r, len, isHoriz) {
+    const cells = [];
+    for(let k = 0; k < len; k++) {
+      const cc = isHoriz ? c + k : c;
+      const rr = isHoriz ? r : r + k;
+      if(cc < 0 || cc >= TRIALS_COLS || rr < 0 || rr >= TRIALS_ROWS) return null;
+      if(protectedCells.has(key(cc, rr))) return null;
+      if(occ.has(key(cc, rr))) return null;
+      for(let dc = -1; dc <= 1; dc++) for(let dr = -1; dr <= 1; dr++) {
+        if(dc === 0 && dr === 0) continue;
+        const nc = cc + dc, nr = rr + dr;
+        if(occ.has(key(nc, nr))) return null;
+      }
+      cells.push([cc, rr]);
+    }
+    return cells;
+  }
+
+  const target = TRIALS_WALL_TARGET;
+  let placed = 0, attempts = 400;
+  for(let a = 0; a < attempts && placed < target; a++) {
+    const isHoriz = Math.random() < 0.5;
+    const len = 2 + Math.floor(Math.random() * 5);
+    const cMax = TRIALS_COLS - (isHoriz ? len : 1) - 1;
+    const rMax = TRIALS_ROWS - (isHoriz ? 1 : len) - 1;
+    if (cMax < 2 || rMax < 2) continue;
+    const c = 1 + Math.floor(Math.random() * (cMax - 1 + 1));
+    const r = 1 + Math.floor(Math.random() * (rMax - 1 + 1));
+    const cells = canPlace(c, r, len, isHoriz);
+    if(!cells) continue;
+    let x, y, w, h;
+    if(isHoriz) { x = c * GRID; y = r * GRID - 6; w = len * GRID; h = 12; }
+    else { x = c * GRID - 6; y = r * GRID; w = 12; h = len * GRID; }
+    const newWall = {x, y, w, h};
+    let tooClose = false;
+    for (const ew of walls) {
+      const g = wallGap(newWall, ew);
+      if (g !== -1 && g < REQUIRED_WALL_GAP) { tooClose = true; break; }
+    }
+    if (tooClose) continue;
+    cells.forEach(([cc, rr]) => occ.add(key(cc, rr)));
+    walls.push({x, y, w, h, rx: 6});
+    placed++;
+  }
+  if(placed < 12) {
+    walls.push(
+      {x: 12 * GRID - 6, y: 8 * GRID, w: 12, h: 12 * GRID, rx: 6},
+      {x: 36 * GRID - 6, y: 8 * GRID, w: 12, h: 12 * GRID, rx: 6},
+      {x: 16 * GRID, y: 8 * GRID - 6, w: 16 * GRID, h: 12, rx: 6},
+      {x: 16 * GRID, y: 20 * GRID - 6, w: 16 * GRID, h: 12, rx: 6},
+      {x: 8 * GRID - 6, y: 14 * GRID, w: 12, h: 8 * GRID, rx: 6},
+      {x: 40 * GRID - 6, y: 14 * GRID, w: 12, h: 8 * GRID, rx: 6},
+    );
+  }
+  wallData = walls;
+  generateTrialsHazards();
+}
+
+function generateTrialsHazards() {
+  hazards = [];
+  const occ = new Set();
+  wallData.forEach(w => {
+    if (!w.isBorder) {
+      for(let cx = Math.floor(w.x/GRID); cx <= Math.floor((w.x+w.w)/GRID); cx++)
+        for(let cy = Math.floor(w.y/GRID); cy <= Math.floor((w.y+w.h)/GRID); cy++)
+          occ.add(`${cx},${cy}`);
+    }
+  });
+  const protectedCells = new Set();
+  [[6,14],[7,14],[40,14],[41,14],[23,14],[24,14],[23,13],[24,13],[24,15],[23,15]].forEach(([c, r]) => {
+    for(let dc = -2; dc <= 2; dc++) for(let dr = -2; dr <= 2; dr++) protectedCells.add(key(c + dc, r + dr));
+  });
+
+  const target = TRIALS_HAZARD_COUNT;
+  let placed = 0, attempts = 200;
+  while(placed < target && attempts < 200) {
+    attempts++;
+    const c = 2 + Math.floor(Math.random() * (TRIALS_COLS - 4));
+    const r = 2 + Math.floor(Math.random() * (TRIALS_ROWS - 4));
+    const k = key(c, r);
+    if(occ.has(k) || protectedCells.has(k)) continue;
+    let adj = false;
+    for(let dc = -1; dc <= 1; dc++) for(let dr = -1; dr <= 1; dr++) {
+      if(dc === 0 && dr === 0) continue;
+      if(occ.has(key(c + dc, r + dr))) { adj = true; break; }
+    }
+    if(adj) continue;
+    const kind = Math.random() < 0.5 ? 'lava' : 'slime';
+    hazards.push({c, r, x: c * GRID + 2, y: r * GRID + 2, w: 36, h: 36, kind, t: Math.random() * 300, lavaCd: 0});
+    occ.add(k);
+    placed++;
+  }
+}
+
+function spawnTrialsPickups(count) {
+  for(let i = 0; i < count; i++) {
+    const kind = pickRandomPowerKind();
+    const cfg = POWER_TYPES[kind] || AMMO_PICKUP_CFG[kind];
+    const life = cfg ? cfg.life : 480;
+    let placed = false;
+    for(let attempt = 0; attempt < 50 && !placed; attempt++) {
+      const x = 80 + Math.random() * (TRIALS_W - 160);
+      const y = 60 + Math.random() * (TRIALS_H - 120);
+      if(isValidTrialsPickupPos(x, y)) {
+        pickups.push({x, y, t: 0, life, kind});
+        placed = true;
+      }
+    }
+    if(!placed) pickups.push({x: TRIALS_W/2, y: TRIALS_H/2, t: 0, life, kind});
+  }
+}
+
+function isValidTrialsPickupPos(x, y) {
+  if(wallsCollide(x, y, 28)) return false;
+  if(len2(x, y, 320, TRIALS_H/2) < 80 || len2(x, y, TRIALS_W-320, TRIALS_H/2) < 80) return false;
+  if(hazardAt(x, y)) return false;
+  return true;
+}
+
+// ============ BOT AI ============
+const BOT_BEHAVIORS = {
+  seekPickup: { weight: 0.35 },
+  engagePlayer: { weight: 0.30 },
+  evadeHazard: { weight: 0.20 },
+  patrol: { weight: 0.10 },
+  retreat: { weight: 0.05 },
+};
+
+function distance(ax, ay, bx, by) {
+  const dx = ax - bx, dy = ay - by;
+  return Math.hypot(dx, dy);
+}
+
+function findNearestPickup(bot, pickups) {
+  let nearest = null, minDist = Infinity;
+  for(const pu of pickups) {
+    const d = distance(bot.x, bot.y, pu.x, pu.y);
+    if(d < minDist) { minDist = d; nearest = pu; }
+  }
+  return nearest ? { target: nearest, dist: minDist } : null;
+}
+
+function findNearestHazard(bot, hazards) {
+  let nearest = null, minDist = Infinity;
+  for(const h of hazards) {
+    const hx = h.x + h.w/2, hy = h.y + h.h/2;
+    const d = distance(bot.x, bot.y, hx, hy);
+    if(d < minDist) { minDist = d; nearest = { hazard: h, centerX: hx, centerY: hy, dist: d }; }
+  }
+  return nearest;
+}
+
+function selectBotBehavior(bot, state) {
+  const { pickups, hazards } = state;
+  const player = players[0];
+  if(!player || !player.alive) return 'patrol';
+  const hpRatio = bot.hp / bot.maxHp;
+
+  const weights = { ...BOT_BEHAVIORS };
+
+  if(hpRatio < 0.3) {
+    weights.retreat = 0.4;
+    weights.engagePlayer = 0.1;
+    weights.seekPickup = 0.3;
+  } else if(hpRatio < 0.6) {
+    weights.retreat = 0.15;
+    weights.seekPickup = 0.4;
+  }
+
+  const hazard = findNearestHazard(bot, hazards);
+  if(hazard && hazard.dist < 100) {
+    weights.evadeHazard = 0.5;
+    weights.engagePlayer = 0.1;
+    weights.seekPickup = 0.1;
+  }
+
+  const pickup = findNearestPickup(bot, pickups);
+  if(pickup && pickup.dist < 300) {
+    weights.seekPickup = Math.max(weights.seekPickup, 0.5);
+  }
+
+  const playerDist = distance(bot.x, bot.y, player.x, player.y);
+  if(playerDist < 800) {
+    weights.engagePlayer = Math.max(weights.engagePlayer, 0.4);
+  }
+
+  const total = Object.values(weights).reduce((a, b) => a + b.weight, 0);
+  let r = Math.random() * total;
+  for(const [name, b] of Object.entries(weights)) {
+    r -= b.weight;
+    if(r <= 0) return name;
+  }
+  return 'patrol';
+}
+
+function executeBotBehavior(bot, behavior, state) {
+  const player = players[0];
+  const { pickups, hazards } = state;
+  let mx = 0, my = 0, shoot = false, dash = false;
+
+  switch(behavior) {
+    case 'seekPickup': {
+      const pickup = findNearestPickup(bot, pickups);
+      if(pickup) {
+        const dx = pickup.target.x - bot.x;
+        const dy = pickup.target.y - bot.y;
+        const dist = Math.hypot(dx, dy);
+        if(dist > 0) { mx = dx / dist; my = dy / dist; }
+      } else {
+        mx = Math.cos(bot.angle); my = Math.sin(bot.angle);
+      }
+      break;
+    }
+    case 'engagePlayer': {
+      if(player) {
+        const bulletSpeed = 7.2;
+        const travelTime = distance(bot.x, bot.y, player.x, player.y) / bulletSpeed;
+        const predX = player.x + player.vx * travelTime;
+        const predY = player.y + player.vy * travelTime;
+
+        const dx = predX - bot.x;
+        const dy = predY - bot.y;
+        const dist = Math.hypot(dx, dy);
+
+        if(dist > 0) {
+          bot.targetAngle = Math.atan2(dy, dx);
+          bot.aimError = (Math.random() - 0.5) * 0.15;
+          bot.angle = bot.targetAngle + bot.aimError;
+        }
+
+        if(dist > 200 && dist < 500) {
+          const strafeAngle = bot.angle + Math.PI/2 * (Math.random() < 0.5 ? 1 : -1);
+          mx = Math.cos(strafeAngle) * 0.7;
+          my = Math.sin(strafeAngle) * 0.7;
+        } else if(dist < 200) {
+          mx = -Math.cos(bot.angle) * 0.5;
+          my = -Math.sin(bot.angle) * 0.5;
+        }
+
+        if(bot.shootCd === 0) {
+          const now = Date.now();
+          if(now - bot.lastShotTime >= bot.reactionDelay) {
+            shoot = true;
+            bot.lastShotTime = now;
+            bot.reactionDelay = 80 + Math.random() * 40;
+          }
+        }
+      }
+      break;
+    }
+    case 'evadeHazard': {
+      const hazard = findNearestHazard(bot, hazards);
+      if(hazard) {
+        const dx = bot.x - hazard.centerX;
+        const dy = bot.y - hazard.centerY;
+        const dist = Math.hypot(dx, dy);
+        if(dist > 0) { mx = dx / dist; my = dy / dist; }
+        if(dist < 60 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
+          dash = true;
+        }
+      }
+      break;
+    }
+    case 'patrol': {
+      if(bot.behaviorTimer <= 0 || distance(bot.x, bot.y, bot.targetX, bot.targetY) < 50) {
+        bot.targetX = 100 + Math.random() * (TRIALS_W - 200);
+        bot.targetY = 100 + Math.random() * (TRIALS_H - 200);
+        bot.behaviorTimer = 60 + Math.random() * 120;
+      }
+      bot.behaviorTimer--;
+      const dx = bot.targetX - bot.x;
+      const dy = bot.targetY - bot.y;
+      const dist = Math.hypot(dx, dy);
+      if(dist > 0) { mx = dx / dist; my = dy / dist; }
+      break;
+    }
+    case 'retreat': {
+      if(player) {
+        const dx = bot.x - player.x;
+        const dy = bot.y - player.y;
+        const dist = Math.hypot(dx, dy);
+        if(dist > 0) { mx = dx / dist; my = dy / dist; }
+        if(dist < 300 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
+          dash = true;
+        }
+      }
+      break;
+    }
+  }
+  return { mx, my, shoot, dash, targetAngle: bot.targetAngle };
+}
+
+function updateBotAI(bot, state) {
+  if(!bot.alive) return { mx: 0, my: 0, shoot: false, dash: false };
+
+  if(bot.dashCd > 0) bot.dashCd--;
+  if(bot.inv > 0) bot.inv--;
+  if(bot.shootCd > 0) bot.shootCd--;
+  if(bot.overcharge > 0) bot.overcharge--;
+  if(bot.speedBoost > 0) bot.speedBoost--;
+  if(bot.lavaCd > 0) bot.lavaCd--;
+  if(bot.voidCd > 0) bot.voidCd--;
+
+  if(bot.dash > 0) {
+    bot.dash--;
+    if(bot.dash === 0) bot.inv = 6;
+  }
+
+  if(!bot.behaviorTimer || bot.behaviorTimer <= 0) {
+    bot.behavior = selectBotBehavior(bot, state);
+    bot.behaviorTimer = 10 + Math.floor(Math.random() * 20);
+  }
+  bot.behaviorTimer--;
+
+  return executeBotBehavior(bot, bot.behavior, state);
+}
+// ============ END BOT AI ============
 
 function hazardAt(x, y) {
   for(const h of hazards) if(x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h;
@@ -357,10 +699,13 @@ function trickDmgAt(bounces){ const t=[2.5,2,1.6,1.2,0.8,0.5]; return t[Math.min
 function damageShake(p, intensity=1){ p.squish = Math.max(p.squish, 6 + intensity*4); }
 
 let globalSpeed = BASE_SPEED;
+let gameMode = '1v1';
 const players = [
   { id: 0, x: 160, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#58d8ff', alive: true, ammoType:'standard', ammo:Infinity },
   { id: 1, x: 800, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#ff5ca8', alive: true, ammoType:'standard', ammo:Infinity },
 ];
+
+const bot = { id: 2, x: 1600, y: 560, vx: 0, vy: 0, angle: 0, hp: BOT_MAX_HP, maxHp: BOT_MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#ffb23e', alive: true, ammoType:'standard', ammo:Infinity, isBot: true, behavior: 'patrol', behaviorTimer: 0, targetX: 0, targetY: 0, reactionDelay: 0, lastShotTime: 0, aimError: 0 };
 // Early event queue so React can trigger start/forfeit even before init finishes
 if (typeof window !== 'undefined') {
   window.addEventListener('nox:startGame', () => {
@@ -411,6 +756,15 @@ let timeLeft = ROUND_TIME;
 let prevHp = [MAX_HP, MAX_HP];
 let pendingTimeouts = [];
 let forfeitLock = false;
+
+// Void Trials state
+let trialPoints = 0;
+let trialHighScore = 0;
+let voidRect = null;
+let voidShrinkStart = 0;
+let lastSaveTime = 0;
+const SAVE_INTERVAL = 120;
+
 function trackTimeout(id) { pendingTimeouts.push(id); return id; }
 function clearPendingTimeouts() { pendingTimeouts.forEach(clearTimeout); pendingTimeouts.length = 0; }
 function clearInputState() { keys = {}; }
@@ -424,24 +778,39 @@ function hardResetInternalState() {
   particles.length = 0;
   scores[0] = 0; scores[1] = 0;
   if (window.NOX_GAME) {
-    // keep exposed refs in sync if they were rebound earlier
     window.NOX_GAME.scores[0] = 0; window.NOX_GAME.scores[1] = 0;
   }
   round = 1;
   timeLeft = ROUND_TIME;
   prevHp[0] = MAX_HP; prevHp[1] = MAX_HP;
-  // reset ammo to standard on full menu reset
   players.forEach(pl => { pl.ammoType = 'standard'; pl.ammo = Infinity; });
   hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
   safeRadius = 999;
   voidTick = [0, 0];
   const voidG = document.getElementById('void');
   if (voidG) voidG.setAttribute('opacity', '0');
-  // reset void radii immediately
   ['voidHole','voidRing','voidInner','voidRing2','voidCore'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.setAttribute('r', '420');
   });
+  // Trials reset
+  trialPoints = 0;
+  voidRect = null;
+  voidShrinkStart = 0;
+  lastSaveTime = 0;
+  bot.hp = BOT_MAX_HP;
+  bot.alive = true;
+  bot.x = TRIALS_W - 320; bot.y = TRIALS_H / 2;
+  bot.vx = 0; bot.vy = 0; bot.angle = Math.PI;
+  bot.dash = 0; bot.dashCd = 0; bot.inv = 0; bot.shootCd = 0;
+  bot.overcharge = 0; bot.shield = false; bot.shieldHp = 0;
+  bot.speedBoost = 0; bot.extraDash = 0; bot.baseSpeed = globalSpeed;
+  bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0;
+  bot.ammoType = 'standard'; bot.ammo = Infinity;
+  bot.behavior = 'patrol'; bot.behaviorTimer = 0;
+  bot.reactionDelay = 80 + Math.random() * 40;
+  bot.aimError = 0;
+  try { localStorage.removeItem('nv_trials_state'); } catch {}
 }
 
 // Input handling
@@ -612,8 +981,64 @@ function resetRound(regenerateWalls = false) {
   updateHUD();
 }
 
+function startTrials() {
+  gameMode = 'trials';
+  gameState = 'playing';
+  timeLeft = TRIAL_DURATION;
+  trialPoints = 0;
+  voidRect = null;
+  voidShrinkStart = 0;
+  lastSaveTime = 0;
+
+  generateTrialsWalls();
+  drawWalls();
+  drawHazards();
+
+  const preservedSpeed = globalSpeed;
+  players[0].x = 320; players[0].y = TRIALS_H / 2; players[0].hp = MAX_HP; players[0].alive = true;
+  players[0].dash = 0; players[0].dashCd = 0; players[0].inv = 0; players[0].overcharge = 0;
+  players[0].shield = false; players[0].shieldHp = 0; players[0].speedBoost = 0;
+  players[0].extraDash = 0; players[0].squish = 0; players[0].inSlime = false;
+  players[0].lavaCd = 0; players[0].voidCd = 0; players[0].baseSpeed = preservedSpeed; players[0].angle = 0;
+  players[0].ammoType = 'standard'; players[0].ammo = Infinity;
+
+  bot.hp = BOT_MAX_HP; bot.alive = true;
+  bot.x = TRIALS_W - 320; bot.y = TRIALS_H / 2;
+  bot.vx = 0; bot.vy = 0; bot.angle = Math.PI;
+  bot.dash = 0; bot.dashCd = 0; bot.inv = 0; bot.shootCd = 0;
+  bot.overcharge = 0; bot.shield = false; bot.shieldHp = 0;
+  bot.speedBoost = 0; bot.extraDash = 0; bot.baseSpeed = preservedSpeed;
+  bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0;
+  bot.ammoType = 'standard'; bot.ammo = Infinity;
+  bot.behavior = 'patrol'; bot.behaviorTimer = 0;
+  bot.reactionDelay = 80 + Math.random() * 40;
+  bot.aimError = 0;
+
+  pushOutOfWalls(players[0]);
+  pushOutOfWalls(bot);
+
+  bullets.length = 0; particles.length = 0; pickups.length = 0;
+  if (window.NOX_GAME) {
+    window.NOX_GAME.bullets.length = 0;
+    window.NOX_GAME.pickups.length = 0;
+    window.NOX_GAME.particles.length = 0;
+  }
+
+  hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
+  spawnTrialsPickups(4);
+
+  trialHighScore = parseInt(localStorage.getItem('nv_trials_highscore') || '0', 10);
+  updateHUD();
+}
+
 function update(dt) {
   if(gameState !== 'playing') return;
+
+  if(gameMode === 'trials') {
+    updateTrials(dt);
+    return;
+  }
+
   timeLeft -= dt / 60;
 
   if(timeLeft <= 0) {
@@ -999,6 +1424,438 @@ function update(dt) {
   }
 
   updateHUD();
+}
+
+function updateTrials(dt) {
+  if(gameState !== 'playing') return;
+
+  // Timer
+  timeLeft -= dt / 60;
+  if(timeLeft <= 0) {
+    // Survived 10 minutes - WIN
+    trialPoints += Math.floor(timeLeft * 0); // remaining time bonus
+    gameState = 'gameOver';
+    const finalPoints = Math.floor(trialPoints);
+    if(finalPoints > trialHighScore) {
+      trialHighScore = finalPoints;
+      try { localStorage.setItem('nv_trials_highscore', String(trialHighScore)); } catch {}
+    }
+    if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(finalPoints);
+    return;
+  }
+
+  // Void shrink logic - starts at VOID_START_TIME (450s), shrinks over VOID_SHRINK_DURATION (30s)
+  const elapsed = TRIAL_DURATION - timeLeft;
+  if(elapsed >= VOID_START_TIME) {
+    const shrinkProgress = Math.min(1, (elapsed - VOID_START_TIME) / VOID_SHRINK_DURATION);
+    const maxRect = Math.max(TRIALS_W, TRIALS_H) * 0.5;
+    const minRect = 480; // 1x center safe zone
+    const currentRect = maxRect - shrinkProgress * (maxRect - minRect);
+    safeRadius = Math.max(minRect, currentRect);
+
+    // Draw void border (rectangular, not circular)
+    const voidG = document.getElementById('void');
+    if(voidG) voidG.setAttribute('opacity', '1');
+
+    // Update void rect visuals
+    const rect = Math.max(10, currentRect);
+    const voidHole = document.getElementById('voidHole');
+    const voidRing = document.getElementById('voidRing');
+    const voidInner = document.getElementById('voidInner');
+    const voidRing2 = document.getElementById('voidRing2');
+    const voidCore = document.getElementById('voidCore');
+    if(voidHole) voidHole.setAttribute('r', rect);
+    if(voidRing) voidRing.setAttribute('r', rect);
+    if(voidInner) voidInner.setAttribute('r', rect);
+    if(voidRing2) voidRing2.setAttribute('r', rect);
+    if(voidCore) voidCore.setAttribute('r', rect);
+
+    // Exponential damage outside safe zone
+    // Damage increases exponentially as player gets further from safe edge
+  } else {
+    safeRadius = 999;
+    const voidG = document.getElementById('void');
+    if(voidG) voidG.setAttribute('opacity', '0');
+    [voidHole, voidRing, voidInner, voidRing2, voidCore].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.setAttribute('r', '420');
+    });
+  }
+
+  // Point accrual: +1 per second (survival)
+  const elapsedTotal = TRIAL_DURATION - timeLeft;
+  if(elapsedTotal >= 1) {
+    const multiplier = elapsedTotal >= VOID_START_TIME ? 2 : 1;
+    trialPoints += 1 * multiplier / 60; // per frame at 60fps
+  }
+
+  // Hazard movement
+  hazards.forEach(h => h.t += 1);
+  if(--hazardRelocateTimer <= 0) {
+    relocateRandomHazards();
+  }
+  drawHazards();
+
+  // Pickup update
+  if(pickups.length === 0 && Math.random() < 0.008) spawnTrialsPickups(2);
+  pickups.forEach(p => p.t += 0.14);
+  {
+    const kept = pickups.filter(p => p.life-- > 0);
+    pickups.length = 0; kept.forEach(v => pickups.push(v));
+    if(window.NOX_GAME) { window.NOX_GAME.pickups.length = 0; kept.forEach(v => window.NOX_GAME.pickups.push(v)); }
+  }
+
+  // Bot AI
+  const botState = { pickups, hazards };
+  const botResult = updateBotAI(bot, botState);
+
+  // Apply bot movement
+  bot.vx = botResult.mx; bot.vy = botResult.my;
+  let botSpd = bot.baseSpeed * (bot.speedBoost > 0 ? 1.22 : 1);
+  if(bot.inSlime) botSpd *= 0.55;
+  let botDashSpd = bot.baseSpeed * 2.35;
+  if(bot.inSlime) botDashSpd *= 0.70;
+  const spd = bot.dash > 0 ? botDashSpd : botSpd;
+  let nx = bot.x + botResult.mx * spd;
+  let ny = bot.y + botResult.my * spd;
+
+  if(botResult.mx || botResult.my || bot.dash > 0) {
+    tryMoveBot(bot, nx, ny);
+  } else {
+    pushOutOfWallsBot(bot);
+  }
+
+  // Bot hazard avoidance (slime/lava) - not void
+  const hz = hazardAt(bot.x, bot.y);
+  if(hz && hz.kind === 'slime') bot.inSlime = true;
+  if(hz && hz.kind === 'lava' && isLavaActive(hz) && bot.lavaCd === 0 && bot.inv === 0) {
+    bot.hp = Math.max(0, bot.hp - 2);
+    bot.lavaCd = 60; bot.inv = 26;
+    particles.push(...spawnHitLava(bot.x, bot.y));
+    damageShake(bot, 1);
+    if(bot.hp <= 0) {
+      bot.alive = false;
+      gameState = 'gameOver';
+      if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT LAVA');
+      return;
+    }
+  }
+
+  // Void damage to bot (bot doesn't know about void, but still takes damage)
+  const dVoidBot = Math.hypot(bot.x - TRIALS_W/2, bot.y - TRIALS_H/2);
+  if(safeRadius < 900 && dVoidBot > safeRadius - PLAYER_R && bot.inv === 0) {
+    bot.voidCd = 54;
+    bot.hp = Math.max(0, bot.hp - 1);
+    particles.push(...spawnHitVoid(bot.x, bot.y));
+    damageShake(bot, 0.8);
+    if(bot.hp <= 0) {
+      bot.alive = false;
+      gameState = 'gameOver';
+      if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT VOID');
+      return;
+    }
+  }
+
+  // Bot shooting (only attacks player, not other bot)
+  if(botResult.shoot && bot.shootCd <= 0) {
+    // Bot shoots at player
+    const target = players[0];
+    if(target && target.alive) {
+      shootBotBullet(bot, target);
+    }
+  }
+
+  // Bot powerup pickup
+  for(let idx = pickups.length - 1; idx >= 0; idx--) {
+    const pu = pickups[idx];
+    if(distance(bot.x, bot.y, pu.x, pu.y) < 24) {
+      pickupBotPowerup(bot, pu);
+      pickups.splice(idx, 1);
+    }
+  }
+
+  // Player (P1) update - reuse existing logic but without 1v1 collision
+  players.forEach(p => {
+    if(!p.alive) return;
+    if(p.dashCd > 0) p.dashCd--;
+    if(p.inv > 0) p.inv--;
+    if(p.shootCd > 0) p.shootCd--;
+    if(p.overcharge > 0) p.overcharge--;
+    if(p.speedBoost > 0) p.speedBoost--;
+    if(p.squish > 0) p.squish--;
+    if(p.lavaCd > 0) p.lavaCd--;
+    if(p.voidCd > 0) p.voidCd--;
+    if(p.dash > 0) { p.dash--; if(p.dash === 0) p.inv = 6; }
+    if(wallsCollide(p.x, p.y, PLAYER_R)) pushOutOfWalls(p);
+    p.inSlime = false;
+
+    let mx = 0, my = 0;
+    if(isDownCode('KeyW') || isDown('w')) my -= 1;
+    if(isDownCode('KeyS') || isDown('s')) my += 1;
+    if(isDownCode('KeyA') || isDown('a')) mx -= 1;
+    if(isDownCode('KeyD') || isDown('d')) mx += 1;
+    const dashKey = isDownCode('ShiftLeft') || isDown('Shift') || isDown('shift');
+    const canDash = p.dash === 0 && (p.dashCd === 0 || p.extraDash > 0);
+    if(dashKey && canDash) {
+      if(p.extraDash > 0) p.extraDash--; else p.dashCd = DASH_COOLDOWN;
+      p.dash = DASH_TIME; p.inv = DASH_TIME + 4;
+      for(let i = 0; i < 8; i++) particles.push({x: p.x, y: p.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 10, max: 10, r: 2, color: p.color, type: 'dash'});
+    }
+    if(isDownCode('Space') || isDown(' ') || isDown('space')) shoot(p);
+
+    const hzPre = hazardAt(p.x, p.y);
+    if(hzPre && hzPre.kind === 'slime') p.inSlime = true;
+
+    let mag = Math.hypot(mx, my);
+    if(mag > 0) { mx /= mag; my /= mag; p.angle = Math.atan2(my, mx); }
+    let curSpeed = p.baseSpeed * (p.speedBoost > 0 ? 1.22 : 1);
+    if(p.inSlime) curSpeed *= 0.55;
+    let dashSpd = p.baseSpeed * 2.35;
+    if(p.inSlime) dashSpd *= 0.70;
+    let spd = p.dash > 0 ? dashSpd : curSpeed;
+    if(p.dash > 0 && mag === 0) { mx = Math.cos(p.angle); my = Math.sin(p.angle); }
+    let nx = p.x + mx * spd;
+    let ny = p.y + my * spd;
+    if(mx || my || p.dash > 0) tryMove(p, nx, ny);
+    else { pushOutOfWalls(p); }
+
+    // Lava damage
+    const hz = hazardAt(p.x, p.y);
+    if(hz && hz.kind === 'lava' && isLavaActive(hz) && p.lavaCd === 0) {
+      if(p.shield && p.shieldHp > 0) {
+        p.shieldHp--; p.lavaCd = 60; p.inv = Math.max(p.inv, 12);
+        particles.push(...spawnHitLava(p.x, p.y));
+        damageShake(p, 0.6);
+        if(p.shieldHp <= 0) { p.shield = false; p.shieldHp = 0; /* shield break particles */ }
+      } else if(p.inv === 0) {
+        const penalty = elapsedTotal >= VOID_START_TIME ? 60 : 30; // 3x after 7:30
+        p.hp = Math.max(0, p.hp - 2); p.lavaCd = 60; p.inv = 26;
+        trialPoints = Math.max(0, trialPoints - penalty);
+        particles.push(...spawnHitLava(p.x, p.y));
+        damageShake(p, 1);
+        if(p.hp <= 0) {
+          p.alive = false;
+          gameState = 'gameOver';
+          if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'LAVA BURNED');
+          return;
+        }
+      }
+    }
+
+    // Void damage to player
+    const dVoid = Math.hypot(p.x - TRIALS_W/2, p.y - TRIALS_H/2);
+    if(safeRadius < 900 && dVoid > safeRadius - PLAYER_R) {
+      if(p.voidCd === 0) {
+        p.voidCd = 54;
+        const dmg = elapsedTotal >= VOID_START_TIME ? 3 : 1; // 3x after 7:30
+        if(p.shield && p.shieldHp > 0) {
+          p.shieldHp--; p.inv = Math.max(p.inv, 10);
+          particles.push(...spawnHitVoid(p.x, p.y));
+          damageShake(p, 0.5);
+          if(p.shieldHp <= 0) { p.shield = false; p.shieldHp = 0; }
+        } else if(p.inv === 0) {
+          p.hp = Math.max(0, p.hp - dmg); p.inv = 22;
+          const penalty = dmg * (elapsedTotal >= VOID_START_TIME ? 3 : 1);
+          trialPoints = Math.max(0, trialPoints - penalty);
+          particles.push(...spawnHitVoid(p.x, p.y));
+          damageShake(p, 0.8);
+          if(p.hp <= 0) {
+            p.alive = false;
+            gameState = 'gameOver';
+            if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'VOID CRUSHED');
+            return;
+          }
+        }
+      }
+    }
+
+    // Player pickup pickup
+    for(let idx = pickups.length - 1; idx >= 0; idx--) {
+      const pu = pickups[idx];
+      if(distance(p.x, p.y, pu.x, pu.y) < 24) {
+        // Award points for pickup
+        const pt = POWER_TYPES[pu.kind];
+        const pointValue = elapsedTotal >= VOID_START_TIME ? 150 : 75;
+        trialPoints += pointValue;
+
+        if(pu.kind && pu.kind.indexOf('ammo_') === 0) {
+          const cfg = AMMO_PICKUP_CFG[pu.kind];
+          if(cfg) {
+            p.ammoType = cfg.bullet; p.ammo = cfg.ammo;
+            particles.push(...spawnPickupEffect(pu.x, pu.y, cfg.color));
+            p.squish = 10;
+          }
+        } else if(pt) {
+          if(pu.kind === 'overcharge') p.overcharge = pt.duration;
+          else if(pu.kind === 'shield') { p.shield = true; p.shieldHp = SHIELD_MAX_HP; p.inv = Math.max(p.inv, 8); }
+          else if(pu.kind === 'blink') { p.extraDash = Math.min(2, p.extraDash + 1); p.dashCd = 0; p.speedBoost = pt.duration; }
+          else if(pu.kind === 'heal') {
+            if(p.hp < MAX_HP) p.hp = Math.min(MAX_HP, p.hp + HEAL_AMOUNT);
+            else if(p.overcharge < 60) p.overcharge = Math.min(240, p.overcharge + 30);
+          }
+          particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color));
+        }
+        pickups.splice(idx, 1);
+      }
+    }
+  });
+
+  // Bot vs Player bullet collision
+  for(let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    if(b.owner !== 2) continue; // Only bot bullets
+    // Check collision with player[0]
+    const p = players[0];
+    if(!p || !p.alive || p.inv > 0) continue;
+    const br = b.r ?? BULLET_R;
+    if(distance(b.x, b.y, p.x, p.y) < br + PLAYER_R) {
+      // Bot hit player
+      p.hp -= b.dmg || 2;
+      p.inv = 28;
+      particles.push(...spawnHitStandard(b.x, b.y, p.color));
+      damageShake(p, 1);
+      trialPoints = Math.max(0, trialPoints - (elapsedTotal >= VOID_START_TIME ? 6 : 3)); // Penalty
+      bullets.splice(i, 1);
+      if(p.hp <= 0) {
+        p.alive = false;
+        gameState = 'gameOver';
+        if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT HIT');
+        return;
+      }
+      continue;
+    }
+  }
+
+  // Player bullets hitting bot
+  for(let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    if(b.owner !== 0) continue; // Only player bullets
+    // Check collision with bot
+    if(!bot.alive || bot.inv > 0) continue;
+    const br = b.r ?? BULLET_R;
+    if(distance(b.x, b.y, bot.x, bot.y) < br + PLAYER_R) {
+      // Player hit bot
+      let dmg = b.dmg || 2;
+      // Check for aim error distance
+      const aimDist = distance(b.x, b.y, bot.x + Math.cos(bot.aimError) * 18, bot.y + Math.sin(bot.aimError) * 18);
+      if(aimDist < br + PLAYER_R) {
+        bot.hp -= dmg;
+        bot.inv = 28;
+        particles.push(...spawnHitStandard(b.x, b.y, bot.color));
+        damageShake(bot, 1);
+        trialPoints += (elapsedTotal >= VOID_START_TIME ? 50 : 25);
+        bullets.splice(i, 1);
+        if(bot.hp <= 0) {
+          bot.alive = false;
+          gameState = 'gameOver';
+          trialPoints += 500; // Bot killed bonus
+          if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(Math.floor(trialPoints));
+          return;
+        }
+      } else {
+        // Missed - bullet continues
+      }
+    }
+  }
+
+  // Save state every SAVE_INTERVAL frames
+  if(Math.floor(timeLeft) % SAVE_INTERVAL === 0 && lastSaveTime !== Math.floor(timeLeft)) {
+    lastSaveTime = Math.floor(timeLeft);
+    saveTrialsState();
+  }
+
+  // Particles
+  particles.forEach(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.96; pt.vy *= 0.96; pt.life--; });
+  {
+    const kept = particles.filter(pt => pt.life > 0);
+    particles.length = 0; kept.forEach(v => particles.push(v));
+    if(window.NOX_GAME) { window.NOX_GAME.particles.length = 0; kept.forEach(v => window.NOX_GAME.particles.push(v)); }
+  }
+
+  updateHUD();
+}
+
+function tryMoveBot(bot, nx, ny) {
+  if(!wallsCollide(nx, ny, PLAYER_R)) { bot.x = nx; bot.y = ny; return; }
+  if(!wallsCollide(nx, bot.y, PLAYER_R)) bot.x = nx;
+  if(!wallsCollide(bot.x, ny, PLAYER_R)) bot.y = ny;
+  pushOutOfWallsBot(bot);
+}
+
+function pushOutOfWallsBot(bot) {
+  bot.x = clamp(bot.x, 10 + PLAYER_R, TRIALS_W - 10 - PLAYER_R);
+  bot.y = clamp(bot.y, 10 + PLAYER_R, TRIALS_H - 10 - PLAYER_R);
+  for(let iter = 0; iter < 4; iter++) {
+    for(const w of wallData) {
+      if(!rectCircleCollide(bot.x, bot.y, PLAYER_R, w.x, w.y, w.w, w.h)) continue;
+      const closestX = clamp(bot.x, w.x, w.x + w.w);
+      const closestY = clamp(bot.y, w.y, w.y + w.h);
+      let dx = bot.x - closestX, dy = bot.y - closestY;
+      let dist = Math.hypot(dx, dy);
+      if(dist < 0.01) { dist = 1; dx = bot.x - w.x < w.w - bot.x ? -1 : 1; dy = bot.y - w.y < w.h - bot.y ? -1 : 1; }
+      const need = PLAYER_R - dist + 0.5;
+      if(need > 0) { bot.x += (dx / dist) * need; bot.y += (dy / dist) * need; }
+    }
+  }
+  bot.x = clamp(bot.x, 10 + PLAYER_R, TRIALS_W - 10 - PLAYER_R);
+  bot.y = clamp(bot.y, 10 + PLAYER_R, TRIALS_H - 10 - PLAYER_R);
+}
+
+function shootBotBullet(bot, target) {
+  const mx = target.x - bot.x;
+  const my = target.y - bot.y;
+  const dist = Math.hypot(mx, my);
+  if(dist < 1) return;
+  const ang = Math.atan2(my, mx);
+  bot.shootCd = 11; // Standard cooldown
+  bullets.push({
+    x: bot.x + Math.cos(ang) * 18, y: bot.y + Math.sin(ang) * 18,
+    vx: Math.cos(ang) * BULLET_SPEED, vy: Math.sin(ang) * BULLET_SPEED,
+    owner: bot.id, life: 90, trail: [], type: 'standard', r: BULLET_R, dmg: 2, bounces: 0, bouncesMax: 0
+  });
+  particles.push(...spawnMuzzle(bot.x + Math.cos(ang) * 18, bot.y + Math.sin(ang) * 18, bot.color, ang));
+}
+
+function pickupBotPowerup(bot, pu) {
+  const pt = POWER_TYPES[pu.kind];
+  if(!pt) return;
+  if(pu.kind === 'overcharge') bot.overcharge = pt.duration;
+  else if(pu.kind === 'shield') { bot.shield = true; bot.shieldHp = SHIELD_MAX_HP; }
+  else if(pu.kind === 'blink') { bot.extraDash = Math.min(2, bot.extraDash + 1); bot.dashCd = 0; bot.speedBoost = pt.duration; }
+  else if(pu.kind === 'heal') { bot.hp = Math.min(bot.maxHp, bot.hp + HEAL_AMOUNT); }
+  if(pu.kind && pu.kind.indexOf('ammo_') === 0) {
+    const cfg = AMMO_PICKUP_CFG[pu.kind];
+    if(cfg) { bot.ammoType = cfg.bullet; bot.ammo = cfg.ammo; }
+  }
+}
+
+function saveTrialsState() {
+  try {
+    const state = {
+      gameMode, timeLeft, trialPoints, trialHighScore,
+      players: players.map(p => ({...p})),
+      bot: {...bot},
+      bullets: bullets.map(b => ({...b})),
+      pickups: pickups.map(p => ({...p})),
+      hazards: hazards.map(h => ({...h})),
+      particles: particles.map(p => ({...p})),
+      voidRect, voidShrinkStart, safeRadius,
+    };
+    localStorage.setItem('nv_trials_state', JSON.stringify(state));
+  } catch {}
+}
+
+function loadTrialsState() {
+  try {
+    const raw = localStorage.getItem('nv_trials_state');
+    if(!raw) return null;
+    const state = JSON.parse(raw);
+    return state;
+  } catch { return null; }
+}
+
+function clearTrialsState() {
+  try { localStorage.removeItem('nv_trials_state'); } catch {}
 }
 
 function drawWalls() {
@@ -1967,6 +2824,7 @@ function init() {
     players, bullets, pickups, particles,
     scores, gameState: () => gameState,
     endRound, showGameOver, startCountdown, resetRound, startGame, rematchGame, backToMenu, forfeit,
+    startTrials, onTrialsWin: null, onTrialsLose: null,
     getGlobalSpeed: () => globalSpeed, setGlobalSpeed,
     W, H, PLAYER_R, BULLET_R, BULLET_SPEED, MAX_HP, ROUND_TIME, WIN_SCORE,
     POWER_TYPES, BULLET_TYPES, AMMO_PICKUP_CFG, DASH_COOLDOWN, DASH_TIME, SHIELD_MAX_HP, HEAL_AMOUNT

@@ -1,0 +1,53 @@
+---
+import '../../styles/global.css';
+import GameShell from '../../components/GameShell';
+import SEO from '../../components/SEO.astro';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <SEO
+      title="NOX // Void Trials - Solo survival, one player, one keyboard"
+      description="Void Trials solo mode. 10 minutes. One player vs AI on 2x arena. Void crush at 7:30. Score points, survive or kill the bot."
+      canonical="/play/trials"
+      structuredData={{
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        name: "NOX // Void Trials",
+        description: "Solo survival trial. 10 minutes, one player vs AI, 2x arena, void crush, scoring.",
+        url: "https://nox-void.vercel.app/play/trials",
+        image: "https://nox-void.vercel.app/og.png",
+        numberOfPlayers: { "@type": "QuantitativeValue", minValue: 1, maxValue: 1 },
+        playMode: "Single"
+      }}
+    />
+  </head>
+  <body>
+    <GameShell client:load />
+    <script>
+      window.addEventListener('nox:startGame', () => {
+        const tryStart = () => {
+          const g = (window as unknown as { NOX_GAME?: { startTrials?: () => void } }).NOX_GAME;
+          if (g?.startTrials) g.startTrials();
+          else setTimeout(tryStart, 30);
+        };
+        tryStart();
+      });
+      window.addEventListener('nox:forfeit', (e) => {
+        const g = (window as unknown as { NOX_GAME?: { forfeit?: (p: number) => void } }).NOX_GAME;
+        if (g?.forfeit) g.forfeit(0);
+      });
+      window.addEventListener('nox:backToMenu', () => {
+        const tryMenu = () => {
+          const g = (window as unknown as { NOX_GAME?: { backToMenu?: () => void } }).NOX_GAME;
+          if (g?.backToMenu) g.backToMenu();
+          else setTimeout(tryMenu, 30);
+        };
+        tryMenu();
+      });
+    </script>
+  </body>
+</html>
