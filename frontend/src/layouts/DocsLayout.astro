@@ -1,7 +1,8 @@
 ---
 import '../styles/global.css';
-interface Props { title?: string; description?: string; }
-const { title = 'NOX // MANUAL', description = 'NEON VOID — complete rules, controls, hazards and HUD. Same keyboard, no bots.' } = Astro.props;
+import SEO from '../components/SEO.astro';
+interface Props { title?: string; description?: string; canonical?: string; }
+const { title = 'NOX // MANUAL', description = 'NEON VOID - complete rules, controls, hazards and HUD. Same keyboard, no bots.', canonical = '/docs' } = Astro.props;
 ---
 
 <!doctype html>
@@ -9,8 +10,14 @@ const { title = 'NOX // MANUAL', description = 'NEON VOID — complete rules, co
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{title}</title>
-    <meta name="description" content={description} />
+    <SEO title={title} description={description} canonical={canonical} type="article" structuredData={{
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://nox-void.vercel.app/" },
+        { "@type": "ListItem", position: 2, name: "Docs", item: "https://nox-void.vercel.app/docs" }
+      ]
+    }} />
   </head>
   <body>
     <div class="nox-shell">

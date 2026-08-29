@@ -1,16 +1,31 @@
 ---
 import '../styles/global.css';
 import Landing from '../components/Landing';
+import SEO from '../components/SEO.astro';
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NOX // Neon Void</title>
-    <meta
-      name="description"
-      content="A chaotic local multiplayer arena where the floor is lava and the last one standing wins."
+    <SEO
+      title="NOX // NEON VOID - Two players. One void."
+      description="A chaotic local multiplayer arena where the floor is lava and the last one standing wins. Same keyboard, 60 seconds, first to 5."
+      canonical="/"
+      structuredData={{
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        name: "NOX // NEON VOID",
+        description: "Chaotic local multiplayer arena. Same keyboard, 60 second rounds, first to 5 wins.",
+        genre: ["Arcade", "Action"],
+        playMode: "CoOp",
+        numberOfPlayers: { "@type": "QuantitativeValue", minValue: 2, maxValue: 2 },
+        applicationCategory: "Game",
+        operatingSystem: "Web",
+        url: "https://nox-void.vercel.app/",
+        image: "https://nox-void.vercel.app/og.png",
+        author: { "@type": "Organization", name: "NOX" }
+      }}
     />
   </head>
   <body>

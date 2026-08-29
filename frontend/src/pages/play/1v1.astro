@@ -1,6 +1,7 @@
 ---
 import '../../styles/global.css';
 import GameShell from '../../components/GameShell';
+import SEO from '../../components/SEO.astro';
 ---
 
 <!doctype html>
@@ -8,8 +9,21 @@ import GameShell from '../../components/GameShell';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NOX // 1V1 Duel</title>
-    <meta name="description" content="1V1 same-keyboard duel — first to 5 wins the void." />
+    <SEO
+      title="NOX // 1V1 Duel - Same keyboard, first to 5"
+      description="1V1 same keyboard duel. Dash, shoot, grab orbs, dodge lava. 60 second rounds, first to 5 wins the void."
+      canonical="/play/1v1"
+      structuredData={{
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        name: "NOX // 1V1 Duel",
+        description: "Same keyboard 1V1 arena duel. 60s rounds, first to 5.",
+        url: "https://nox-void.vercel.app/play/1v1",
+        image: "https://nox-void.vercel.app/og.png",
+        numberOfPlayers: { "@type": "QuantitativeValue", minValue: 2, maxValue: 2 },
+        playMode: "CoOp"
+      }}
+    />
   </head>
   <body>
     <GameShell client:load />

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-// 1:1 — same ship + bullet as game-logic.js (ship M 18 0 ..., r5/3.5/7/4 speeds 7.2/8.5/3.8/6.2 cd 11/14/32/16) — fixed 60Hz step so not 3x on high-refresh
+// 1:1 - same ship + bullet as game-logic.js (ship M 18 0 ..., r5/3.5/7/4 speeds 7.2/8.5/3.8/6.2 cd 11/14/32/16) - fixed 60Hz step so not 3x on high-refresh
 export default function DocBulletDemo() {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [type, setType] = useState<'standard' | 'needle' | 'cannon' | 'trick'>('standard')
@@ -126,10 +126,10 @@ export default function DocBulletDemo() {
   }, [])
 
   const meta: Record<string, { label: string; note: string }> = {
-    standard: { label: 'STANDARD', note: 'Steady and reliable — never runs out' },
-    needle: { label: 'NEEDLE', note: 'Tiny and very fast — strong from behind' },
-    cannon: { label: 'CANNON', note: 'Big and slow — hits really hard' },
-    trick: { label: 'TRICK', note: 'Bounces off walls — first hit is strongest' },
+    standard: { label: 'STANDARD', note: 'Steady and reliable - never runs out' },
+    needle: { label: 'NEEDLE', note: 'Tiny and very fast - strong from behind' },
+    cannon: { label: 'CANNON', note: 'Big and slow - hits really hard' },
+    trick: { label: 'TRICK', note: 'Bounces off walls - first hit is strongest' },
   }
 
   return (

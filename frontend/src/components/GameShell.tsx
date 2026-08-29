@@ -535,7 +535,7 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
           <h2 id="how-modal-title" className="how-modal__title">
             NEON VOID // QUICK GUIDE
           </h2>
-          <p className="how-modal__subtitle">Same keyboard, two players — first to 5 wins.</p>
+          <p className="how-modal__subtitle">Same keyboard, two players - first to 5 wins.</p>
         </div>
 
         <div className="how-modal__body">
@@ -569,7 +569,7 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                 </span>
               </div>
               <p className="how-desc">
-                Use the move keys to run around. Hold <strong>Shift</strong> or <strong>/</strong> to <strong>dash</strong> — you flash forward and cannot get hit for a moment. Hold <strong>Space</strong> or <strong>Enter</strong> to keep shooting.
+                Use the move keys to run around. Hold <strong>Shift</strong> or <strong>/</strong> to <strong>dash</strong> - you flash forward and cannot get hit for a moment. Hold <strong>Space</strong> or <strong>Enter</strong> to keep shooting.
               </p>
             </div>
           </section>
@@ -587,19 +587,19 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
               </div>
               <ul className="how-list">
                 <li>
-                  <strong style={{ color: 'var(--nox-amber)' }}>⚡ Triple shot</strong> — shoots three bullets at once for a little while.
+                  <strong style={{ color: 'var(--nox-amber)' }}>⚡ Triple shot</strong> - shoots three bullets at once for a little while.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-cyan)' }}>❄ Shield</strong> — puts a bubble around you. It cracks when hit and breaks after a few hits.
+                  <strong style={{ color: 'var(--nox-cyan)' }}>❄ Shield</strong> - puts a bubble around you. It cracks when hit and breaks after a few hits.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-lime)' }}>✦ Dash boost</strong> — lets you dash again right away and makes you a bit faster.
+                  <strong style={{ color: 'var(--nox-lime)' }}>✦ Dash boost</strong> - lets you dash again right away and makes you a bit faster.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--success)' }}>✚ Heart</strong> — heals you a little.
+                  <strong style={{ color: 'var(--success)' }}>✚ Heart</strong> - heals you a little.
                 </li>
                 <li style={{ marginTop: 8, opacity: 0.95 }}>
-                  <strong style={{ color: '#a78bfa' }}>Needle</strong> — tiny and very fast. Weak from the front, super strong from behind. &nbsp;•&nbsp; <strong style={{ color: '#ffb23e' }}>Cannon</strong> — big and slow but hits really hard. &nbsp;•&nbsp; <strong style={{ color: '#58d8ff' }}>Trick</strong> — bounces off walls.
+                  <strong style={{ color: '#a78bfa' }}>Needle</strong> - tiny and very fast. Weak from the front, super strong from behind. &nbsp;•&nbsp; <strong style={{ color: '#ffb23e' }}>Cannon</strong> - big and slow but hits really hard. &nbsp;•&nbsp; <strong style={{ color: '#58d8ff' }}>Trick</strong> - bounces off walls.
                 </li>
               </ul>
               <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
@@ -615,16 +615,16 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
             <div className="how-card how-card--amber">
               <ul className="how-list">
                 <li>
-                  <strong>Walls</strong> — dark blocks. They stop you and stop most bullets. Trick bullets bounce off them.
+                  <strong>Walls</strong> - dark blocks. They stop you and stop most bullets. Trick bullets bounce off them.
                 </li>
                 <li>
-                  <strong style={{ color: '#fb923c' }}>Lava</strong> — orange circle on the floor. It blinks first to warn you, then turns red and burns you if you stay on it.
+                  <strong style={{ color: '#fb923c' }}>Lava</strong> - orange circle on the floor. It blinks first to warn you, then turns red and burns you if you stay on it.
                 </li>
                 <li>
-                  <strong style={{ color: '#10b981' }}>Slime</strong> — green goo that makes you move slow while you are inside. It does not hurt you.
+                  <strong style={{ color: '#10b981' }}>Slime</strong> - green goo that makes you move slow while you are inside. It does not hurt you.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-lime)' }}>The Void</strong> — after a while the edge of the arena starts closing in. Green blocks crumble at the border. Stay in the middle or you will lose health.
+                  <strong style={{ color: 'var(--nox-lime)' }}>The Void</strong> - after a while the edge of the arena starts closing in. Green blocks crumble at the border. Stay in the middle or you will lose health.
                 </li>
               </ul>
             </div>

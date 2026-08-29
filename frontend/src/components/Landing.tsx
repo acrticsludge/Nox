@@ -39,7 +39,7 @@ const ORBS: Record<OrbType, { icon: string; label: string; desc: string; color: 
 
 type BulletType = 'standard' | 'needle' | 'cannon' | 'trick'
 const BULLETS: Record<BulletType, { icon: string; label: string; desc: string; color: string; border: string; accent: 'cyan' | 'pink' | 'amber' | 'orange' }> = {
-  standard: { icon: '●', label: 'STANDARD', desc: 'Your normal shot — balanced and reliable. You never run out.', color: '#d6e2e4', border: 'rgba(214,226,228,0.4)' },
+  standard: { icon: '●', label: 'STANDARD', desc: 'Your normal shot - balanced and reliable. You never run out.', color: '#d6e2e4', border: 'rgba(214,226,228,0.4)' },
   needle: { icon: '◈', label: 'NEEDLE', desc: 'Tiny and super fast. Weak from the front, huge from behind.', color: '#a78bfa', border: 'rgba(167,139,250,0.45)' },
   cannon: { icon: '■', label: 'CANNON', desc: 'Big and slow. Hits really hard. You only get a few.', color: 'var(--nox-amber)', border: 'var(--nox-amber)' },
   trick: { icon: '◇', label: 'TRICK', desc: 'Bounces off walls. First hit is strongest.', color: 'var(--nox-cyan)', border: 'var(--nox-cyan)' },
@@ -168,7 +168,7 @@ const instructions: {
         <Text type="body" color="secondary">
           Knock out the other player to win the round.
           <br />
-          <strong>After a while the void closes in — stay in the middle.</strong>
+          <strong>After a while the void closes in - stay in the middle.</strong>
         </Text>
       </div>
     ),
@@ -292,7 +292,7 @@ export default function Landing() {
             <span>YOUR SHOT</span>
           </h2>
           <p style={{ maxWidth: '52ch', marginTop: '12px', color: 'var(--nox-muted)', font: '12px/1.7 var(--nox-mono)' }}>
-            Four kinds of bullets. Same arena, new tricks. Pick them up — you get a few shots, then you go back to normal.
+            Four kinds of bullets. Same arena, new tricks. Pick them up - you get a few shots, then you go back to normal.
           </p>
         </div>
 
@@ -311,7 +311,7 @@ export default function Landing() {
               </HStack>
               <Heading level={3}>Standard</Heading>
               <Text type="body" color="secondary">
-                Your normal shot — balanced and reliable. You never run out.
+                Your normal shot - balanced and reliable. You never run out.
               </Text>
             </VStack>
           </Card>
@@ -349,7 +349,7 @@ export default function Landing() {
               </HStack>
               <Heading level={3}>Cannon</Heading>
               <Text type="body" color="secondary">
-                Big and slow. Hits really hard. You only get a few — make them count.
+                Big and slow. Hits really hard. You only get a few - make them count.
               </Text>
             </VStack>
           </Card>
