@@ -24,10 +24,54 @@ import SEO from '../../components/SEO.astro';
         playMode: "Single"
       }}
     />
+    <style>
+      .trials-hud-overlay {
+        position: absolute; top: 72px; left: 16px; z-index: 10;
+        font: 14px var(--nox-mono); color: var(--nox-fg);
+        display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+      }
+      .trials-hud-overlay .trials-pts {
+        font-size: 32px; font-weight: 800; color: var(--nox-lime); letter-spacing: -0.02em;
+        text-shadow: 0 0 20px rgba(201,255,47,0.4);
+      }
+      .trials-hud-overlay .trials-bot-hp {
+        font-size: 12px; color: var(--nox-amber); letter-spacing: 0.05em;
+      }
+      .trials-hud-overlay .trials-bot-hp .bar {
+        width: 120px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 2px; overflow: hidden;
+      }
+      .trials-hud-overlay .trials-bot-hp .bar-fill {
+        height: 100%; background: var(--nox-amber); border-radius: 3px; transition: width 0.3s;
+      }
+      .trials-hud-overlay .trials-void-warn {
+        font-size: 11px; color: #ef4444; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.5s;
+        text-shadow: 0 0 10px rgba(239,68,68,0.6);
+      }
+      .trials-hud-overlay .trials-void-warn.active { opacity: 1; animation: voidPulse 1s infinite; }
+      @keyframes voidPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
   </head>
   <body>
     <GameShell client:load />
+    <div class="trials-hud-overlay" id="trialsHud" style="display:none">
+      <div class="trials-pts" id="trialPoints">0</div>
+      <div class="trials-bot-hp">
+        BOT HP <span id="botHp">12 / 12</span>
+        <div class="bar"><div class="bar-fill" id="botHpBar" style="width:100%"></div></div>
+      </div>
+      <div class="trials-void-warn" id="voidWarn">⚠ VOID CRUSHING</div>
+    </div>
     <script>
+      // Show trials HUD when trials mode starts
+      const observer = new MutationObserver(() => {
+        const g = (window as unknown as { NOX_GAME?: { gameState?: () => string } }).NOX_GAME;
+        if(g?.gameState?.() === 'playing') {
+          const hud = document.getElementById('trialsHud');
+          if(hud) hud.style.display = 'flex';
+        }
+      });
+      document.body.addEventListener('DOMContentLoaded', () => { observer.observe(document.body, { childList: true, subtree: true }); });
+
       window.addEventListener('nox:startGame', () => {
         const tryStart = () => {
           const g = (window as unknown as { NOX_GAME?: { startTrials?: () => void } }).NOX_GAME;

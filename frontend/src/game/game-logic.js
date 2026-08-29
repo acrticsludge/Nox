@@ -2454,6 +2454,33 @@ function startCountdown() {
 }
 
 function updateHUD() {
+  // Trials mode HUD
+  if(gameMode === 'trials') {
+    const ptsEl = document.getElementById('trialPoints');
+    if(ptsEl) ptsEl.textContent = Math.floor(trialPoints).toLocaleString();
+    const botHpEl = document.getElementById('botHp');
+    if(botHpEl) {
+      const pct = (bot.hp / bot.maxHp) * 100;
+      botHpEl.textContent = `${bot.hp} / ${bot.maxHp}`;
+      botHpEl.style.width = pct + '%';
+    }
+    const rl = document.getElementById('roundLabel');
+    if(rl) {
+      const elapsed = TRIAL_DURATION - timeLeft;
+      rl.textContent = `VOID TRIALS // ${Math.floor(trialPoints).toLocaleString()} PTS`;
+      rl.style.color = elapsed >= VOID_START_TIME ? '#ef4444' : '#c9ff2f';
+      rl.style.opacity = '0.95';
+    }
+    const timerEl = document.getElementById('timer');
+    if(timerEl) {
+      const m = Math.floor(Math.max(0, timeLeft) / 60).toString().padStart(2, '0');
+      const s = Math.floor(Math.max(0, timeLeft) % 60).toString().padStart(2, '0');
+      const inner = timerEl.querySelector('.cyber-timer__inner');
+      if(inner) inner.textContent = `${m}:${s}`;
+    }
+    return;
+  }
+  
   const scoreP1 = document.getElementById('scoreP1');
   const scoreP2 = document.getElementById('scoreP2');
   if(scoreP1) scoreP1.textContent = scores[0];
@@ -2602,6 +2629,46 @@ function updateHUD() {
       const anyActive = p.overcharge > 0 || p.shield || p.speedBoost > 0 || p.extraDash > 0;
       card.classList.toggle('hud-active', anyActive);
     }
+  }
+}
+
+function updateTrialsHUD() {
+  // Points display - update scoreP1 to show points (trials uses single player)
+  const ptsEl = document.getElementById('trialPoints');
+  if(ptsEl) ptsEl.textContent = Math.floor(trialPoints).toLocaleString();
+  
+  // Bot HP display
+  const botHpEl = document.getElementById('botHp');
+  if(botHpEl) {
+    const pct = (bot.hp / bot.maxHp) * 100;
+    botHpEl.textContent = `${bot.hp} / ${bot.maxHp}`;
+    botHpEl.style.width = pct + '%';
+  }
+
+  // Timer with void warning at 7:30
+  const m = Math.floor(Math.max(0, timeLeft) / 60).toString().padStart(2, '0');
+  const s = Math.floor(Math.max(0, timeLeft) % 60).toString().padStart(2, '0');
+  const timerEl = document.getElementById('timer');
+  if(timerEl) {
+    const inner = timerEl.querySelector('.cyber-timer__inner');
+    if(inner) inner.textContent = `${m}:${s}`;
+  }
+
+  // Void warning
+  const elapsed = TRIAL_DURATION - timeLeft;
+  if(elapsed >= VOID_START_TIME) {
+    const warn = document.getElementById('voidWarn');
+    if(warn) warn.style.opacity = '1';
+    // Red timer when void is active
+    if(timerEl) timerEl.classList.add('timer-critical');
+  }
+
+  // Round label
+  const rl = document.getElementById('roundLabel');
+  if(rl) {
+    rl.textContent = `VOID TRIALS // ${Math.floor(trialPoints).toLocaleString()} PTS`;
+    rl.style.color = elapsed >= VOID_START_TIME ? '#ef4444' : '#c9ff2f';
+    rl.style.opacity = '0.95';
   }
 }
 
