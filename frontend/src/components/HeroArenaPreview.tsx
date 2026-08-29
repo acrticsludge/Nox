@@ -178,7 +178,7 @@ export default function HeroArenaPreview() {
 
     const frame = (now: number) => {
       raf=requestAnimationFrame(frame)
-      // throttle to ~60fps so it is not 3× on 144Hz — regular speed
+      // throttle to ~60fps so it is not 3× on 144Hz - regular speed
       if (now - lastDraw < 15) return
       lastDraw = now
       try {
@@ -392,7 +392,7 @@ export default function HeroArenaPreview() {
   }, [])
 
   return (
-    <div className="hero-preview-wrap" role="img" aria-label="Live preview of Neon Void arena — two players fighting, 30 second loop">
+    <div className="hero-preview-wrap" role="img" aria-label="Live preview of Neon Void arena - two players fighting, 30 second loop">
       <div className="hero-preview-frame">
         <div className="hero-preview-top">
           <span className="hero-preview-badge">▶ PREVIEW // 30S LOOP</span>
@@ -431,7 +431,7 @@ export default function HeroArenaPreview() {
           <g id="pv-pickups"/><g id="pv-bullets"/><g id="pv-players"/><g id="pv-particles"/>
         </svg>
         <div className="hero-preview-bar" aria-hidden="true"><div ref={barRef} className="hero-preview-bar__fill"/></div>
-        <div className="hero-preview-caption"><span>Real match — no bots, just you vs a friend</span><span style={{opacity:0.7}}>Watch the dash, shots and hazards</span></div>
+        <div className="hero-preview-caption"><span>Real match - no bots, just you vs a friend</span><span style={{opacity:0.7}}>Watch the dash, shots and hazards</span></div>
       </div>
       <div className="hero-preview-legend"><span style={{color:'#a78bfa'}}>◈ NEEDLE</span><span style={{color:'var(--nox-amber)'}}>■ CANNON</span><span style={{color:'var(--nox-cyan)'}}>◇ TRICK</span><span style={{color:'#d6e2e4'}}>● STANDARD</span></div>
     </div>

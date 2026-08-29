@@ -1,7 +1,8 @@
 ---
 import '../styles/global.css';
+import SEO from '../components/SEO.astro';
 
-// Mode registry — add entry + create src/pages/play/<slug>.astro for a new arena
+// Mode registry - add entry + create src/pages/play/<slug>.astro for a new arena
 const modes = [
   {
     slug: '1v1',
@@ -10,7 +11,7 @@ const modes = [
     badge: 'LIVE // 2 PLAYERS • 60s',
     badgeVariant: 'cyan',
     accent: 'cyan',
-    desc: 'Dash through walls, grab orbs. First to 5 wins. No bots — you vs friend, one keyboard.',
+    desc: 'Dash through walls, grab orbs. First to 5 wins. No bots - you vs friend, one keyboard.',
     meta: ['2P', 'LOCAL', '60S', 'FIRST TO 5'],
     cta: 'ENTER ARENA →',
     live: true,
@@ -47,8 +48,19 @@ const modes = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NOX // Select Mode</title>
-    <meta name="description" content="Select your void — 1V1 duel live, more modes incoming." />
+    <SEO
+      title="NOX // Select Mode - Choose your void"
+      description="Select your void. 1V1 same keyboard duel live, more arenas incoming. First to 5 wins."
+      canonical="/play"
+      structuredData={{
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://nox-void.vercel.app/" },
+          { "@type": "ListItem", position: 2, name: "Play", item: "https://nox-void.vercel.app/play" }
+        ]
+      }}
+    />
   </head>
   <body>
     <div class="nox-shell">
@@ -72,7 +84,7 @@ const modes = [
         <section style="padding-bottom:28px">
           <div class="eyebrow"><span class="eyebrow-line"></span> CHOOSE YOUR VOID</div>
           <h1 class="hero-title" style="font-size:clamp(44px,8vw,84px); margin:18px 0 12px; line-height:0.85">SELECT<br/><em>MODE</em></h1>
-          <p class="hero-copy" style="max-width:58ch">Two players, one keyboard, one void. Jump into <strong style="color:var(--nox-fg)">1V1</strong> — more arenas opening soon.</p>
+          <p class="hero-copy" style="max-width:58ch">Two players, one keyboard, one void. Jump into <strong style="color:var(--nox-fg)">1V1</strong> - more arenas opening soon.</p>
         </section>
 
         <div class="mode-grid">
@@ -93,7 +105,7 @@ const modes = [
         <div class="mode-footer">
           <div>
             <div style="font:11px var(--nox-mono); font-weight:800; letter-spacing:0.12em; color:var(--nox-lime)">1V1 IS LIVE</div>
-            <div style="font:11px var(--nox-mono); color:var(--nox-muted); margin-top:6px; line-height:1.6">Jump in now — squad and trials are warming up. Check back soon.</div>
+            <div style="font:11px var(--nox-mono); color:var(--nox-muted); margin-top:6px; line-height:1.6">Jump in now - squad and trials are warming up. Check back soon.</div>
           </div>
           <a href="/play/1v1" class="btn btn-primary">▶ PLAY 1V1 NOW</a>
         </div>

@@ -55,7 +55,7 @@ export function DocWallDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge">WALLS</span>
-          <span className="docs-demo__note">Blocks shots — trick shots bounce</span>
+          <span className="docs-demo__note">Blocks shots - trick shots bounce</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
           <defs>
@@ -159,7 +159,7 @@ export function DocSlimeDemo() {
         ${inSlime ? `<text x="0" y="28" text-anchor="middle" font-size="7" font-family="JetBrains Mono, monospace" fill="#6ee7b7">SLOW</text>` : ''}
       `
       const txt = el.querySelector('#sd-label') as HTMLDivElement | null
-      if (txt) txt.textContent = inSlime ? 'INSIDE SLIME — YOU ARE SLOW' : 'Move freely'
+      if (txt) txt.textContent = inSlime ? 'INSIDE SLIME - YOU ARE SLOW' : 'Move freely'
     }
     loop(performance.now())
     return () => cancelAnimationFrame(raf)
@@ -226,7 +226,7 @@ export function DocVoidDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge" style={{ background: '#c9ff2f', borderColor: '#c9ff2f', color: '#07090b' }}>THE VOID</span>
-          <span className="docs-demo__note">Closes in — stay in the middle</span>
+          <span className="docs-demo__note">Closes in - stay in the middle</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
           <defs>

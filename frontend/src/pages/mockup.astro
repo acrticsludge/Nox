@@ -1,13 +1,18 @@
 ---
 import '../styles/global.css';
+import SEO from '../components/SEO.astro';
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NOX // MOCKUP LAB — Vector Rework</title>
-    <meta name="description" content="NOX gamebox vector rework — 3 crisp directions for players, buffs, debuffs, shooting FX. Not live." />
+    <SEO
+      title="NOX // MOCKUP LAB - Vector rework"
+      description="NOX gamebox vector rework - 3 crisp directions for players, buffs, debuffs, shooting FX. Not indexed."
+      canonical="/mockup"
+      noindex={true}
+    />
   </head>
   <body>
     <div class="nox-shell">
@@ -26,13 +31,13 @@ import '../styles/global.css';
         <section class="hero-section" style="padding-top:64px; padding-bottom:32px">
           <div class="eyebrow"><span class="eyebrow-line"></span> VECTOR REWORK // NO EMOJIS // CRISP SVG</div>
           <h1 class="hero-title" style="font-size:clamp(44px,8vw,96px); margin:18px 0 16px">GAMEBOX<br/><em>REWORK</em></h1>
-          <p class="hero-copy" style="max-width:62ch">Blurry emojis replaced with razor vectors. Three directions — same Nox palette — pick one and we ship it to <code style="background:rgba(255,255,255,0.06); padding:2px 6px; border:1px solid var(--nox-border)">/play</code>. Shooting FX, hit sparks, dash flames all vector, not text.</p>
+          <p class="hero-copy" style="max-width:62ch">Blurry emojis replaced with razor vectors. Three directions - same Nox palette - pick one and we ship it to <code style="background:rgba(255,255,255,0.06); padding:2px 6px; border:1px solid var(--nox-border)">/play</code>. Shooting FX, hit sparks, dash flames all vector, not text.</p>
           <div style="display:flex; gap:10px; margin-top:22px; flex-wrap:wrap">
-            <span class="cyber-badge cyber-badge--cyan"><span class="cyber-badge__text">A // RAZOR — hairline • 1px • vector</span><span class="cyber-badge__spark"></span></span>
-            <span class="cyber-badge cyber-badge--lime"><span class="cyber-badge__text">B // PLASMA — soft bloom • inner glow</span><span class="cyber-badge__spark"></span></span>
-            <span class="cyber-badge cyber-badge--pink"><span class="cyber-badge__text">C // FORGE — brutal • 2px • block</span><span class="cyber-badge__spark"></span></span>
+            <span class="cyber-badge cyber-badge--cyan"><span class="cyber-badge__text">A // RAZOR - hairline • 1px • vector</span><span class="cyber-badge__spark"></span></span>
+            <span class="cyber-badge cyber-badge--lime"><span class="cyber-badge__text">B // PLASMA - soft bloom • inner glow</span><span class="cyber-badge__spark"></span></span>
+            <span class="cyber-badge cyber-badge--pink"><span class="cyber-badge__text">C // FORGE - brutal • 2px • block</span><span class="cyber-badge__spark"></span></span>
           </div>
-          <p style="margin-top:14px; font:11px var(--nox-mono); color:var(--nox-muted); letter-spacing:0.06em">How to use: compare columns → tell me “ship A/B/C” or “A players + B buffs + C shooting” — we’ll wire the winner into <code style="color:var(--nox-lime)">game-logic.js</code>.</p>
+          <p style="margin-top:14px; font:11px var(--nox-mono); color:var(--nox-muted); letter-spacing:0.06em">How to use: compare columns → tell me “ship A/B/C” or “A players + B buffs + C shooting” - we’ll wire the winner into <code style="color:var(--nox-lime)">game-logic.js</code>.</p>
         </section>
 
         <!-- VARIANT COMPARISON GRID HEADER -->
@@ -61,11 +66,11 @@ import '../styles/global.css';
                 </div>
                 <div class="player-mock">
                   <svg viewBox="0 0 80 80" width="84" height="84"><g transform="translate(40,40)"><path d="M 18 0 L -10 -8 L -6 0 L -10 8 Z" fill="#3ec5f2" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><circle cx="0" cy="0" r="5" fill="#fff"/><path d="M -10 0 L -22 -5 L -24 0 L -22 5 Z" fill="#a9e9ff" opacity="0.95"/><path d="M -12 -2 L -18 -4 M -12 2 L -18 4" stroke="#58d8ff" stroke-width="1.2" opacity="0.7"/></g></svg>
-                  <span class="mock-cap">dash — twin jet</span>
+                  <span class="mock-cap">dash - twin jet</span>
                 </div>
                 <div class="player-mock">
                   <svg viewBox="0 0 80 80" width="84" height="84"><g transform="translate(40,40)"><path d="M 18 0 L -10 -8 L -6 0 L -10 8 Z" fill="#3ec5f2" stroke="#fff" stroke-width="1.6"/><circle cx="0" cy="0" r="5" fill="#fff"/><g transform="translate(18,0)"><path d="M -4 -4 L 4 0 L -4 4 Z" fill="#fff" stroke="#58d8ff" stroke-width="1.2"/><circle cx="0" cy="0" r="1.2" fill="#58d8ff"/><g opacity="0.9"><path d="M 4 0 L 18 0" stroke="#fff" stroke-width="1.2"/><circle cx="10" cy="0" r="1" fill="#fff"/><circle cx="16" cy="0" r="0.7" fill="#fff" opacity="0.7"/></g></g></g></svg>
-                  <span class="mock-cap">shoot — star muzzle</span>
+                  <span class="mock-cap">shoot - star muzzle</span>
                 </div>
               </div>
               <div class="player-row-mock">
@@ -85,15 +90,15 @@ import '../styles/global.css';
               <div class="player-row-mock">
                 <div class="player-mock">
                   <svg viewBox="0 0 80 80" width="84" height="84"><g transform="translate(40,40)"><ellipse cx="0" cy="14" rx="13" ry="5" fill="rgba(0,0,0,0.35)"/><path d="M 0 -15 L 11 -7 L 11 7 L 0 15 L -11 7 L -11 -7 Z" fill="none" stroke="#58d8ff" stroke-width="1.8"/><path d="M 0 -12 L 9 -6 L 9 6 L 0 12 L -9 6 L -9 -6 Z" fill="#0f1f25" stroke="rgba(88,216,255,0.6)" stroke-width="1"/><circle cx="0" cy="0" r="4.2" fill="#fff"/><circle cx="0" cy="0" r="7.5" fill="none" stroke="#58d8ff" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"/><circle cx="0" cy="0" r="2.2" fill="#58d8ff" opacity="0.95"/></g></svg>
-                  <span class="mock-cap">P1 hex — orbit ring</span>
+                  <span class="mock-cap">P1 hex - orbit ring</span>
                 </div>
                 <div class="player-mock">
                   <svg viewBox="0 0 80 80" width="84" height="84"><g transform="translate(40,40)"><path d="M 0 -15 L 11 -7 L 11 7 L 0 15 L -11 7 L -11 -7 Z" fill="none" stroke="#58d8ff" stroke-width="1.8"/><circle cx="0" cy="0" r="4.2" fill="#fff"/><circle cx="0" cy="0" r="10" fill="none" stroke="#58d8ff" stroke-width="1.2" opacity="0.35"/><g opacity="0.9"><ellipse cx="-14" cy="0" rx="6" ry="2.2" fill="#a9e9ff"/><ellipse cx="-14" cy="0" rx="3" ry="1" fill="#fff" opacity="0.9"/></g></g></svg>
-                  <span class="mock-cap">dash — bloom thrust</span>
+                  <span class="mock-cap">dash - bloom thrust</span>
                 </div>
                 <div class="player-mock">
                   <svg viewBox="0 0 80 80" width="84" height="84"><g transform="translate(40,40)"><path d="M 0 -15 L 11 -7 L 11 7 L 0 15 L -11 7 L -11 -7 Z" fill="none" stroke="#58d8ff" stroke-width="1.2" opacity="0.8"/><circle cx="0" cy="0" r="4.2" fill="#fff"/><g transform="translate(12,0)"><circle cx="6" cy="0" r="3" fill="#fff" stroke="#58d8ff" stroke-width="1.4"/><circle cx="6" cy="0" r="1.2" fill="#58d8ff"/><circle cx="14" cy="0" r="6" fill="none" stroke="#58d8ff" stroke-width="0.8" opacity="0.35"/><circle cx="14" cy="0" r="1.4" fill="#a9e9ff" opacity="0.9"/></g></g></svg>
-                  <span class="mock-cap">orb shot — 2-stage</span>
+                  <span class="mock-cap">orb shot - 2-stage</span>
                 </div>
               </div>
               <div class="player-row-mock">
@@ -110,15 +115,15 @@ import '../styles/global.css';
               <div class="player-row-mock">
                 <div class="player-mock">
                   <svg viewBox="0 0 80 80" width="84" height="84"><g transform="translate(40,40)"><rect x="-14" y="-11" width="28" height="22" rx="2" fill="#0f1a1e" stroke="#58d8ff" stroke-width="2"/><rect x="-14" y="-11" width="28" height="5" rx="1" fill="#58d8ff" opacity="0.95"/><rect x="-10" y="2" width="10" height="6" rx="1" fill="#fff"/><rect x="6" y="-3" width="10" height="6" rx="1" fill="#58d8ff"/><circle cx="10" cy="0" r="1.4" fill="#0f1a1e"/></g></svg>
-                  <span class="mock-cap">P1 block — heavy 2px</span>
+                  <span class="mock-cap">P1 block - heavy 2px</span>
                 </div>
                 <div class="player-mock">
                   <svg viewBox="0 0 80 80" width="84" height="84"><g transform="translate(40,40)"><rect x="-14" y="-11" width="28" height="22" rx="2" fill="#0f1a1e" stroke="#58d8ff" stroke-width="2"/><rect x="-20" y="-4" width="8" height="8" rx="1" fill="#58d8ff"/><rect x="-20" y="-2" width="8" height="3" fill="#fff" opacity="0.85"/></g></svg>
-                  <span class="mock-cap">dash — exhaust block</span>
+                  <span class="mock-cap">dash - exhaust block</span>
                 </div>
                 <div class="player-mock">
                   <svg viewBox="0 0 80 80" width="84" height="84"><g transform="translate(40,40)"><rect x="-14" y="-11" width="28" height="22" rx="2" fill="#0f1a1e" stroke="#fff" stroke-width="1.6"/><rect x="12" y="-4" width="10" height="8" rx="1" fill="#fff" stroke="#58d8ff" stroke-width="1.6"/><line x1="22" x2="30" y1="0" y2="0" stroke="#fff" stroke-width="2"/><rect x="28" y="-1.5" width="4" height="3" fill="#58d8ff"/></g></svg>
-                  <span class="mock-cap">slug — square flash</span>
+                  <span class="mock-cap">slug - square flash</span>
                 </div>
               </div>
               <div class="player-row-mock">
@@ -136,7 +141,7 @@ import '../styles/global.css';
           <div style="display:flex; align-items:center; gap:12px; margin:28px 0 16px; border-top:1px solid var(--nox-border); padding-top:22px">
             <span style="font:10px var(--nox-mono); letter-spacing:0.16em; color:var(--nox-pink)">02 // BUFFS // ORBS</span>
             <span style="flex:1; height:1px; background:var(--nox-border)"></span>
-            <span style="font:10px var(--nox-mono); color:var(--nox-muted)">over // shield // blink // heal — no emojis</span>
+            <span style="font:10px var(--nox-mono); color:var(--nox-muted)">over // shield // blink // heal - no emojis</span>
           </div>
 
           <div class="mock-grid">
@@ -187,10 +192,10 @@ import '../styles/global.css';
             <div class="mock-card mock-card--a">
               <div class="mock-variant-label">A // RAZOR</div>
               <div class="haz-grid">
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><path d="M 12 12 L 68 12 L 62 48 L 18 48 Z" fill="#1a0b0e" stroke="#dc2626" stroke-width="1.2"/><path d="M 20 18 L 60 18 L 56 42 L 22 42 Z" fill="#7c2d12"/><path d="M 28 24 Q 32 20 38 24 T 52 26 Q 40 32 30 28 Z" fill="#fb923c" opacity="0.9"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="#fb923c">LAVA</text></svg><span>LAVA — cracked vent</span></div>
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><path d="M 12 12 L 68 12 L 62 48 L 18 48 Z" fill="none" stroke="#fb923c" stroke-width="1.2" stroke-dasharray="4 3"/><circle cx="40" cy="28" r="8" fill="none" stroke="#fb923c" stroke-width="1"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">VENT</text></svg><span>VENT — warning ring</span></div>
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><path d="M 14 38 Q 18 14 40 14 Q 62 14 66 38 Q 62 44 40 44 Q 18 44 14 38 Z" fill="#065f46" stroke="#10b981" stroke-width="1.2"/><ellipse cx="28" cy="24" rx="3" ry="2" fill="rgba(255,255,255,0.22)"/><ellipse cx="50" cy="32" rx="6" ry="3" fill="rgba(16,185,129,0.2)"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">SLIME</text></svg><span>SLIME — puddle highlight</span></div>
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="10" y="22" width="60" height="10" rx="1" fill="#0f172a" stroke="rgba(255,255,255,0.08)" stroke-width="1"/><rect x="10" y="22" width="60" height="1.2" rx="1" fill="rgba(255,255,255,0.09)"/></svg><span>WALL — 1px highlight</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><path d="M 12 12 L 68 12 L 62 48 L 18 48 Z" fill="#1a0b0e" stroke="#dc2626" stroke-width="1.2"/><path d="M 20 18 L 60 18 L 56 42 L 22 42 Z" fill="#7c2d12"/><path d="M 28 24 Q 32 20 38 24 T 52 26 Q 40 32 30 28 Z" fill="#fb923c" opacity="0.9"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="#fb923c">LAVA</text></svg><span>LAVA - cracked vent</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><path d="M 12 12 L 68 12 L 62 48 L 18 48 Z" fill="none" stroke="#fb923c" stroke-width="1.2" stroke-dasharray="4 3"/><circle cx="40" cy="28" r="8" fill="none" stroke="#fb923c" stroke-width="1"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">VENT</text></svg><span>VENT - warning ring</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><path d="M 14 38 Q 18 14 40 14 Q 62 14 66 38 Q 62 44 40 44 Q 18 44 14 38 Z" fill="#065f46" stroke="#10b981" stroke-width="1.2"/><ellipse cx="28" cy="24" rx="3" ry="2" fill="rgba(255,255,255,0.22)"/><ellipse cx="50" cy="32" rx="6" ry="3" fill="rgba(16,185,129,0.2)"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">SLIME</text></svg><span>SLIME - puddle highlight</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="10" y="22" width="60" height="10" rx="1" fill="#0f172a" stroke="rgba(255,255,255,0.08)" stroke-width="1"/><rect x="10" y="22" width="60" height="1.2" rx="1" fill="rgba(255,255,255,0.09)"/></svg><span>WALL - 1px highlight</span></div>
               </div>
               <div class="mock-note">1.2px stroke, polygon chamfer, no blur, label 6px mono.</div>
             </div>
@@ -198,10 +203,10 @@ import '../styles/global.css';
             <div class="mock-card mock-card--b">
               <div class="mock-variant-label" style="color:var(--nox-lime); border-color:rgba(201,255,47,0.3)">B // PLASMA</div>
               <div class="haz-grid">
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><circle cx="40" cy="26" r="16" fill="url(#mockLavaB)" stroke="#fff" stroke-width="1.2"/><defs><radialGradient id="mockLavaB"><stop offset="0%" stop-color="#fb923c"/><stop offset="55%" stop-color="#f97316"/><stop offset="100%" stop-color="#7c2d12"/></radialGradient></defs><circle cx="40" cy="26" r="16" fill="none" stroke="#fff" stroke-width="0.6" opacity="0.35"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="#fff">LAVA</text></svg><span>circle — soft glow</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><circle cx="40" cy="26" r="16" fill="url(#mockLavaB)" stroke="#fff" stroke-width="1.2"/><defs><radialGradient id="mockLavaB"><stop offset="0%" stop-color="#fb923c"/><stop offset="55%" stop-color="#f97316"/><stop offset="100%" stop-color="#7c2d12"/></radialGradient></defs><circle cx="40" cy="26" r="16" fill="none" stroke="#fff" stroke-width="0.6" opacity="0.35"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="#fff">LAVA</text></svg><span>circle - soft glow</span></div>
                 <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><circle cx="40" cy="26" r="14" fill="none" stroke="#fb923c" stroke-width="1" stroke-dasharray="3 3" opacity="0.8"/><circle cx="40" cy="26" r="8" fill="none" stroke="#fb923c" stroke-width="0.6" opacity="0.4"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.6)">VENT</text></svg><span>double ring warning</span></div>
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><ellipse cx="40" cy="28" rx="22" ry="12" fill="#065f46" stroke="#6ee7b7" stroke-width="1"/><ellipse cx="40" cy="28" rx="18" ry="8" fill="#10b981" opacity="0.5"/><circle cx="30" cy="22" r="2" fill="rgba(255,255,255,0.3)"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">SLIME</text></svg><span>ellipse — bio</span></div>
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="10" y="22" width="60" height="10" rx="3" fill="#0f172a" stroke="#334155" stroke-width="1"/><rect x="12" y="24" width="56" height="2" rx="1" fill="rgba(255,255,255,0.12)"/></svg><span>wall — rounded</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><ellipse cx="40" cy="28" rx="22" ry="12" fill="#065f46" stroke="#6ee7b7" stroke-width="1"/><ellipse cx="40" cy="28" rx="18" ry="8" fill="#10b981" opacity="0.5"/><circle cx="30" cy="22" r="2" fill="rgba(255,255,255,0.3)"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">SLIME</text></svg><span>ellipse - bio</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="10" y="22" width="60" height="10" rx="3" fill="#0f172a" stroke="#334155" stroke-width="1"/><rect x="12" y="24" width="56" height="2" rx="1" fill="rgba(255,255,255,0.12)"/></svg><span>wall - rounded</span></div>
               </div>
               <div class="mock-note">Radial grad, blur, rounded. Softest, most game-y.</div>
             </div>
@@ -209,10 +214,10 @@ import '../styles/global.css';
             <div class="mock-card mock-card--c">
               <div class="mock-variant-label" style="color:var(--nox-pink); border-color:rgba(255,92,168,0.3)">C // FORGE</div>
               <div class="haz-grid">
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="12" y="12" width="56" height="28" rx="2" fill="#7c2d12" stroke="#fb923c" stroke-width="1.6"/><rect x="16" y="16" width="48" height="16" fill="#dc2626"/><path d="M 20 24 L 28 20 L 36 26 L 44 22 L 52 28 L 60 24" stroke="#fb923c" stroke-width="1.4" fill="none" stroke-linecap="round"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="#ffb86a">LAVA</text></svg><span>block — magma slit</span></div>
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="12" y="12" width="56" height="28" rx="2" fill="none" stroke="#fb923c" stroke-width="1.6" stroke-dasharray="4 3"/><rect x="24" y="22" width="32" height="8" rx="1" fill="none" stroke="#fb923c" stroke-width="0.8" opacity="0.5"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">VENT</text></svg><span>frame — stencil</span></div>
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="12" y="18" width="56" height="20" rx="2" fill="#065f46" stroke="#10b981" stroke-width="1.6"/><rect x="16" y="22" width="48" height="6" rx="3" fill="rgba(110,231,183,0.2)"/><circle cx="24" cy="28" r="2" fill="rgba(255,255,255,0.25)"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">SLIME</text></svg><span>block — flat</span></div>
-                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="10" y="22" width="60" height="10" rx="0" fill="#0f172a" stroke="#fff" stroke-width="1.2"/><rect x="10" y="22" width="60" height="3" fill="#334155"/></svg><span>wall — hard 0 radius</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="12" y="12" width="56" height="28" rx="2" fill="#7c2d12" stroke="#fb923c" stroke-width="1.6"/><rect x="16" y="16" width="48" height="16" fill="#dc2626"/><path d="M 20 24 L 28 20 L 36 26 L 44 22 L 52 28 L 60 24" stroke="#fb923c" stroke-width="1.4" fill="none" stroke-linecap="round"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="#ffb86a">LAVA</text></svg><span>block - magma slit</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="12" y="12" width="56" height="28" rx="2" fill="none" stroke="#fb923c" stroke-width="1.6" stroke-dasharray="4 3"/><rect x="24" y="22" width="32" height="8" rx="1" fill="none" stroke="#fb923c" stroke-width="0.8" opacity="0.5"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">VENT</text></svg><span>frame - stencil</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="12" y="18" width="56" height="20" rx="2" fill="#065f46" stroke="#10b981" stroke-width="1.6"/><rect x="16" y="22" width="48" height="6" rx="3" fill="rgba(110,231,183,0.2)"/><circle cx="24" cy="28" r="2" fill="rgba(255,255,255,0.25)"/><text x="40" y="52" text-anchor="middle" font-size="6" font-family="monospace" fill="rgba(255,255,255,0.55)">SLIME</text></svg><span>block - flat</span></div>
+                <div class="haz-mock"><svg viewBox="0 0 80 60" width="80" height="60"><rect x="10" y="22" width="60" height="10" rx="0" fill="#0f172a" stroke="#fff" stroke-width="1.2"/><rect x="10" y="22" width="60" height="3" fill="#334155"/></svg><span>wall - hard 0 radius</span></div>
               </div>
               <div class="mock-note">0-2px radius, 1.6px block stroke, flat fill. Brutalist.</div>
             </div>
@@ -301,7 +306,7 @@ import '../styles/global.css';
           <div style="display:flex; align-items:center; gap:12px; margin:28px 0 16px; border-top:1px solid var(--nox-border); padding-top:22px">
             <span style="font:10px var(--nox-mono); letter-spacing:0.16em; color:var(--nox-lime)">05 // TENSION & SKILL</span>
             <span style="flex:1; height:1px; background:var(--nox-border)"></span>
-            <span style="font:10px var(--nox-mono); color:var(--nox-muted)">parry • sudden death • wall bounce — Yomi</span>
+            <span style="font:10px var(--nox-mono); color:var(--nox-muted)">parry • sudden death • wall bounce - Yomi</span>
           </div>
           <div class="mock-grid">
             <div class="mock-card mock-card--a">
@@ -382,7 +387,7 @@ import '../styles/global.css';
                   <!-- players racing -->
                   <g transform="translate(90,50)"><path d="M 12 0 L -8 -6 L -5 0 L -8 6 Z" fill="#3ec5f2" stroke="#fff" stroke-width="1.1"/><circle cx="0" cy="0" r="2.8" fill="#fff"/><g opacity="0.5"><path d="M -6 0 L -12 0" stroke="#58d8ff" stroke-width="1" stroke-dasharray="2 2"/></g></g>
                   <g transform="translate(230,50)"><path d="M 12 0 L -8 -6 L -5 0 L -8 6 Z" fill="#f43f5e" stroke="#fff" stroke-width="1.1"/><circle cx="0" cy="0" r="2.8" fill="#fff"/></g>
-                  <text x="160" y="16" text-anchor="middle" font-size="6" font-family="monospace" fill="var(--nox-muted)">ONE CORE SPAWNS 12s — FIGHT FOR CENTER</text>
+                  <text x="160" y="16" text-anchor="middle" font-size="6" font-family="monospace" fill="var(--nox-muted)">ONE CORE SPAWNS 12s - FIGHT FOR CENTER</text>
                 </svg>
                 <style>.anim-koth-ring{animation:kothPulse 1s ease-in-out infinite}@keyframes kothPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}</style>
               </div>
@@ -433,7 +438,7 @@ import '../styles/global.css';
           <div style="display:flex; align-items:center; gap:12px; margin:28px 0 16px; border-top:1px solid var(--nox-border); padding-top:22px">
             <span style="font:10px var(--nox-mono); letter-spacing:0.16em; color:var(--nox-pink)">07 // RETENTION</span>
             <span style="flex:1; height:1px; background:var(--nox-border)"></span>
-            <span style="font:10px var(--nox-mono); color:var(--nox-muted)">crown • wager • ghost — evolution</span>
+            <span style="font:10px var(--nox-mono); color:var(--nox-muted)">crown • wager • ghost - evolution</span>
           </div>
           <div class="mock-grid">
             <div class="mock-card mock-card--a">
@@ -453,7 +458,7 @@ import '../styles/global.css';
               <div class="feat-demo">
                 <svg viewBox="0 0 320 100" width="100%" height="100" style="background:#0a0e10; border:1px solid var(--nox-border)">
                   <rect x="20" y="14" width="280" height="72" rx="0" fill="var(--nox-card)" stroke="var(--nox-border)"/>
-                  <text x="160" y="30" text-anchor="middle" font-size="7" font-family="monospace" fill="var(--nox-muted)">P1 0 — 2 P2 • P2 LEADS</text>
+                  <text x="160" y="30" text-anchor="middle" font-size="7" font-family="monospace" fill="var(--nox-muted)">P1 0 - 2 P2 • P2 LEADS</text>
                   <text x="160" y="44" text-anchor="middle" font-size="9" font-family="monospace" fill="#ffb23e" font-weight="800">DOUBLE OR NOTHING?</text>
                   <g transform="translate(110,68)"><rect x="-40" y="-10" width="80" height="20" rx="0" fill="rgba(255,255,255,0.06)" stroke="var(--nox-border)"/><text x="0" y="4" text-anchor="middle" font-size="6" font-family="monospace" fill="var(--nox-muted)">NO</text></g>
                   <g transform="translate(210,68)"><rect x="-40" y="-10" width="80" height="20" rx="0" fill="var(--nox-lime)" stroke="var(--nox-lime)"/><text x="0" y="4" text-anchor="middle" font-size="6" font-family="monospace" fill="#0f1a1e" font-weight="800">WAGER → FIRST TO 2</text></g>
@@ -473,7 +478,7 @@ import '../styles/global.css';
                   <!-- live player -->
                   <g transform="translate(160,50)"><path d="M 12 0 L -8 -6 L -5 0 L -8 6 Z" fill="#3ec5f2" stroke="#fff" stroke-width="1.1"/><circle cx="0" cy="0" r="2.8" fill="#fff"/></g>
                   <g transform="translate(170,20)"><rect x="-28" y="-8" width="56" height="14" rx="1" fill="var(--nox-card)" stroke="var(--nox-border)"/><text x="0" y="2" text-anchor="middle" font-size="5" font-family="monospace" fill="var(--nox-muted)">GHOST 12.4s</text></g>
-                  <text x="160" y="88" text-anchor="middle" font-size="6" font-family="monospace" fill="var(--nox-cyan)">BEAT YOUR BEST — no server</text>
+                  <text x="160" y="88" text-anchor="middle" font-size="6" font-family="monospace" fill="var(--nox-cyan)">BEAT YOUR BEST - no server</text>
                 </svg>
               </div>
               <div class="mock-note"><strong style="color:var(--nox-fg)">Arc telemetry.</strong> Record `60` ticks `×60s` to `localStorage` `nox_ghost_&lt;mode&gt;`. Race translucent trail.</div>
@@ -485,7 +490,7 @@ import '../styles/global.css';
         <section style="margin-top:32px; padding:18px; background:linear-gradient(180deg, rgba(201,255,47,0.08), rgba(201,255,47,0.02)); border:1px solid rgba(201,255,47,0.22); display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between">
           <div>
             <div style="font:12px var(--nox-mono); font-weight:800; letter-spacing:0.08em; color:var(--nox-lime)">PICK ONE → WE SHIP</div>
-            <div style="font:11px var(--nox-mono); color:var(--nox-muted); margin-top:4px">Reply “ship A/B/C” or mix e.g. “A players + B buffs + C hits”. This page is mockup only — <code style="color:var(--nox-fg)">/play</code> untouched.</div>
+            <div style="font:11px var(--nox-mono); color:var(--nox-muted); margin-top:4px">Reply “ship A/B/C” or mix e.g. “A players + B buffs + C hits”. This page is mockup only - <code style="color:var(--nox-fg)">/play</code> untouched.</div>
           </div>
           <div style="display:flex; gap:8px">
             <a href="/play" style="text-decoration:none; padding:10px 16px; background:var(--nox-lime); color:var(--nox-bg); font:12px var(--nox-mono); font-weight:800; letter-spacing:0.06em">▶ BACK TO GAME</a>

@@ -2,12 +2,19 @@
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import mdx from '@astrojs/mdx';
+import sitemap from '@astrojs/sitemap';
 
-// Static output by default — deploys to Vercel with zero configuration
-// (no adapter needed). The Astryx landing page is a React island
-// (src/components/Landing.tsx) hydrated on the client; the game page
-// (/play) stays framework-free vanilla JS.
+// Canonical base - keep in sync with src/config/site.ts
+const SITE = process.env.PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://nox-void.vercel.app')
+
 export default defineConfig({
+  site: SITE,
   output: 'static',
-  integrations: [react(), mdx()],
+  integrations: [
+    react(),
+    mdx(),
+    sitemap({
+      filter: (page) => !page.includes('/mockup'),
+    }),
+  ],
 });

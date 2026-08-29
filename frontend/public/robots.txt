@@ -1,0 +1,10 @@
+# NOX // NEON VOID robots
+# Keep the arena crawlable, hide lab, point to sitemap
+User-agent: *
+Allow: /
+Disallow: /mockup
+Disallow: /api/
+
+# Sitemap - Astro generates sitemap-index.xml, fallback to sitemap.xml
+Sitemap: https://nox-void.vercel.app/sitemap-index.xml
+Sitemap: https://nox-void.vercel.app/sitemap.xml

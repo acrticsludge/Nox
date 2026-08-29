@@ -57,7 +57,7 @@ export default function DocDashDemo() {
       <div className="docs-demo__frame">
         <div className="docs-demo__top">
           <span className="docs-demo__badge">DASH</span>
-          <span className="docs-demo__note">Flash forward — can't be hit for a moment</span>
+          <span className="docs-demo__note">Flash forward - can't be hit for a moment</span>
           <span className="docs-demo__live">● LIVE</span>
         </div>
         <svg viewBox="0 0 360 140" xmlns="http://www.w3.org/2000/svg" className="docs-demo__svg">
