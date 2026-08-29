@@ -533,15 +533,15 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
         <div className="how-modal__header">
           <CyberBadge variant="cyan">HOW TO PLAY</CyberBadge>
           <h2 id="how-modal-title" className="how-modal__title">
-            NEON VOID // MANUAL
+            NEON VOID // QUICK GUIDE
           </h2>
-          <p className="how-modal__subtitle">Master the arena. Own the void.</p>
+          <p className="how-modal__subtitle">Same keyboard, two players — first to 5 wins.</p>
         </div>
 
         <div className="how-modal__body">
           <section className="how-section">
             <h3 className="how-section__title" style={{ color: 'var(--nox-cyan)' }}>
-              <span className="how-section__index">01</span> MOVEMENT
+              <span className="how-section__index">01</span> MOVE & SHOOT
             </h3>
             <div className="how-card how-card--cyan">
               <div className="how-row">
@@ -569,15 +569,14 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                 </span>
               </div>
               <p className="how-desc">
-                Hold <strong>SHIFT / /</strong> to <strong>dash</strong> // 0.25s invincible + speed burst (1s
-                cooldown). Hold <strong>SPACE / ENTER</strong> for auto-fire.
+                Use the move keys to run around. Hold <strong>Shift</strong> or <strong>/</strong> to <strong>dash</strong> — you flash forward and cannot get hit for a moment. Hold <strong>Space</strong> or <strong>Enter</strong> to keep shooting.
               </p>
             </div>
           </section>
 
           <section className="how-section">
             <h3 className="how-section__title" style={{ color: 'var(--nox-pink)' }}>
-              <span className="how-section__index">02</span> ORBS
+              <span className="how-section__index">02</span> POWER-UPS
             </h3>
             <div className="how-card how-card--pink">
               <div className="orb-grid">
@@ -588,53 +587,59 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
               </div>
               <ul className="how-list">
                 <li>
-                  <strong style={{ color: 'var(--nox-amber)' }}>⚡ OVERCHARGE</strong> // triple shot, 4s
+                  <strong style={{ color: 'var(--nox-amber)' }}>⚡ Triple shot</strong> — shoots three bullets at once for a little while.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-cyan)' }}>❄ FROST SHIELD</strong> // 5 HP barrier, cracks
-                  on damage
+                  <strong style={{ color: 'var(--nox-cyan)' }}>❄ Shield</strong> — puts a bubble around you. It cracks when hit and breaks after a few hits.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-lime)' }}>✦ BLINK</strong> // dash reset + 22% speed, 3s
+                  <strong style={{ color: 'var(--nox-lime)' }}>✦ Dash boost</strong> — lets you dash again right away and makes you a bit faster.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--success)' }}>✚ HEAL</strong> // +2 HP (cap 12), rare
+                  <strong style={{ color: 'var(--success)' }}>✚ Heart</strong> — heals you a little.
                 </li>
                 <li style={{ marginTop: 8, opacity: 0.95 }}>
-                  <strong style={{ color: '#a78bfa' }}>N NEEDLE</strong> // rear <code>6</code> front <code>0 BLOCK</code> • <strong style={{ color: '#ffb23e' }}>C CANNON</strong> <code>4 dmg 533ms r7</code> • <strong style={{ color: '#58d8ff' }}>T TRICK</strong> <code>2.5→0.8 5 bounces</code>
+                  <strong style={{ color: '#a78bfa' }}>Needle</strong> — tiny and very fast. Weak from the front, super strong from behind. &nbsp;•&nbsp; <strong style={{ color: '#ffb23e' }}>Cannon</strong> — big and slow but hits really hard. &nbsp;•&nbsp; <strong style={{ color: '#58d8ff' }}>Trick</strong> — bounces off walls.
                 </li>
               </ul>
-            </div>
-          </section>
-
-          <section className="how-section">
-            <h3 className="how-section__title" style={{ color: 'var(--nox-pink)' }}>
-              <span className="how-section__index">03</span> BULLETS
-            </h3>
-            <div className="how-card how-card--pink">
-              <p className="how-desc">
-                <strong>STD</strong> white <code>2 dmg 7.2</code> • <strong style={{ color: '#a78bfa' }}>NEEDLE</strong> violet <code>r3.5 8.5</code> front <code>BLOCK</code> rear <code>CRIT 6</code> (<code>dot&gt;0.5</code>) • <strong style={{ color: '#ffb23e' }}>CANNON</strong> amber <code>4 dmg r7 3.8 slow</code> • <strong style={{ color: '#58d8ff' }}>TRICK</strong> cyan diamond <code>6.2 5 bounces 2.5→0.8</code>
-              </p>
               <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
-                Orbs grant <code>NEEDLE x5</code> <code>CANNON x3</code> <code>TRICK x6</code> then revert. Default <code>STD INF</code>. Each hit has distinct FX: <code>STD cyan ring</code> . <code>BLOCK hex</code> . <code>CRIT violet star</code> . <code>CANNON amber ember</code> . <code>TRICK bounce pip</code> . <code>LAVA -2</code> . <code>VOID -1</code>.
+                Special bullets come from pickups. You get a few shots, then you go back to your normal bullet.
               </p>
             </div>
           </section>
 
           <section className="how-section">
             <h3 className="how-section__title" style={{ color: 'var(--nox-amber)' }}>
-              <span className="how-section__index">04</span> HAZARDS
+              <span className="how-section__index">03</span> WATCH OUT
             </h3>
             <div className="how-card how-card--amber">
+              <ul className="how-list">
+                <li>
+                  <strong>Walls</strong> — dark blocks. They stop you and stop most bullets. Trick bullets bounce off them.
+                </li>
+                <li>
+                  <strong style={{ color: '#fb923c' }}>Lava</strong> — orange circle on the floor. It blinks first to warn you, then turns red and burns you if you stay on it.
+                </li>
+                <li>
+                  <strong style={{ color: '#10b981' }}>Slime</strong> — green goo that makes you move slow while you are inside. It does not hurt you.
+                </li>
+                <li>
+                  <strong style={{ color: 'var(--nox-lime)' }}>The Void</strong> — after a while the edge of the arena starts closing in. Green blocks crumble at the border. Stay in the middle or you will lose health.
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          <section className="how-section">
+            <h3 className="how-section__title" style={{ color: 'var(--nox-lime)' }}>
+              <span className="how-section__index">04</span> HOW TO WIN
+            </h3>
+            <div className="how-card how-card--lime">
               <p className="how-desc">
-                <strong>Walls</strong> block movement & bullets (grid-aligned, <code>TRICK</code> bounces).{' '}
-                <strong style={{ color: '#fb923c' }}>LAVA</strong> pulses // burns <code>2 HP</code> when active.{' '}
-                <strong style={{ color: '#10b981' }}>SLIME</strong> slows to 55%.{' '}
-                <strong style={{ color: 'var(--nox-lime)' }}>VOID</strong> crushes from edge after 45s // stay
-                central!
+                Knock out the other player to win a round. If no one is knocked out when the timer runs out, the player with more health wins. Tied health is a draw.
               </p>
-              <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
-                Orbs never spawn inside hazards. <code>12 HP</code> • First to <strong>5 wins</strong> claims the void.
+              <p className="how-desc" style={{ marginTop: 8 }}>
+                First to <strong>5 round wins</strong> wins the whole game.
               </p>
             </div>
           </section>
