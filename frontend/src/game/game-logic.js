@@ -2539,8 +2539,114 @@ function startCountdown() {
   tick();
 }
 
+function updatePlayerCardHUD(p, pi) {
+  // Shared helper — called for both 1v1 and trials P1 so health/pointer never drifts
+  const hEl = document.getElementById(pi === 0 ? 'heartsP1' : 'heartsP2');
+  const justDamaged = prevHp[pi] > p.hp;
+  const pct = (p.hp / MAX_HP) * 100;
+  if(hEl) {
+    hEl.innerHTML = '';
+    const fill = document.createElement('div');
+    fill.className = 'hp-fill';
+    fill.style.width = pct + '%';
+    if(p.hp <= 2) fill.classList.add('low');
+    hEl.appendChild(fill);
+    const txt = document.createElement('div');
+    txt.className = 'hp-text';
+    txt.textContent = `${p.hp} / ${MAX_HP}`;
+    hEl.appendChild(txt);
+    if(justDamaged) {
+      hEl.classList.remove('damage');
+      void hEl.offsetWidth;
+      hEl.classList.add('damage');
+      setTimeout(() => hEl.classList.remove('damage'), 300);
+    }
+    if(p.hp <= 2) hEl.style.filter = pi === 0 ? 'brightness(1.15)' : 'brightness(1.12)';
+    else if(p.hp <= 4) hEl.style.filter = 'brightness(1.05)';
+    else hEl.style.filter = 'none';
+    prevHp[pi] = p.hp;
+  }
+  const ov = document.getElementById(`ovP${pi + 1}`);
+  const ovF = document.getElementById(`ovF${pi + 1}`);
+  const ovT = document.getElementById(`ovT${pi + 1}`);
+  if(ov) {
+    const active = p.overcharge > 0;
+    ov.classList.toggle('active', active);
+    if(ovF) ovF.style.width = active ? (p.overcharge / 240 * 100) + '%' : '0%';
+    if(ovT) ovT.textContent = active ? (p.overcharge / 60).toFixed(1) + 's' : '';
+  }
+  const sh = document.getElementById(`shP${pi + 1}`);
+  const shF = document.getElementById(`shF${pi + 1}`);
+  const shT = document.getElementById(`shT${pi + 1}`);
+  if(sh) {
+    const active = !!p.shield && p.shieldHp > 0;
+    sh.classList.toggle('active', active);
+    const max = p.shieldMax || SHIELD_MAX_HP;
+    const pct2 = active ? (p.shieldHp / max * 100) : 0;
+    if(shF) shF.style.width = pct2 + '%';
+    if(active) {
+      if(p.shieldHp === 1) { sh.style.animation = 'crackShake 0.35s infinite'; }
+      else if(p.shieldHp === 2) { sh.style.animation = 'none'; }
+      else { sh.style.animation = 'shieldPulse 1.3s infinite'; }
+    } else {
+      if(shF) shF.style.filter = 'none';
+      sh.style.animation = 'none';
+    }
+    if(shT) shT.textContent = active ? `${p.shieldHp}/${max}` : '';
+    const lab = sh.querySelector('.chip-label');
+    if(lab) lab.textContent = active && p.shieldHp === 1 ? 'CRACK' : 'SHLD';
+  }
+  const bl = document.getElementById(`blP${pi + 1}`);
+  const blF = document.getElementById(`blF${pi + 1}`);
+  const blT = document.getElementById(`blT${pi + 1}`);
+  if(bl) {
+    const hasDash = p.extraDash > 0;
+    const hasBoost = p.speedBoost > 0;
+    const active = hasDash || hasBoost;
+    bl.classList.toggle('active', active);
+    let pctB = 0, txtB = '';
+    if(hasBoost) { pctB = p.speedBoost / 180 * 100; txtB = (p.speedBoost / 60).toFixed(1) + 's'; }
+    else if(hasDash) { pctB = 100; txtB = 'x' + p.extraDash; }
+    if(blF) blF.style.width = pctB + '%';
+    if(blT) blT.textContent = txtB;
+  }
+  const ammoChip = document.getElementById(`ammoP${pi + 1}`);
+  const ammoT = document.getElementById(`ammoT${pi + 1}`);
+  if(ammoChip && ammoT){
+    const t = p.ammoType || 'standard';
+    let label = 'STD INF'; let cls = 'ammo-chip--standard';
+    if(t==='needle'){ label = `NEEDLE x${p.ammo}`; cls='ammo-chip--needle'; }
+    else if(t==='cannon'){ label = `CANNON x${p.ammo}`; cls='ammo-chip--cannon'; }
+    else if(t==='trick'){ label = `TRICK x${p.ammo} ${'.'.repeat(Math.max(0, 5 - (p.ammo !== Infinity ? (6 - p.ammo) : 0)))}`; cls='ammo-chip--trick'; }
+    ammoChip.className = `ammo-chip ${cls}`;
+    ammoT.textContent = label;
+  }
+  const dashEl = document.getElementById(`dashP${pi + 1}`);
+  if(dashEl) {
+    const ready = p.dashCd === 0;
+    const pct3 = ready ? 100 : (1 - p.dashCd / DASH_COOLDOWN) * 100;
+    dashEl.style.width = pct3 + '%';
+    dashEl.style.background = ready ? '#22c55e' : (pct3 > 65 ? '#ff9d2e' : '#ef4444');
+    dashEl.style.opacity = p.dash > 0 ? '0.95' : '1';
+    dashEl.style.boxShadow = p.dash > 0 ? '0 0 6px #22c55e' : 'none';
+  }
+  const extraEl = document.getElementById(`extraP${pi + 1}`);
+  if(extraEl) {
+    extraEl.innerHTML = '';
+    for(let k = 0; k < p.extraDash; k++) {
+      const i = document.createElement('i');
+      extraEl.appendChild(i);
+    }
+  }
+  const card = document.getElementById(`cardP${pi + 1}`);
+  if(card) {
+    const anyActive = p.overcharge > 0 || p.shield || p.speedBoost > 0 || p.extraDash > 0;
+    card.classList.toggle('hud-active', anyActive);
+  }
+}
+
 function updateHUD() {
-  // Trials mode HUD
+  // Trials mode HUD — timer/bot/points are trials-specific, but P1 health pointer reuses same helper as 1v1
   if(gameMode === 'trials') {
     const ptsEl = document.getElementById('trialPoints');
     if(ptsEl) ptsEl.textContent = Math.floor(trialPoints).toLocaleString();
@@ -2582,6 +2688,10 @@ function updateHUD() {
       const elapsed = TRIAL_DURATION - timeLeft;
       warn.style.opacity = (elapsed >= VOID_START_TIME && gameState === 'playing') ? '1' : '0';
     }
+    // Keep P1 pointer/health/chips in sync — previously early-returned and health stayed stale
+    updatePlayerCardHUD(players[0], 0);
+    const rlTrials = document.getElementById('roundLabel');
+    if(rlTrials && gameState !== 'playing') { /* keep hidden */ }
     return;
   }
   
@@ -2621,119 +2731,8 @@ function updateHUD() {
     }
   }
 
-  for(let pi = 0; pi < 2; pi++) {
-    const p = players[pi];
-    const hEl = document.getElementById(pi === 0 ? 'heartsP1' : 'heartsP2');
-    const justDamaged = prevHp[pi] > p.hp;
-    const pct = (p.hp / MAX_HP) * 100;
-    if(hEl) {
-      hEl.innerHTML = '';
-      const fill = document.createElement('div');
-      fill.className = 'hp-fill';
-      fill.style.width = pct + '%';
-      if(p.hp <= 2) fill.classList.add('low');
-      hEl.appendChild(fill);
-      const txt = document.createElement('div');
-      txt.className = 'hp-text';
-      txt.textContent = `${p.hp} / ${MAX_HP}`;
-      hEl.appendChild(txt);
-      if(justDamaged) {
-        hEl.classList.remove('damage');
-        void hEl.offsetWidth;
-        hEl.classList.add('damage');
-        setTimeout(() => hEl.classList.remove('damage'), 300);
-      }
-      if(p.hp <= 2) hEl.style.filter = pi === 0 ? 'brightness(1.15)' : 'brightness(1.12)';
-      else if(p.hp <= 4) hEl.style.filter = 'brightness(1.05)';
-      else hEl.style.filter = 'none';
-      prevHp[pi] = p.hp;
-    }
-
-    const ov = document.getElementById(`ovP${pi + 1}`);
-    const ovF = document.getElementById(`ovF${pi + 1}`);
-    const ovT = document.getElementById(`ovT${pi + 1}`);
-    if(ov) {
-      const active = p.overcharge > 0;
-      ov.classList.toggle('active', active);
-      if(ovF) ovF.style.width = active ? (p.overcharge / 240 * 100) + '%' : '0%';
-      if(ovT) ovT.textContent = active ? (p.overcharge / 60).toFixed(1) + 's' : '';
-    }
-
-    const sh = document.getElementById(`shP${pi + 1}`);
-    const shF = document.getElementById(`shF${pi + 1}`);
-    const shT = document.getElementById(`shT${pi + 1}`);
-    if(sh) {
-      const active = !!p.shield && p.shieldHp > 0;
-      sh.classList.toggle('active', active);
-      const max = p.shieldMax || SHIELD_MAX_HP;
-      const pct = active ? (p.shieldHp / max * 100) : 0;
-      if(shF) shF.style.width = pct + '%';
-      if(active) {
-        if(p.shieldHp === 1) { sh.style.animation = 'crackShake 0.35s infinite'; }
-        else if(p.shieldHp === 2) { sh.style.animation = 'none'; }
-        else { sh.style.animation = 'shieldPulse 1.3s infinite'; }
-      } else {
-        if(shF) shF.style.filter = 'none';
-        sh.style.animation = 'none';
-      }
-      if(shT) shT.textContent = active ? `${p.shieldHp}/${max}` : '';
-      const lab = sh.querySelector('.chip-label');
-      if(lab) lab.textContent = active && p.shieldHp === 1 ? 'CRACK' : 'SHLD';
-    }
-
-    const bl = document.getElementById(`blP${pi + 1}`);
-    const blF = document.getElementById(`blF${pi + 1}`);
-    const blT = document.getElementById(`blT${pi + 1}`);
-    if(bl) {
-      const hasDash = p.extraDash > 0;
-      const hasBoost = p.speedBoost > 0;
-      const active = hasDash || hasBoost;
-      bl.classList.toggle('active', active);
-      let pct = 0, txt = '';
-      if(hasBoost) { pct = p.speedBoost / 180 * 100; txt = (p.speedBoost / 60).toFixed(1) + 's'; }
-      else if(hasDash) { pct = 100; txt = 'x' + p.extraDash; }
-      if(blF) blF.style.width = pct + '%';
-      if(blT) blT.textContent = txt;
-    }
-
-    // ammo chip - per-type minimal
-    const ammoChip = document.getElementById(`ammoP${pi + 1}`);
-    const ammoT = document.getElementById(`ammoT${pi + 1}`);
-    if(ammoChip && ammoT){
-      const t = p.ammoType || 'standard';
-      let label = 'STD INF'; let cls = 'ammo-chip--standard';
-      if(t==='needle'){ label = `NEEDLE x${p.ammo}`; cls='ammo-chip--needle'; }
-      else if(t==='cannon'){ label = `CANNON x${p.ammo}`; cls='ammo-chip--cannon'; }
-      else if(t==='trick'){ label = `TRICK x${p.ammo} ${'.'.repeat(Math.max(0, 5 - (p.ammo !== Infinity ? (6 - p.ammo) : 0)))}`; cls='ammo-chip--trick'; }
-      ammoChip.className = `ammo-chip ${cls}`;
-      ammoT.textContent = label;
-    }
-
-    const dashEl = document.getElementById(`dashP${pi + 1}`);
-    if(dashEl) {
-      const ready = p.dashCd === 0;
-      const pct = ready ? 100 : (1 - p.dashCd / DASH_COOLDOWN) * 100;
-      dashEl.style.width = pct + '%';
-      dashEl.style.background = ready ? '#22c55e' : (pct > 65 ? '#ff9d2e' : '#ef4444');
-      dashEl.style.opacity = p.dash > 0 ? '0.95' : '1';
-      dashEl.style.boxShadow = p.dash > 0 ? '0 0 6px #22c55e' : 'none';
-    }
-
-    const extraEl = document.getElementById(`extraP${pi + 1}`);
-    if(extraEl) {
-      extraEl.innerHTML = '';
-      for(let k = 0; k < p.extraDash; k++) {
-        const i = document.createElement('i');
-        extraEl.appendChild(i);
-      }
-    }
-
-    const card = document.getElementById(`cardP${pi + 1}`);
-    if(card) {
-      const anyActive = p.overcharge > 0 || p.shield || p.speedBoost > 0 || p.extraDash > 0;
-      card.classList.toggle('hud-active', anyActive);
-    }
-  }
+  // Shared per-player HUD — same for 1v1 and trials (prevents pointer/health drift)
+  for(let pi = 0; pi < 2; pi++) updatePlayerCardHUD(players[pi], pi);
 }
 
 function updateTrialsHUD() {
