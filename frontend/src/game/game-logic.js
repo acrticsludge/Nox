@@ -389,8 +389,10 @@ function wallsCollide(x, y, r) {
   return false;
 }
 function pushOutOfWalls(p) {
-  p.x = clamp(p.x, 10 + PLAYER_R, 950 - PLAYER_R);
-  p.y = clamp(p.y, 10 + PLAYER_R, 550 - PLAYER_R);
+  const maxW = gameMode === 'trials' ? TRIALS_W : W;
+  const maxH = gameMode === 'trials' ? TRIALS_H : H;
+  p.x = clamp(p.x, 10 + PLAYER_R, maxW - 10 - PLAYER_R);
+  p.y = clamp(p.y, 10 + PLAYER_R, maxH - 10 - PLAYER_R);
   for(let iter = 0; iter < 4; iter++) {
     for(const w of wallData) {
       if(!rectCircleCollide(p.x, p.y, PLAYER_R, w.x, w.y, w.w, w.h)) continue;
@@ -417,8 +419,8 @@ function pushOutOfWalls(p) {
       }
     }
   }
-  p.x = clamp(p.x, 10 + PLAYER_R, 950 - PLAYER_R);
-  p.y = clamp(p.y, 10 + PLAYER_R, 550 - PLAYER_R);
+  p.x = clamp(p.x, 10 + PLAYER_R, maxW - 10 - PLAYER_R);
+  p.y = clamp(p.y, 10 + PLAYER_R, maxH - 10 - PLAYER_R);
 }
 
 function tryMove(p, nx, ny) {
@@ -526,6 +528,13 @@ if (typeof window !== 'undefined') {
     };
     tryStart();
   });
+  window.addEventListener('nox:startTrials', () => {
+    const tryStart = () => {
+      if (window.NOX_GAME && window.NOX_GAME.startTrials) window.NOX_GAME.startTrials();
+      else setTimeout(tryStart, 30);
+    };
+    tryStart();
+  });
   window.addEventListener('nox:forfeit', (e) => {
     const pid = (e.detail && e.detail.playerId) ?? 0;
     const tryForfeit = () => {
@@ -534,12 +543,37 @@ if (typeof window !== 'undefined') {
     };
     tryForfeit();
   });
+  window.addEventListener('nox:forfeitTrials', () => {
+    const tryFT = () => {
+      if (window.NOX_GAME && window.NOX_GAME.forfeitTrials) window.NOX_GAME.forfeitTrials();
+      else setTimeout(tryFT, 30);
+    };
+    tryFT();
+  });
   window.addEventListener('nox:backToMenu', () => {
     const tryMenu = () => {
       if (window.NOX_GAME && window.NOX_GAME.backToMenu) window.NOX_GAME.backToMenu();
       else setTimeout(tryMenu, 30);
     };
     tryMenu();
+  });
+  // Trials pause/resume via React overlay buttons
+  window.addEventListener('nox:pause', () => {
+    if (gameMode !== 'trials' || gameState !== 'playing') return;
+    gameState = 'paused';
+    try { localStorage.setItem('nv_trials_paused', '1'); } catch {}
+  });
+  window.addEventListener('nox:resume', () => {
+    if (gameMode !== 'trials' || gameState !== 'paused') return;
+    gameState = 'playing';
+    try { localStorage.removeItem('nv_trials_paused'); } catch {}
+  });
+  window.addEventListener('nox:resumeTrial', () => {
+    const tryR = () => {
+      if (window.NOX_GAME && window.NOX_GAME.resumeTrials) window.NOX_GAME.resumeTrials();
+      else setTimeout(tryR, 30);
+    };
+    tryR();
   });
 }
 function setGlobalSpeed(v) {
@@ -793,13 +827,20 @@ function resetRound(regenerateWalls = false) {
 }
 
 function startTrials() {
+  clearPendingTimeouts();
+  clearInputState();
+  forfeitLock = false;
+  document.getElementById('gameOverOverlay')?.classList.add('hidden');
+  document.getElementById('roundOverlay')?.classList.add('hidden');
+  document.getElementById('startOverlay')?.classList.add('hidden');
+
   gameMode = 'trials';
-  gameState = 'playing';
   timeLeft = TRIAL_DURATION;
   trialPoints = 0;
   voidRect = null;
   voidShrinkStart = 0;
   lastSaveTime = 0;
+  safeRadius = 999;
 
   generateTrialsWalls();
   drawWalls();
@@ -812,6 +853,13 @@ function startTrials() {
   players[0].extraDash = 0; players[0].squish = 0; players[0].inSlime = false;
   players[0].lavaCd = 0; players[0].voidCd = 0; players[0].baseSpeed = preservedSpeed; players[0].angle = 0;
   players[0].ammoType = 'standard'; players[0].ammo = Infinity;
+
+  // In trials, P2 is not used - hide it so only P1 + bot render (fixes 3-char bug)
+  players[1].alive = false;
+  players[1].hp = 0;
+  players[1].inv = 0;
+  players[1].shield = false;
+  players[1].overcharge = 0;
 
   bot.hp = BOT_MAX_HP; bot.alive = true;
   bot.x = TRIALS_W - 320; bot.y = TRIALS_H / 2;
@@ -839,6 +887,20 @@ function startTrials() {
   spawnTrialsPickups(4);
 
   trialHighScore = parseInt(localStorage.getItem('nv_trials_highscore') || '0', 10);
+  updateHUD();
+  render();
+  // 3-2-1 countdown before bot/player can move
+  startCountdown();
+}
+
+function prepareTrialsMenu() {
+  gameMode = 'trials';
+  timeLeft = TRIAL_DURATION;
+  trialPoints = 0;
+  voidRect = null;
+  safeRadius = 999;
+  // Ensure P2 hidden in menu preview as well
+  players[1].alive = false;
   updateHUD();
 }
 
@@ -1337,24 +1399,45 @@ function updateTrials(dt) {
     if(window.NOX_GAME) { window.NOX_GAME.pickups.length = 0; kept.forEach(v => window.NOX_GAME.pickups.push(v)); }
   }
 
+  // Bot ticks — same lifecycle as 1v1 P2 so shootCd actually ticks
+  if(bot.dashCd > 0) bot.dashCd--;
+  if(bot.inv > 0) bot.inv--;
+  if(bot.shootCd > 0) bot.shootCd--;
+  if(bot.overcharge > 0) bot.overcharge--;
+  if(bot.speedBoost > 0) bot.speedBoost--;
+  if(bot.squish > 0) bot.squish--;
+  if(bot.lavaCd > 0) bot.lavaCd--;
+  if(bot.voidCd > 0) bot.voidCd--;
+  if(bot.dash > 0) { bot.dash--; if(bot.dash === 0) bot.inv = 6; }
+  if(wallsCollide(bot.x, bot.y, PLAYER_R)) pushOutOfWalls(bot);
+  bot.inSlime = false;
+
   // Bot AI
   const botState = { pickups, hazards };
   const botResult = updateBotAI(bot, botState);
 
-  // Apply bot movement
+  // Apply bot movement — reuse same physics as 1v1 P2
   bot.vx = botResult.mx; bot.vy = botResult.my;
+  // keep angle in sync for shooting (bot aims at player)
+  if (botResult.mx || botResult.my) bot.angle = Math.atan2(botResult.my, botResult.mx);
   let botSpd = bot.baseSpeed * (bot.speedBoost > 0 ? 1.22 : 1);
   if(bot.inSlime) botSpd *= 0.55;
   let botDashSpd = bot.baseSpeed * 2.35;
   if(bot.inSlime) botDashSpd *= 0.70;
-  const spd = bot.dash > 0 ? botDashSpd : botSpd;
-  let nx = bot.x + botResult.mx * spd;
-  let ny = bot.y + botResult.my * spd;
+  const spdBot = bot.dash > 0 ? botDashSpd : botSpd;
+  let nx = bot.x + botResult.mx * spdBot;
+  let ny = bot.y + botResult.my * spdBot;
 
   if(botResult.mx || botResult.my || bot.dash > 0) {
-    tryMoveBot(bot, nx, ny);
+    tryMove(bot, nx, ny);
   } else {
-    pushOutOfWallsBot(bot);
+    pushOutOfWalls(bot);
+  }
+  // bot dash — same as P2 dash in 1v1
+  if (botResult.dash && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
+    if(bot.extraDash > 0) bot.extraDash--; else bot.dashCd = DASH_COOLDOWN;
+    bot.dash = DASH_TIME; bot.inv = DASH_TIME + 4;
+    for(let i = 0; i < 8; i++) particles.push({x: bot.x, y: bot.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 10, max: 10, r: 2, color: bot.color, type: 'dash'});
   }
 
   // Bot hazard avoidance (slime/lava) - not void
@@ -1387,12 +1470,13 @@ function updateTrials(dt) {
     }
   }
 
-  // Bot shooting (only attacks player, not other bot)
+  // Bot shooting — reuse same shoot() as 1v1 (supports overcharge/ammo types)
   if(botResult.shoot && bot.shootCd <= 0) {
-    // Bot shoots at player
     const target = players[0];
     if(target && target.alive) {
-      shootBotBullet(bot, target);
+      const ang = Math.atan2(target.y - bot.y, target.x - bot.x) + (Math.random() - 0.5) * 0.15;
+      bot.angle = ang;
+      shoot(bot);
     }
   }
 
@@ -1538,60 +1622,86 @@ function updateTrials(dt) {
     }
   });
 
-  // Bot vs Player bullet collision
+  // Bullets — identical physics to 1v1 update(), just bounds scaled to 1920x1120
   for(let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
-    if(b.owner !== 2) continue; // Only bot bullets
-    // Check collision with player[0]
-    const p = players[0];
-    if(!p || !p.alive || p.inv > 0) continue;
     const br = b.r ?? BULLET_R;
-    if(distance(b.x, b.y, p.x, p.y) < br + PLAYER_R) {
-      // Bot hit player
-      p.hp -= b.dmg || 2;
-      p.inv = 28;
-      particles.push(...spawnHitStandard(b.x, b.y, p.color));
-      damageShake(p, 1);
-      trialPoints = Math.max(0, trialPoints - (elapsedTotal >= VOID_START_TIME ? 6 : 3)); // Penalty
-      bullets.splice(i, 1);
-      if(p.hp <= 0) {
-        p.alive = false;
-        gameState = 'gameOver';
-        clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT HIT'); showTrialsGameOver(Math.floor(trialPoints), 'KILLED BY THE BOT', false);
-        return;
+    const trailLen = b.type === 'cannon' ? 6 : b.type === 'needle' ? 2 : b.type === 'trick' ? 5 : 4;
+    b.trail.unshift({x: b.x, y: b.y});
+    if(b.trail.length > trailLen) b.trail.pop();
+    b.x += b.vx; b.y += b.vy;
+    b.life--;
+    let hitWall = null;
+    for(const w of wallData) { if(rectCircleCollide(b.x, b.y, br, w.x, w.y, w.w, w.h)) { hitWall = w; break; } }
+    if(hitWall) {
+      if(b.type === 'trick' && (b.bounces ?? 0) < (b.bouncesMax ?? 5)) {
+        const closestX = clamp(b.x, hitWall.x, hitWall.x + hitWall.w);
+        const closestY = clamp(b.y, hitWall.y, hitWall.y + hitWall.h);
+        let nx2 = b.x - closestX, ny2 = b.y - closestY;
+        let nlen = Math.hypot(nx2, ny2);
+        if(nlen < 0.01){
+          const dl = b.x - hitWall.x; const dr = (hitWall.x + hitWall.w) - b.x; const dt = b.y - hitWall.y; const db = (hitWall.y + hitWall.h) - b.y; const m = Math.min(dl,dr,dt,db);
+          if(m===dl){ nx2=-1; ny2=0; } else if(m===dr){ nx2=1; ny2=0; } else if(m===dt){ nx2=0; ny2=-1; } else { nx2=0; ny2=1; } nlen = 1;
+        } else { nx2/=nlen; ny2/=nlen; }
+        const dot = b.vx*nx2 + b.vy*ny2;
+        b.vx = (b.vx - 2*dot*nx2) * 0.97; b.vy = (b.vy - 2*dot*ny2) * 0.97;
+        b.x += nx2 * (br + 2); b.y += ny2 * (br + 2);
+        b.bounces = (b.bounces ?? 0) + 1; b.dmg = trickDmgAt(b.bounces);
+        particles.push(...spawnBounceSpark(b.x, b.y, '#58d8ff'));
+        continue;
       }
-      continue;
+      if(b.type === 'cannon') particles.push(...spawnHitCannon(b.x, b.y, '#ffb23e'));
+      else if(b.type === 'needle') particles.push(...spawnHit(b.x, b.y, '#a78bfa'));
+      else if(b.type === 'trick') particles.push(...spawnBounceSpark(b.x,b.y,'#58d8ff'));
+      else particles.push(...spawnHit(b.x, b.y, b.owner === 0 ? '#58d8ff' : '#ffb23e'));
+      bullets.splice(i, 1); continue;
     }
-  }
-
-  // Player bullets hitting bot
-  for(let i = bullets.length - 1; i >= 0; i--) {
-    const b = bullets[i];
-    if(b.owner !== 0) continue; // Only player bullets
-    // Check collision with bot
-    if(!bot.alive || bot.inv > 0) continue;
-    const br = b.r ?? BULLET_R;
-    if(distance(b.x, b.y, bot.x, bot.y) < br + PLAYER_R) {
-      // Player hit bot
-      let dmg = b.dmg || 2;
-      // Check for aim error distance
-      const aimDist = distance(b.x, b.y, bot.x + Math.cos(bot.aimError) * 18, bot.y + Math.sin(bot.aimError) * 18);
-      if(aimDist < br + PLAYER_R) {
-        bot.hp -= dmg;
-        bot.inv = 28;
-        particles.push(...spawnHitStandard(b.x, b.y, bot.color));
-        damageShake(bot, 1);
+    if(b.life <= 0 || b.x < -20 || b.x > TRIALS_W + 20 || b.y < -20 || b.y > TRIALS_H + 20) { bullets.splice(i, 1); continue; }
+    // hit checks
+    if(b.owner === 2) {
+      const p = players[0];
+      if(!p || !p.alive || p.inv > 0) continue;
+      if(distance(b.x, b.y, p.x, p.y) < br + PLAYER_R) {
+        // shield absorb same as 1v1
+        if(p.shield && p.shieldHp > 0) {
+          let sd = 1; if(b.type==='cannon') sd=2; else if(b.type==='needle'){ const f=Math.cos(p.angle), ff=Math.sin(p.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; sd = dot2>0.5?2:0; } else if(b.type==='trick') sd=1;
+          if(sd===0){ p.inv=8; particles.push(...spawnHitNeedleBlock(b.x,b.y)); bullets.splice(i,1); continue; }
+          p.shieldHp-=sd; p.inv= b.type==='cannon'?18:16; particles.push(...spawnHit(b.x,b.y,'#58d8ff')); damageShake(p, sd>1?1.2:0.8);
+          if(p.shieldHp<=0){ p.shield=false; p.shieldHp=0; }
+          bullets.splice(i,1); continue;
+        }
+        // direct
+        let dmg=2, inv=28, fx=null, shake=1;
+        if(b.type==='standard'){ dmg=2; inv=28; fx=spawnHitStandard(b.x,b.y,p.color); }
+        else if(b.type==='needle'){ const f=Math.cos(p.angle), ff=Math.sin(p.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; if(dot2>0.5){ dmg=6; inv=30; fx=spawnHitNeedleCrit(p.x,p.y); shake=1.6; } else { p.inv=6; particles.push(...spawnHitNeedleBlock(b.x,b.y)); damageShake(p,0.4); bullets.splice(i,1); continue; } }
+        else if(b.type==='cannon'){ dmg=4; inv=34; fx=spawnHitCannon(p.x,p.y,p.color); shake=1.5; }
+        else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fx=spawnHitTrick(p.x,p.y,p.color,b.bounces??0); }
+        p.hp = Math.max(0, p.hp - dmg); p.inv = inv; if(fx) particles.push(...fx); damageShake(p,shake);
+        trialPoints = Math.max(0, trialPoints - (elapsedTotal >= VOID_START_TIME ? 6 : 3));
+        bullets.splice(i, 1);
+        if(p.hp <= 0) { p.alive=false; gameState='gameOver'; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints),'BOT HIT'); showTrialsGameOver(Math.floor(trialPoints),'KILLED BY THE BOT',false); return; }
+        continue;
+      }
+    } else if(b.owner === 0) {
+      if(!bot.alive || bot.inv > 0) continue;
+      if(distance(b.x, b.y, bot.x, bot.y) < br + PLAYER_R) {
+        if(bot.shield && bot.shieldHp > 0) {
+          let sd=1; if(b.type==='cannon') sd=2; else if(b.type==='needle'){ const f=Math.cos(bot.angle), ff=Math.sin(bot.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; sd=dot2>0.5?2:0; }
+          if(sd===0){ bot.inv=8; particles.push(...spawnHitNeedleBlock(b.x,b.y)); bullets.splice(i,1); continue; }
+          bot.shieldHp-=sd; bot.inv=16; particles.push(...spawnHit(b.x,b.y,'#58d8ff')); damageShake(bot,0.8);
+          if(bot.shieldHp<=0){ bot.shield=false; bot.shieldHp=0; }
+          bullets.splice(i,1); continue;
+        }
+        let dmg=b.dmg??2, inv=28, fx=null;
+        if(b.type==='needle'){ const f=Math.cos(bot.angle), ff=Math.sin(bot.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; if(dot2>0.5){ dmg=6; inv=30; fx=spawnHitNeedleCrit(bot.x,bot.y); } else { bot.inv=6; particles.push(...spawnHitNeedleBlock(b.x,b.y)); bullets.splice(i,1); continue; } }
+        else if(b.type==='cannon'){ dmg=4; inv=34; fx=spawnHitCannon(bot.x,bot.y,bot.color); }
+        else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fx=spawnHitTrick(bot.x,bot.y,bot.color,b.bounces??0); }
+        else { fx=spawnHitStandard(b.x,b.y,bot.color); }
+        bot.hp = Math.max(0, bot.hp - dmg); bot.inv = inv; if(fx) particles.push(...fx); damageShake(bot,1);
         trialPoints += (elapsedTotal >= VOID_START_TIME ? 50 : 25);
         bullets.splice(i, 1);
-        if(bot.hp <= 0) {
-          bot.alive = false;
-          gameState = 'gameOver';
-          trialPoints += 500; // Bot killed bonus
-          clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(Math.floor(trialPoints)); showTrialsGameOver(Math.floor(trialPoints), 'BOT DESTROYED', true);
-          return;
-        }
-      } else {
-        // Missed - bullet continues
+        if(bot.hp <= 0) { bot.alive=false; gameState='gameOver'; trialPoints+=500; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(Math.floor(trialPoints)); showTrialsGameOver(Math.floor(trialPoints),'BOT DESTROYED',true); return; }
+        continue;
       }
     }
   }
@@ -1645,45 +1755,11 @@ function forfeitTrials() {
   updateHUD();
 }
 
-function tryMoveBot(bot, nx, ny) {
-  if(!wallsCollide(nx, ny, PLAYER_R)) { bot.x = nx; bot.y = ny; return; }
-  if(!wallsCollide(nx, bot.y, PLAYER_R)) bot.x = nx;
-  if(!wallsCollide(bot.x, ny, PLAYER_R)) bot.y = ny;
-  pushOutOfWallsBot(bot);
-}
-
-function pushOutOfWallsBot(bot) {
-  bot.x = clamp(bot.x, 10 + PLAYER_R, TRIALS_W - 10 - PLAYER_R);
-  bot.y = clamp(bot.y, 10 + PLAYER_R, TRIALS_H - 10 - PLAYER_R);
-  for(let iter = 0; iter < 4; iter++) {
-    for(const w of wallData) {
-      if(!rectCircleCollide(bot.x, bot.y, PLAYER_R, w.x, w.y, w.w, w.h)) continue;
-      const closestX = clamp(bot.x, w.x, w.x + w.w);
-      const closestY = clamp(bot.y, w.y, w.y + w.h);
-      let dx = bot.x - closestX, dy = bot.y - closestY;
-      let dist = Math.hypot(dx, dy);
-      if(dist < 0.01) { dist = 1; dx = bot.x - w.x < w.w - bot.x ? -1 : 1; dy = bot.y - w.y < w.h - bot.y ? -1 : 1; }
-      const need = PLAYER_R - dist + 0.5;
-      if(need > 0) { bot.x += (dx / dist) * need; bot.y += (dy / dist) * need; }
-    }
-  }
-  bot.x = clamp(bot.x, 10 + PLAYER_R, TRIALS_W - 10 - PLAYER_R);
-  bot.y = clamp(bot.y, 10 + PLAYER_R, TRIALS_H - 10 - PLAYER_R);
-}
-
 function shootBotBullet(bot, target) {
-  const mx = target.x - bot.x;
-  const my = target.y - bot.y;
-  const dist = Math.hypot(mx, my);
-  if(dist < 1) return;
-  const ang = Math.atan2(my, mx);
-  bot.shootCd = 11; // Standard cooldown
-  bullets.push({
-    x: bot.x + Math.cos(ang) * 18, y: bot.y + Math.sin(ang) * 18,
-    vx: Math.cos(ang) * BULLET_SPEED, vy: Math.sin(ang) * BULLET_SPEED,
-    owner: bot.id, life: 90, trail: [], type: 'standard', r: BULLET_R, dmg: 2, bounces: 0, bouncesMax: 0
-  });
-  particles.push(...spawnMuzzle(bot.x + Math.cos(ang) * 18, bot.y + Math.sin(ang) * 18, bot.color, ang));
+  // kept for backwards compat — now delegates to shared shoot()
+  const ang = Math.atan2(target.y - bot.y, target.x - bot.x);
+  bot.angle = ang;
+  shoot(bot);
 }
 
 function pickupBotPowerup(bot, pu) {
@@ -1917,7 +1993,9 @@ function render() {
   if(!playersG || !bulletsG || !pickupsG || !particlesG) return;
 
   playersG.innerHTML = '';
-  players.forEach(p => {
+  // In trials only render P1; bot rendered separately. In 1v1 render both.
+  const activePlayers = gameMode === 'trials' ? [players[0]] : players;
+  activePlayers.forEach(p => {
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.setAttribute('transform', `translate(${p.x},${p.y}) rotate(${p.angle * 180 / Math.PI})`);
     g.setAttribute('opacity', p.inv > 0 && Math.floor(p.inv / 4) % 2 === 0 ? '0.35' : '1');
@@ -2431,20 +2509,26 @@ function startCountdown() {
   // ensure gameOver hidden during countdown
   document.getElementById('gameOverOverlay')?.classList.add('hidden');
   let c = 3;
+  const isTrialsCountdown = gameMode === 'trials';
   if(badge) {
-    setCyberBadgeText(badge, `ROUND ${round}`);
-    setCyberBadgeVariant(badge, 'cyan');
+    if (isTrialsCountdown) {
+      setCyberBadgeText(badge, 'TRIAL // RUN');
+      setCyberBadgeVariant(badge, 'amber');
+    } else {
+      setCyberBadgeText(badge, `ROUND ${round}`);
+      setCyberBadgeVariant(badge, 'cyan');
+    }
   }
   const tick = () => {
     if (gameState !== 'countdown') return;
     if(c > 0) {
       if(title) { title.textContent = String(c); title.className = 'result-score winner-draw'; }
-      if(sub) sub.textContent = 'Get ready...';
+      if(sub) sub.textContent = isTrialsCountdown ? 'Survive 10:00 or kill the bot • Stay centered' : 'Get ready...';
       c--;
       trackTimeout(setTimeout(tick, 650));
     } else {
       if(title) { title.textContent = 'FIGHT!'; title.className = 'result-score winner-draw'; }
-      if(sub) sub.textContent = 'Dash = invincible • Grab the orb!';
+      if(sub) sub.textContent = isTrialsCountdown ? 'Void crush at 7:30 • Bot has no void sense' : 'Dash = invincible • Grab the orb!';
       trackTimeout(setTimeout(() => {
         if (gameState !== 'countdown') return;
         ro.classList.add('hidden');
@@ -2471,17 +2555,32 @@ function updateHUD() {
     }
     const rl = document.getElementById('roundLabel');
     if(rl) {
-      const elapsed = TRIAL_DURATION - timeLeft;
-      rl.textContent = `VOID TRIALS // ${Math.floor(trialPoints).toLocaleString()} PTS`;
-      rl.style.color = elapsed >= VOID_START_TIME ? '#ef4444' : '#c9ff2f';
-      rl.style.opacity = '0.95';
+      // Hide duplicate points label in center - TrialsHUD shows PTS large
+      rl.style.display = 'none';
     }
     const timerEl = document.getElementById('timer');
     if(timerEl) {
-      const m = Math.floor(Math.max(0, timeLeft) / 60).toString().padStart(2, '0');
-      const s = Math.floor(Math.max(0, timeLeft) % 60).toString().padStart(2, '0');
+      // In menu, show 10:00 static; in play/pause show actual countdown
+      let displayLeft = timeLeft;
+      if (gameState === 'menu') displayLeft = TRIAL_DURATION;
+      const m = Math.floor(Math.max(0, displayLeft) / 60).toString().padStart(2, '0');
+      const s = Math.floor(Math.max(0, displayLeft) % 60).toString().padStart(2, '0');
       const inner = timerEl.querySelector('.cyber-timer__inner');
       if(inner) inner.textContent = `${m}:${s}`;
+      // Tint timer amber when void active
+      const elapsed = TRIAL_DURATION - timeLeft;
+      if (elapsed >= VOID_START_TIME && gameState === 'playing') {
+        timerEl.classList.add('timer-critical');
+        timerEl.classList.remove('timer-warning');
+      } else if (gameState === 'playing') {
+        timerEl.classList.remove('timer-critical');
+      }
+    }
+    // Void warning in TrialsHUD only visible when active
+    const warn = document.getElementById('voidWarn');
+    if (warn) {
+      const elapsed = TRIAL_DURATION - timeLeft;
+      warn.style.opacity = (elapsed >= VOID_START_TIME && gameState === 'playing') ? '1' : '0';
     }
     return;
   }
@@ -2696,6 +2795,15 @@ function init() {
   drawWalls();
   drawHazards();
 
+  // Auto-detect trials page so initial HUD never flashes 01:00
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.pathname.includes('/play/trials')) {
+      gameMode = 'trials';
+      timeLeft = TRIAL_DURATION;
+      players[1].alive = false;
+    }
+  } catch {}
+
   setupInput();
 
   const svg = document.getElementById('gameSvg');
@@ -2899,7 +3007,7 @@ function init() {
     players, bullets, pickups, particles,
     scores, gameState: () => gameState,
     endRound, showGameOver, startCountdown, resetRound, startGame, rematchGame, backToMenu, forfeit,
-    startTrials, onTrialsWin: null, onTrialsLose: null, onTrialsPause: null,
+    startTrials, prepareTrialsMenu, onTrialsWin: null, onTrialsLose: null, onTrialsPause: null,
     forfeitTrials, resumeTrials, hasTrialsState, loadTrialsState, saveTrialsState, clearTrialsState,
     getGlobalSpeed: () => globalSpeed, setGlobalSpeed,
     getTimeLeft: () => timeLeft, getTrialPoints: () => Math.floor(trialPoints), getGameMode: () => gameMode,
