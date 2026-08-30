@@ -28,14 +28,22 @@ import SEO from '../../components/SEO.astro';
   <body>
     <GameShell mode="trials" client:load />
     <script>
-      window.addEventListener('nox:startGame', () => {
+      // Prepare menu HUD to show 10:00 immediately (before first start)
+      const tryPrepare = () => {
+        const g = (window as unknown as { NOX_GAME?: { prepareTrialsMenu?: () => void } }).NOX_GAME;
+        if (g?.prepareTrialsMenu) g.prepareTrialsMenu();
+        else setTimeout(tryPrepare, 30);
+      };
+      tryPrepare();
+      const onStartTrials = () => {
         const tryStart = () => {
           const g = (window as unknown as { NOX_GAME?: { startTrials?: () => void } }).NOX_GAME;
           if (g?.startTrials) g.startTrials();
           else setTimeout(tryStart, 30);
         };
         tryStart();
-      });
+      };
+      window.addEventListener('nox:startTrials', onStartTrials);
       window.addEventListener('nox:resumeTrial', () => {
         const tryResume = () => {
           const g = (window as unknown as { NOX_GAME?: { resumeTrials?: () => boolean } }).NOX_GAME;
@@ -46,10 +54,18 @@ import SEO from '../../components/SEO.astro';
         };
         tryResume();
       });
-      window.addEventListener('nox:forfeit', () => {
+      const onForfeitTrials = () => {
         const g = (window as unknown as { NOX_GAME?: { forfeitTrials?: () => void } }).NOX_GAME;
         if (g?.forfeitTrials) g.forfeitTrials();
-        else { const g2 = (window as unknown as { NOX_GAME?: { forfeit?: (p: number) => void } }).NOX_GAME; if (g2?.forfeit) g2.forfeit(0); }
+      };
+      window.addEventListener('nox:forfeitTrials', onForfeitTrials);
+      window.addEventListener('nox:forfeit', (e) => {
+        // Only handle generic forfeit if no dedicated forfeitTrials handler will run;
+        // trials page prefers nox:forfeitTrials, but handle fallback for pause overlay calling generic
+        const g = (window as unknown as { NOX_GAME?: { getGameMode?: () => string } }).NOX_GAME;
+        if (g?.getGameMode?.() === 'trials') {
+          onForfeitTrials();
+        }
       });
       window.addEventListener('nox:backToMenu', () => {
         const tryMenu = () => {

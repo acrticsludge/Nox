@@ -71,28 +71,49 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
   }, [])
 
   const handlePlay = () => {
-    // instant feedback
-    document.getElementById('startOverlay')?.classList.add('hidden')
-    window.dispatchEvent(new CustomEvent('nox:startGame'))
-    // fallback direct if event not yet handled
-    setTimeout(() => {
-      const g = (window as unknown as { NOX_GAME?: { startGame?: () => void } }).NOX_GAME
-      if (g?.startGame && document.getElementById('startOverlay') && !document.getElementById('startOverlay')?.classList.contains('hidden')) {
-        g.startGame()
-      }
-    }, 60)
+    const g = (window as unknown as { NOX_GAME?: { startTrials?: () => void; startGame?: () => void } }).NOX_GAME
+    if (isTrials) {
+      if (g?.startTrials) g.startTrials()
+      else window.dispatchEvent(new CustomEvent('nox:startTrials'))
+      setTimeout(() => {
+        const gg = (window as unknown as { NOX_GAME?: { startTrials?: () => void } }).NOX_GAME
+        const overlay = document.getElementById('startOverlay')
+        const inCountdown = (gg as unknown as { gameState?: () => string })?.gameState?.() === 'countdown'
+        if (gg?.startTrials && overlay && !overlay.classList.contains('hidden') && !inCountdown) {
+          gg.startTrials()
+        }
+      }, 60)
+    } else {
+      window.dispatchEvent(new CustomEvent('nox:startGame'))
+      setTimeout(() => {
+        const gg = (window as unknown as { NOX_GAME?: { startGame?: () => void } }).NOX_GAME
+        if (gg?.startGame && document.getElementById('startOverlay') && !document.getElementById('startOverlay')?.classList.contains('hidden')) {
+          gg.startGame()
+        }
+      }, 60)
+    }
   }
   const handleHow = () => setShowHow(true)
   const handleCloseHow = () => setShowHow(false)
   const handleRematch = () => {
     document.getElementById('gameOverOverlay')?.classList.add('hidden')
-    window.dispatchEvent(new CustomEvent('nox:startGame'))
+    if (isTrials) {
+      const g = (window as unknown as { NOX_GAME?: { startTrials?: () => void } }).NOX_GAME
+      if (g?.startTrials) g.startTrials()
+      else window.dispatchEvent(new CustomEvent('nox:startTrials'))
+    } else {
+      window.dispatchEvent(new CustomEvent('nox:startGame'))
+    }
   }
   const handleMenu = () => {
     window.dispatchEvent(new CustomEvent('nox:backToMenu'))
   }
   const handleExit = (player: 1 | 2) => {
-    window.dispatchEvent(new CustomEvent('nox:forfeit', { detail: { playerId: player - 1 } }))
+    if (isTrials) {
+      window.dispatchEvent(new CustomEvent('nox:forfeitTrials'))
+    } else {
+      window.dispatchEvent(new CustomEvent('nox:forfeit', { detail: { playerId: player - 1 } }))
+    }
   }
 
   // Sync global speed dial with game logic after load
@@ -141,9 +162,9 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
         <div className="nox-content game-layout">
           {/* Top bar: player HUD + round info */}
           <div className="game-top-bar">
-            <PlayerHUD player={1} onExit={() => handleExit(1)} />
-            <CenterHUD mode={mode} />
-            {isTrials ? <TrialsHUD /> : <PlayerHUD player={2} onExit={() => handleExit(2)} />}
+            <PlayerHUD player={1} onExit={() => handleExit(1)} mode={mode} />
+            <CenterHUD mode={mode} onPause={() => { setShowPause(true); window.dispatchEvent(new CustomEvent('nox:pause')) }} />
+            {isTrials ? <TrialsHUD onPause={() => { setShowPause(true); window.dispatchEvent(new CustomEvent('nox:pause')) }} /> : <PlayerHUD player={2} onExit={() => handleExit(2)} mode={mode} />}
           </div>
 
           <div className="controls-strip" aria-label="Controls">
@@ -160,19 +181,7 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
                 SPACE
               </span>
             </div>
-            {isTrials ? (
-              <div className="controls-group">
-                <span className="controls-label" style={{ color: 'var(--nox-pink)' }}>
-                  BOT // AI
-                </span>
-                <span className="keycap">PREDICTS</span>
-                <span className="keycap">DASHES</span>
-                <span className="keycap">AVOIDS LAVA</span>
-                <span className="keycap" style={{ borderColor: 'rgba(255,92,168,0.4)', color: 'var(--nox-pink)' }}>
-                  NO VOID SENSE
-                </span>
-              </div>
-            ) : (
+            {isTrials ? null : (
               <div className="controls-group">
                 <span className="controls-label" style={{ color: 'var(--nox-pink)' }}>
                   P2 // PINK
@@ -218,7 +227,7 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
               Press <strong style={{ color: 'var(--nox-fg)' }}>P</strong> or <strong style={{ color: 'var(--nox-fg)' }}>Esc</strong> to resume. Your state is saved locally.
             </p>
             <div className="btn-row" style={{ marginTop: 20 }}>
-              <button className="btn btn-primary" onClick={() => { setShowPause(false); window.dispatchEvent(new CustomEvent('nox:resume')) }}>
+              <button className="btn btn-primary" onClick={() => { setShowPause(false); const g = (window as unknown as { NOX_GAME?: { resumeTrials?: () => void } }).NOX_GAME; if ((g as unknown as { gameState?: () => string })?.gameState?.() === 'paused') { window.dispatchEvent(new CustomEvent('nox:resume')) } }}>
                 ▶ RESUME
               </button>
               <button className="btn btn-ghost" onClick={() => setShowExitConfirm(true)}>
@@ -239,7 +248,7 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
               Your progress and high score will be saved. Are you sure you want to leave the trial?
             </p>
             <div className="btn-row" style={{ marginTop: 20 }}>
-              <button className="btn btn-primary" style={{ background: 'var(--nox-amber)', color: 'var(--nox-bg)' }} onClick={() => { setShowExitConfirm(false); window.dispatchEvent(new CustomEvent('nox:forfeit', { detail: { playerId: 0 } })) }}>
+              <button className="btn btn-primary" style={{ background: 'var(--nox-amber)', color: 'var(--nox-bg)' }} onClick={() => { setShowExitConfirm(false); setShowPause(false); window.dispatchEvent(new CustomEvent('nox:forfeitTrials')) }}>
                 YES // EXIT
               </button>
               <button className="btn btn-ghost" onClick={() => setShowExitConfirm(false)}>
@@ -250,7 +259,7 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
         </div>
       )}
 
-      {showHow && <HowToPlayModal onClose={handleCloseHow} />}
+      {showHow && <HowToPlayModal mode={mode} onClose={handleCloseHow} />}
     </>
   )
 }
@@ -287,10 +296,10 @@ function CyberBadge({
   )
 }
 
-function CyberTimer() {
+function CyberTimer({ initial = '01:00' }: { initial?: string }) {
   return (
     <div className="cyber-timer" id="timer" aria-live="polite">
-      <span className="cyber-timer__inner">01:00</span>
+      <span className="cyber-timer__inner">{initial}</span>
       <span className="cyber-timer__brackets" aria-hidden="true">
         <span className="bracket bracket--tl" />
         <span className="bracket bracket--tr" />
@@ -302,8 +311,9 @@ function CyberTimer() {
   )
 }
 
-function PlayerHUD({ player, onExit }: { player: 1 | 2; onExit?: () => void }) {
+function PlayerHUD({ player, onExit, mode = '1v1' }: { player: 1 | 2; onExit?: () => void; mode?: '1v1' | 'trials' }) {
   const isP1 = player === 1
+  const isTrials = mode === 'trials'
   return (
     <div className={`player-hud ${isP1 ? 'p1' : 'p2'}`} id={`cardP${player}`}>
       {isP1 && (
@@ -319,7 +329,7 @@ function PlayerHUD({ player, onExit }: { player: 1 | 2; onExit?: () => void }) {
             <div className="hud-name">PLAYER {player}</div>
             <div className="hud-sub">{isP1 ? 'CYAN SPECTRE' : 'MAGENTA RIFT'}</div>
           </div>
-          <div className="score" id={`scoreP${player}`}>
+          <div className="score" id={`scoreP${player}`} style={isTrials ? { opacity: 0, pointerEvents: 'none', width: 0, minWidth: 0 } : undefined}>
             0
           </div>
         </div>
@@ -416,13 +426,26 @@ function PowerChip({
   )
 }
 
-function CenterHUD({ mode = '1v1' }: { mode?: '1v1' | 'trials' }) {
+function CenterHUD({ mode = '1v1', onPause }: { mode?: '1v1' | 'trials'; onPause?: () => void }) {
+  const isTrials = mode === 'trials'
   return (
     <div className="center-hud">
-      <div className="round-label" id="roundLabel">
-        {mode === 'trials' ? 'VOID TRIALS // 10:00' : 'FIRST TO 5 • ROUND 1'}
+      <div className="round-label" id="roundLabel" style={isTrials ? { opacity: 0.0, height: 0, overflow: 'hidden', margin: 0, padding: 0 } : undefined}>
+        {mode === 'trials' ? 'VOID TRIALS' : 'FIRST TO 5 • ROUND 1'}
       </div>
-      <CyberTimer />
+      <CyberTimer initial={isTrials ? '10:00' : '01:00'} />
+      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {isTrials && onPause && (
+          <button className="cyber-pause-btn" onClick={onPause} aria-label="Pause trial">
+            <span>⏸</span> PAUSE <span style={{ opacity: 0.6, fontSize: '9px' }}>[P]</span>
+          </button>
+        )}
+        {isTrials && (
+          <button className="cyber-pause-btn" style={{ borderColor: 'rgba(255,92,168,0.28)', color: 'var(--nox-pink)', background: 'rgba(255,92,168,0.08)' }} onClick={() => window.dispatchEvent(new CustomEvent('nox:forfeitTrials'))} aria-label="Exit trial">
+            ✕ EXIT
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -437,7 +460,7 @@ function TrialsHUD() {
         <div className="trials-hud__bot-bar"><div className="trials-hud__bot-fill" id="botHpBar" /></div>
         <span className="trials-hud__bot-hp" id="botHp">12 / 12</span>
       </div>
-      <div className="trials-hud__void" id="voidWarn">⚠ VOID CRUSHING</div>
+      <div className="trials-hud__void" id="voidWarn" style={{ opacity: 0 }}>⚠ VOID CRUSHING</div>
     </div>
   )
 }
@@ -462,7 +485,7 @@ function GameStage({
   const cy = arenaH / 2
   const voidR = isTrials ? 900 : 420
   return (
-    <div className="stage" id="stage">
+    <div className="stage" id="stage" style={isTrials ? { width: 'min(1180px, calc(100vw - 24px))', aspectRatio: '1920 / 1120', maxHeight: 'min(640px, calc(100vh - 210px))' } as React.CSSProperties : undefined}>
       <svg
         id="gameSvg"
         viewBox={`0 0 ${arenaW} ${arenaH}`}
@@ -631,17 +654,16 @@ function StartOverlay({ mode = '1v1', onPlay, onHow }: { mode?: '1v1' | 'trials'
   if (mode === 'trials') {
     return (
       <div className="overlay" id="startOverlay">
-        <div className="menu-card" style={{ borderColor: 'rgba(255,178,62,0.35)' }}>
+        <div className="menu-card menu-card--trials" style={{ borderColor: 'rgba(255,178,62,0.35)', gap: 10, padding: '20px 18px' }}>
           <CyberBadge variant="amber">⬢ 1 PLAYER • VS AI • 10:00</CyberBadge>
-          <h2 className="menu-title">
+          <h2 className="menu-title" style={{ fontSize: 'clamp(32px, 6vw, 52px)', lineHeight: 0.9 }}>
             <span style={{ color: 'var(--nox-amber)' }}>VOID</span> TRIALS
           </h2>
-          <p className="menu-copy">
-            Solo survival. You vs the <strong>AI bot</strong> on a 2x arena. Survive <strong>10 minutes</strong> or kill
-            the bot. The <strong style={{ color: 'var(--nox-amber)' }}>void crushes at 7:30</strong> - stay inside or burn.
+          <p className="menu-copy" style={{ fontSize: 13, lineHeight: 1.4, opacity: 0.7 }}>
+            Solo on <strong>2x arena</strong> vs bot. Same physics as <strong>1v1</strong> — survive <strong>10:00</strong> or kill the bot. Void crushes at <strong style={{ color: 'var(--nox-amber)' }}>7:30</strong>.
           </p>
 
-          <div className="trials-score-board">
+          <div className="trials-score-board" style={{ margin: '6px 0', padding: '8px 10px' }}>
             <div className="trials-score-board__row">
               <span>HIGH SCORE</span>
               <strong id="trialsHighScore">{highScore.toLocaleString()}</strong>
@@ -656,22 +678,22 @@ function StartOverlay({ mode = '1v1', onPlay, onHow }: { mode?: '1v1' | 'trials'
 
           <GlobalSpeedControl />
 
-          <div className="btn-row">
-            <button className="btn btn-primary" id="playBtn" onClick={onPlay}>
+          <div className="btn-row" style={{ gap: 8 }}>
+            <button className="btn btn-primary" id="playBtn" onClick={onPlay} style={{ padding: '10px 18px', fontSize: 13 }}>
               ▶ ENTER THE TRIAL
             </button>
             {hasSaved && (
-              <button className="btn btn-ghost" id="resumeBtn" style={{ borderColor: 'var(--nox-lime)', color: 'var(--nox-lime)' }} onClick={handleResume}>
-                ↻ RESUME TRIAL
+              <button className="btn btn-ghost" id="resumeBtn" style={{ borderColor: 'var(--nox-lime)', color: 'var(--nox-lime)', padding: '10px 14px', fontSize: 13 }} onClick={handleResume}>
+                ↻ RESUME
               </button>
             )}
-            <button className="btn btn-ghost" id="howBtn" onClick={onHow}>
+            <button className="btn btn-ghost" id="howBtn" onClick={onHow} style={{ padding: '10px 14px', fontSize: 13 }}>
               How to play
             </button>
           </div>
 
-          <div className="hint" style={{ color: 'var(--nox-muted)' }}>
-            WASD move • SHIFT dash • SPACE shoot • P / ESC pause • Bot has NO void sense - use it
+          <div className="hint" style={{ color: 'var(--nox-muted)', fontSize: 10, marginTop: 2 }}>
+            WASD + SHIFT + SPACE • P pause • EXIT forfeit • Bot shoots back same as P2
           </div>
         </div>
       </div>
@@ -727,7 +749,8 @@ function GlobalSpeedControl() {
   )
 }
 
-function HowToPlayModal({ onClose }: { onClose: () => void }) {
+function HowToPlayModal({ mode = '1v1', onClose }: { mode?: '1v1' | 'trials'; onClose: () => void }) {
+  const isTrials = mode === 'trials'
   return (
     <div className="how-modal" role="dialog" aria-modal="true" aria-labelledby="how-modal-title">
       <div className="how-modal__backdrop" onClick={onClose} aria-hidden="true" />
@@ -736,17 +759,17 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
           ✕
         </button>
         <div className="how-modal__header">
-          <CyberBadge variant="cyan">HOW TO PLAY</CyberBadge>
+          <CyberBadge variant={isTrials ? 'amber' : 'cyan'}>{isTrials ? 'VOID TRIALS // SOLO' : 'HOW TO PLAY'}</CyberBadge>
           <h2 id="how-modal-title" className="how-modal__title">
-            NEON VOID // QUICK GUIDE
+            {isTrials ? 'VOID TRIALS // FIELD MANUAL' : 'NEON VOID // QUICK GUIDE'}
           </h2>
-          <p className="how-modal__subtitle">Same keyboard, two players - first to 5 wins.</p>
+          <p className="how-modal__subtitle">{isTrials ? 'One keyboard. You vs the bot. 10 minutes. The void crushes at 7:30.' : 'Same keyboard, two players - first to 5 wins.'}</p>
         </div>
 
         <div className="how-modal__body">
           <section className="how-section">
             <h3 className="how-section__title" style={{ color: 'var(--nox-cyan)' }}>
-              <span className="how-section__index">01</span> MOVE & SHOOT
+              <span className="how-section__index">01</span> {isTrials ? 'MOVE // SOLO' : 'MOVE & SHOOT'}
             </h3>
             <div className="how-card how-card--cyan">
               <div className="how-row">
@@ -759,23 +782,31 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                 <span className="keycap" style={{ background: '#fff', color: '#07090b' }}>
                   SPACE
                 </span>
+                {isTrials && <span className="keycap" style={{ marginLeft: 8, borderColor: 'var(--nox-amber)', color: 'var(--nox-amber)' }}>P / ESC = PAUSE</span>}
               </div>
-              <div className="how-row">
-                <span className="how-player" style={{ color: 'var(--nox-pink)' }}>
-                  P2 // PINK
-                </span>
-                <span className="keycap">↑</span>
-                <span className="keycap">←</span>
-                <span className="keycap">↓</span>
-                <span className="keycap">→</span>
-                <span className="keycap keycap-accent">/</span>
-                <span className="keycap" style={{ background: '#fff', color: '#07090b' }}>
-                  ENTER
-                </span>
-              </div>
+              {!isTrials && (
+                <div className="how-row">
+                  <span className="how-player" style={{ color: 'var(--nox-pink)' }}>
+                    P2 // PINK
+                  </span>
+                  <span className="keycap">↑</span>
+                  <span className="keycap">←</span>
+                  <span className="keycap">↓</span>
+                  <span className="keycap">→</span>
+                  <span className="keycap keycap-accent">/</span>
+                  <span className="keycap" style={{ background: '#fff', color: '#07090b' }}>
+                    ENTER
+                  </span>
+                </div>
+              )}
               <p className="how-desc">
-                Use the move keys to run around. Hold <strong>Shift</strong> or <strong>/</strong> to <strong>dash</strong> - you flash forward and cannot get hit for a moment. Hold <strong>Space</strong> or <strong>Enter</strong> to keep shooting.
+                {isTrials ? (
+                  <>Use <strong>WASD</strong> to run. Hold <strong>Shift</strong> to <strong>dash</strong> - you flash forward and cannot be hit. Hold <strong>Space</strong> to shoot. The bot uses the same arena and rules, but it has <strong>no void sense</strong> - use that.</>
+                ) : (
+                  <>Use the move keys to run around. Hold <strong>Shift</strong> or <strong>/</strong> to <strong>dash</strong> - you flash forward and cannot get hit for a moment. Hold <strong>Space</strong> or <strong>Enter</strong> to keep shooting.</>
+                )}
               </p>
+              {isTrials && <p className="how-desc" style={{ marginTop: 6, opacity: 0.7 }}>Press <strong>P</strong> or <strong>Esc</strong> to pause - your run saves locally and you can resume.</p>}
             </div>
           </section>
 
@@ -808,7 +839,7 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                 </li>
               </ul>
               <p className="how-desc" style={{ opacity: 0.7, marginTop: 8 }}>
-                Special bullets come from pickups. You get a few shots, then you go back to your normal bullet.
+                {isTrials ? 'Both you and the bot can pick them up. The bot loves shield when hurt and triple when healthy.' : 'Special bullets come from pickups. You get a few shots, then you go back to your normal bullet.'}
               </p>
             </div>
           </section>
@@ -829,7 +860,7 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
                   <strong style={{ color: '#10b981' }}>Slime</strong> - green goo that makes you move slow while you are inside. It does not hurt you.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--nox-lime)' }}>The Void</strong> - after a while the edge of the arena starts closing in. Green blocks crumble at the border. Stay in the middle or you will lose health.
+                  <strong style={{ color: 'var(--nox-amber)' }}>The Void {isTrials ? '// RECTANGLE' : ''}</strong> - {isTrials ? 'At 7:30 a rectangular border starts shrinking from the 2× edges toward the 1× center over 30 seconds. Damage outside is exponential - deeper = deadlier. Stay inside the amber line.' : 'after a while the edge of the arena starts closing in. Green blocks crumble at the border. Stay in the middle or you will lose health.'}
                 </li>
               </ul>
             </div>
@@ -837,22 +868,35 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
 
           <section className="how-section">
             <h3 className="how-section__title" style={{ color: 'var(--nox-lime)' }}>
-              <span className="how-section__index">04</span> HOW TO WIN
+              <span className="how-section__index">04</span> {isTrials ? 'HOW TO SURVIVE' : 'HOW TO WIN'}
             </h3>
             <div className="how-card how-card--lime">
-              <p className="how-desc">
-                Knock out the other player to win a round. If no one is knocked out when the timer runs out, the player with more health wins. Tied health is a draw.
-              </p>
-              <p className="how-desc" style={{ marginTop: 8 }}>
-                First to <strong>5 round wins</strong> wins the whole game.
-              </p>
+              {isTrials ? (
+                <>
+                  <p className="how-desc">
+                    Survive <strong>10:00</strong> or <strong>kill the bot</strong> (12 HP). You earn <strong>+1/s</strong> for living, <strong>+25</strong> per hit, <strong>+75</strong> per pickup. Lava <strong>-30</strong>, slime <strong>-15</strong>. After <strong>7:30</strong> gains <strong>×2</strong> and losses <strong>×3</strong>.
+                  </p>
+                  <p className="how-desc" style={{ marginTop: 8 }}>
+                    The bot has <strong>no void sense</strong> - it will walk into the crush. Use the center. Pause with <strong>P</strong>, exit with confirmation saves your high score. Your run auto-saves every 2 seconds.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="how-desc">
+                    Knock out the other player to win a round. If no one is knocked out when the timer runs out, the player with more health wins. Tied health is a draw.
+                  </p>
+                  <p className="how-desc" style={{ marginTop: 8 }}>
+                    First to <strong>5 round wins</strong> wins the whole game.
+                  </p>
+                </>
+              )}
             </div>
           </section>
         </div>
 
         <div className="how-modal__footer">
           <button className="btn btn-primary" onClick={onClose}>
-            GOT IT // FIGHT!
+            {isTrials ? 'ENTER THE VOID // READY' : 'GOT IT // FIGHT!'}
           </button>
         </div>
       </div>

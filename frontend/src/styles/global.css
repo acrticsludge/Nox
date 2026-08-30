@@ -643,7 +643,7 @@ body {
 }
 .game-top-bar {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   width: 100%;
   max-width: 1180px;
   display: flex;
@@ -760,8 +760,7 @@ body {
   transition: opacity 0.4s;
   text-shadow: 0 0 10px rgba(239, 68, 68, 0.55);
 }
-.trials-hud__void[style*='opacity: 1'],
-.trials-hud__void:not([style]) {
+.trials-hud__void[style*='opacity: 1'] {
   animation: voidPulse 1.1s infinite;
 }
 @keyframes voidPulse {
@@ -797,6 +796,23 @@ body {
   font-size: 11px;
   letter-spacing: 0.06em;
 }
+.cyber-pause-btn {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font: 10px var(--nox-mono);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--nox-amber);
+  background: rgba(255, 178, 62, 0.08);
+  border: 1px solid rgba(255, 178, 62, 0.28);
+  cursor: pointer;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  transition: background 0.15s, transform 0.15s;
+}
+.cyber-pause-btn:hover { background: rgba(255, 178, 62, 0.14); transform: translateY(-1px); }
 .avatar {
   width: 44px;
   height: 44px;
@@ -1130,7 +1146,7 @@ body {
 }
 .stage {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   width: min(960px, calc(100vw - 24px));
   aspect-ratio: 960 / 560;
   max-height: min(560px, calc(100vh - 210px));
@@ -1153,12 +1169,17 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
+  align-content: center;
   background: radial-gradient(
     600px 400px at 50% 50%,
     rgba(15, 23, 42, 0.9),
     rgba(7, 9, 11, 0.92)
   );
   z-index: 5;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  -webkit-overflow-scrolling: touch;
 }
 .overlay.hidden {
   display: none;
@@ -1167,15 +1188,33 @@ body {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   border: 1px solid var(--nox-border);
   border-radius: 0;
-  padding: 32px 28px;
+  padding: 28px 24px;
   width: min(520px, 92%);
+  max-height: min(92vh, 640px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--nox-border) transparent;
   text-align: center;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   align-items: center;
+  justify-content: flex-start;
 }
+.menu-card--trials {
+  gap: 10px;
+  padding: 20px 18px;
+  max-height: min(88vh, 560px);
+}
+.menu-card--trials .menu-title { margin: 2px 0; }
+.menu-card--trials .menu-copy { margin: 0; max-width: 42ch; }
+.menu-card--trials .global-speed { padding: 10px 12px; }
+.menu-card--trials .trials-score-board { gap: 3px; }
+.menu-card::-webkit-scrollbar { width: 6px; }
+.menu-card::-webkit-scrollbar-thumb { background: var(--nox-border); }
+.menu-card::-webkit-scrollbar-track { background: transparent; }
 .menu-card .cyber-badge { margin: 0; }
 .menu-title {
   font-size: clamp(48px, 10vw, 82px);
