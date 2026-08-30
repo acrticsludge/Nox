@@ -619,7 +619,7 @@ let gameState = 'menu';
 let scores = [0, 0];
 let round = 1;
 let timeLeft = ROUND_TIME;
-let prevHp = [MAX_HP, MAX_HP];
+let prevHp = [MAX_HP, MAX_HP, BOT_MAX_HP];
 let pendingTimeouts = [];
 let forfeitLock = false;
 
@@ -648,7 +648,7 @@ function hardResetInternalState() {
   }
   round = 1;
   timeLeft = ROUND_TIME;
-  prevHp[0] = MAX_HP; prevHp[1] = MAX_HP;
+  prevHp[0] = MAX_HP; prevHp[1] = MAX_HP; prevHp[2] = BOT_MAX_HP;
   players.forEach(pl => { pl.ammoType = 'standard'; pl.ammo = Infinity; });
   hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
   safeRadius = 999;
@@ -841,7 +841,7 @@ function resetRound(regenerateWalls = false) {
     window.NOX_GAME.particles.length = 0;
   }
   timeLeft = ROUND_TIME;
-  prevHp[0] = MAX_HP; prevHp[1] = MAX_HP;
+  prevHp[0] = MAX_HP; prevHp[1] = MAX_HP; prevHp[2] = BOT_MAX_HP;
   hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
   spawnPickupSoon(true);
   updateHUD();
@@ -2753,9 +2753,24 @@ function updateHUD() {
       botHpEl.textContent = `${bot.hp} / ${bot.maxHp}`;
     }
     const botHpBar = document.getElementById('botHpBar');
+    const botHearts = document.getElementById('botHearts');
     if(botHpBar) {
       const pct = (bot.hp / bot.maxHp) * 100;
       botHpBar.style.width = pct + '%';
+      if(bot.hp <= 2) botHpBar.classList.add('low');
+      else botHpBar.classList.remove('low');
+    }
+    if(botHearts){
+      if(bot.hp <= 2) botHearts.style.filter = 'brightness(1.12)';
+      else if(bot.hp <= 4) botHearts.style.filter = 'brightness(1.05)';
+      else botHearts.style.filter = 'none';
+      if(botHearts && typeof prevHp !== 'undefined' && prevHp[2] != null && prevHp[2] > bot.hp){
+        botHearts.classList.remove('damage');
+        void botHearts.offsetWidth;
+        botHearts.classList.add('damage');
+        setTimeout(()=> botHearts.classList.remove('damage'),300);
+      }
+      if(typeof prevHp !== 'undefined') prevHp[2]=bot.hp;
     }
     const rl = document.getElementById('roundLabel');
     if(rl) {
@@ -3079,7 +3094,7 @@ function init() {
     resetRound(false);
     const vg2 = document.getElementById('void');
     if (vg2) vg2.setAttribute('opacity','0');
-    safeRadius = 999; voidTick=[0,0]; timeLeft=ROUND_TIME; prevHp[0]=MAX_HP; prevHp[1]=MAX_HP;
+    safeRadius = 999; voidTick=[0,0]; timeLeft=ROUND_TIME; prevHp[0]=MAX_HP; prevHp[1]=MAX_HP; prevHp[2]=BOT_MAX_HP;
     updateHUD();
     render();
   }

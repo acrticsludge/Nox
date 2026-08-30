@@ -4,10 +4,12 @@ export default function TrialsHUD() {
     <div className="trials-hud" aria-label="Trial status">
       <div className="trials-hud__points" id="trialPoints">0</div>
       <div className="trials-hud__label">PTS</div>
-      <div className="trials-hud__bot">
+      <div className="trials-hud__bot" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span className="trials-hud__bot-name">BOT</span>
-        <div className="trials-hud__bot-bar"><div className="trials-hud__bot-fill" id="botHpBar" /></div>
-        <span className="trials-hud__bot-hp" id="botHp">12 / 12</span>
+        <div className="hearts" style={{ flex: 1, marginTop: 0 }} id="botHearts">
+          <div className="hp-fill" id="botHpBar" style={{ background: 'linear-gradient(90deg, var(--nox-pink), #f43f5e)', boxShadow: '0 0 10px rgba(255,92,168,0.55)' }} />
+          <div className="hp-text" id="botHp">12 / 12</div>
+        </div>
       </div>
       {/* Bot buffs — so you see when it grabbed shield/overcharge/blink */}
       <div className="status-row" style={{ marginTop: 6 }} id="botStatus">
