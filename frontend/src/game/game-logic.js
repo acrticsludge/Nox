@@ -318,23 +318,38 @@ function isLavaWarning(h) {
 }
 
 function findValidHazardPos(ignoreIdx = -1) {
-  // try 60 random cells for a valid hazard spot (not on wall, not on other hazard, not near spawn)
-  for (let attempt = 0; attempt < 60; attempt++) {
-    const c = 1 + Math.floor(Math.random() * (COLS - 2));
-    const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+  // mode-aware so trials (48x28) doesn't pick from 24x14 only
+  const cols = gameMode === 'trials' ? TRIALS_COLS : COLS;
+  const rows = gameMode === 'trials' ? TRIALS_ROWS : ROWS;
+  const vcX = gameMode === 'trials' ? TRIALS_W/2 : W/2;
+  const vcY = gameMode === 'trials' ? TRIALS_H/2 : H/2;
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const c = 1 + Math.floor(Math.random() * (cols - 2));
+    const r = 1 + Math.floor(Math.random() * (rows - 2));
     const x = c * GRID + 2, y = r * GRID + 2;
     const cx = x + 18, cy = y + 18;
-    // avoid spawn protects (mirror generateRandomWalls protectedCells)
-    if ((c >= 2 && c <= 5 && r >= 6 && r <= 8) || (c >= 18 && c <= 21 && r >= 6 && r <= 8) || (c >= 10 && c <= 13 && r >= 5 && r <= 9)) continue;
+    // avoid spawn protects — mirror generators' protectedCells per mode
+    if (gameMode === 'trials') {
+      const inTrialSpawn = (c>=5&&c<=8&&r>=12&&r<=16) || (c>=39&&c<=42&&r>=12&&r<=16) || (c>=21&&c<=26&&r>=12&&r<=16);
+      if (inTrialSpawn) continue;
+      // also block 1-cell halo
+      let nearSpawn=false;
+      for(let dc=-1;dc<=1;dc++) for(let dr=-1;dr<=1;dr++){
+        const cc=c+dc, rr=r+dr;
+        const near = (cc>=5&&cc<=8&&rr>=12&&rr<=16) || (cc>=39&&cc<=42&&rr>=12&&rr<=16) || (cc>=21&&cc<=26&&rr>=12&&rr<=16);
+        if(near){ nearSpawn=true; break; }
+      }
+      if(nearSpawn) continue;
+    } else {
+      if ((c >= 2 && c <= 5 && r >= 6 && r <= 8) || (c >= 18 && c <= 21 && r >= 6 && r <= 8) || (c >= 10 && c <= 13 && r >= 5 && r <= 9)) continue;
+    }
     if (wallsCollide(cx, cy, 22)) continue;
-    // adjacency to walls: if any wall within 1 cell, skip
     let nearWall = false;
     for (const w of wallData) {
       if (w.isBorder) continue;
       if (rectCircleCollide(cx, cy, 28, w.x, w.y, w.w, w.h)) { nearWall = true; break; }
     }
     if (nearWall) continue;
-    // avoid other hazards (40px gap)
     let overlap = false;
     for (let i = 0; i < hazards.length; i++) {
       if (i === ignoreIdx) continue;
@@ -342,14 +357,20 @@ function findValidHazardPos(ignoreIdx = -1) {
       if (Math.abs(h.x - x) < 42 && Math.abs(h.y - y) < 42) { overlap = true; break; }
     }
     if (overlap) continue;
-    // avoid players (80px) - prevents insta-damage on relocate
-    if (len2(cx, cy, players[0].x, players[0].y) < 88 || len2(cx, cy, players[1].x, players[1].y) < 88) continue;
-    // avoid pickups
+    // avoid players/bot (80px) — include bot in trials
+    const avoid = gameMode === 'trials' ? [players[0], bot] : [players[0], players[1]];
+    let nearEnt=false;
+    for(const ent of avoid){ if(ent && ent.alive && len2(cx,cy,ent.x,ent.y)<88){ nearEnt=true; break; } }
+    if(nearEnt) continue;
     let nearPickup = false;
     for (const pu of pickups) if (len2(cx, cy, pu.x, pu.y) < 60) { nearPickup = true; break; }
     if (nearPickup) continue;
-    // avoid void crush zone when void is active
-    if (safeRadius < 900 && len2(cx, cy, 480, 280) > safeRadius - 32) continue;
+    // avoid void: circle for 1v1, rect for trials
+    if (gameMode === 'trials' && safeRadius < 900 && voidRect) {
+      const inSafeX = cx > voidRect.x && cx < voidRect.x+voidRect.w;
+      const inSafeY = cy > voidRect.y && cy < voidRect.y+voidRect.h;
+      if (!inSafeX || !inSafeY) continue;
+    } else if (safeRadius < 900 && len2(cx, cy, vcX, vcY) > safeRadius - 32) continue;
     return { c, r, x, y };
   }
   return null;
@@ -1763,15 +1784,27 @@ function shootBotBullet(bot, target) {
 }
 
 function pickupBotPowerup(bot, pu) {
-  const pt = POWER_TYPES[pu.kind];
-  if(!pt) return;
-  if(pu.kind === 'overcharge') bot.overcharge = pt.duration;
-  else if(pu.kind === 'shield') { bot.shield = true; bot.shieldHp = SHIELD_MAX_HP; }
-  else if(pu.kind === 'blink') { bot.extraDash = Math.min(2, bot.extraDash + 1); bot.dashCd = 0; bot.speedBoost = pt.duration; }
-  else if(pu.kind === 'heal') { bot.hp = Math.min(bot.maxHp, bot.hp + HEAL_AMOUNT); }
+  // Ammo pickups are separate from POWER_TYPES — handle first
   if(pu.kind && pu.kind.indexOf('ammo_') === 0) {
     const cfg = AMMO_PICKUP_CFG[pu.kind];
     if(cfg) { bot.ammoType = cfg.bullet; bot.ammo = cfg.ammo; }
+    particles.push(...spawnPickupEffect(pu.x, pu.y, cfg ? cfg.color : '#a78bfa'));
+    bot.squish = 10;
+    particles.push({x: bot.x, y: bot.y - 22, vx:0, vy:-0.9, life:36, max:36, r:0, color: cfg ? cfg.color : '#a78bfa', type:'healText', text: cfg ? cfg.bullet.toUpperCase()+` x${cfg.ammo}` : 'AMMO'});
+    damageShake(bot, 0.6);
+    return;
+  }
+  const pt = POWER_TYPES[pu.kind];
+  if(!pt) return;
+  if(pu.kind === 'overcharge') { bot.overcharge = pt.duration; particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color)); bot.squish = 10; damageShake(bot,0.5); }
+  else if(pu.kind === 'shield') { bot.shield = true; bot.shieldHp = SHIELD_MAX_HP; particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color)); bot.squish = 10; damageShake(bot,0.5); }
+  else if(pu.kind === 'blink') { bot.extraDash = Math.min(2, bot.extraDash + 1); bot.dashCd = 0; bot.speedBoost = pt.duration; particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color)); bot.squish = 10; damageShake(bot,0.5); }
+  else if(pu.kind === 'heal') {
+    const before = bot.hp;
+    bot.hp = Math.min(bot.maxHp, bot.hp + HEAL_AMOUNT);
+    particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color));
+    if(bot.hp > before) particles.push({x: bot.x, y: bot.y - 26, vx:0, vy:-0.9, life:36, max:36, r:0, color:'#22c55e', type:'healText', text:`+${bot.hp-before}`});
+    bot.squish = 10;
   }
 }
 
@@ -2181,6 +2214,71 @@ function render() {
       flame.setAttribute('fill', '#ffd8a8');
       flame.setAttribute('opacity', '0.9');
       g.appendChild(flame);
+    }
+
+    if(bot.overcharge > 0) {
+      const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.setAttribute('cx', '0'); ring.setAttribute('cy', '0'); ring.setAttribute('r', '20');
+      ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', '#ffb23e');
+      ring.setAttribute('stroke-width', '2'); ring.setAttribute('stroke-dasharray', '4 4'); ring.setAttribute('opacity', '0.85');
+      ring.setAttribute('transform', `rotate(${(Date.now() / 12) % 360})`);
+      g.appendChild(ring);
+    }
+    if(bot.shield) {
+      const hp = bot.shieldHp || 0;
+      let dash='6 3', op='0.92', sw='2.6';
+      if(hp===2){dash='6 7'; op='0.68'; sw='2.2';} else if(hp===1){dash='3.5 9'; op='0.42'; sw='1.8';}
+      const sr = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      sr.setAttribute('cx','0'); sr.setAttribute('cy','0'); sr.setAttribute('r','22');
+      sr.setAttribute('fill','none'); sr.setAttribute('stroke','#58d8ff'); sr.setAttribute('stroke-width',sw);
+      sr.setAttribute('opacity',op); sr.setAttribute('stroke-dasharray',dash); sr.setAttribute('stroke-linecap','round');
+      if(hp===1) sr.setAttribute('transform',`rotate(${(Date.now()/14)%360})`);
+      g.appendChild(sr);
+      const sr2=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      sr2.setAttribute('cx','0'); sr2.setAttribute('cy','0'); sr2.setAttribute('r','24');
+      sr2.setAttribute('fill','#58d8ff'); sr2.setAttribute('opacity', hp===1?'0.06':hp===2?'0.09':'0.13');
+      g.appendChild(sr2);
+    }
+    if(bot.speedBoost > 0) {
+      const br=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      br.setAttribute('cx','0'); br.setAttribute('cy','0'); br.setAttribute('r','18');
+      br.setAttribute('fill','none'); br.setAttribute('stroke','#c9ff2f'); br.setAttribute('stroke-width','2');
+      br.setAttribute('opacity','0.8'); br.setAttribute('stroke-dasharray','2 5');
+      br.setAttribute('transform',`rotate(${(Date.now()/8)%360})`);
+      g.appendChild(br);
+    }
+    if(bot.extraDash > 0) {
+      const ed=document.createElementNS('http://www.w3.org/2000/svg','text');
+      ed.setAttribute('x','14'); ed.setAttribute('y','-14'); ed.setAttribute('font-size','10'); ed.setAttribute('font-weight','800'); ed.setAttribute('fill','#c9ff2f');
+      ed.textContent='◆'.repeat(bot.extraDash);
+      g.appendChild(ed);
+    }
+    // bot hp arc + ammo indicator (mirrors player)
+    {
+      const hpArc=document.createElementNS('http://www.w3.org/2000/svg','text');
+      hpArc.setAttribute('x','0'); hpArc.setAttribute('y','28'); hpArc.setAttribute('text-anchor','middle');
+      hpArc.setAttribute('font-size', bot.hp>8?'8':'9'); hpArc.setAttribute('font-family','JetBrains Mono, monospace');
+      hpArc.setAttribute('fill','#fff'); hpArc.setAttribute('opacity','0.85');
+      hpArc.setAttribute('transform',`rotate(${-bot.angle*180/Math.PI})`);
+      hpArc.textContent= bot.hp<=6 ? '♥'.repeat(bot.hp) : `${bot.hp}♥`;
+      g.appendChild(hpArc);
+      if(bot.ammoType && bot.ammoType!=='standard'){
+        const ammoArc=document.createElementNS('http://www.w3.org/2000/svg','text');
+        ammoArc.setAttribute('x','0'); ammoArc.setAttribute('y', bot.hp>6?'38':'36'); ammoArc.setAttribute('text-anchor','middle');
+        ammoArc.setAttribute('font-size','6'); ammoArc.setAttribute('font-family','JetBrains Mono, monospace');
+        ammoArc.setAttribute('fill', bot.ammoType==='needle'?'#a78bfa':bot.ammoType==='cannon'?'#ffb23e':'#58d8ff');
+        ammoArc.setAttribute('opacity','0.9'); ammoArc.setAttribute('transform',`rotate(${-bot.angle*180/Math.PI})`);
+        ammoArc.textContent= bot.ammoType==='needle'?`Nx${bot.ammo}`:bot.ammoType==='cannon'?`Cx${bot.ammo}`:`Tx${bot.ammo}`;
+        g.appendChild(ammoArc);
+      }
+      if(bot.dashCd>0){
+        const cdbg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        cdbg.setAttribute('x','-12'); cdbg.setAttribute('y','-18'); cdbg.setAttribute('width','24'); cdbg.setAttribute('height','3'); cdbg.setAttribute('rx','2');
+        cdbg.setAttribute('fill','rgba(255,255,255,0.18)'); g.appendChild(cdbg);
+        const cdf=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        cdf.setAttribute('x','-12'); cdf.setAttribute('y','-18'); cdf.setAttribute('width', String(24*(1-bot.dashCd/DASH_COOLDOWN))); cdf.setAttribute('height','3'); cdf.setAttribute('rx','2');
+        cdf.setAttribute('fill', bot.dashCd<10?'#22c55e':'#ff9d2e'); g.appendChild(cdf);
+      }
     }
 
     playersG.appendChild(g);
@@ -2690,6 +2788,17 @@ function updateHUD() {
     }
     // Keep P1 pointer/health/chips in sync — previously early-returned and health stayed stale
     updatePlayerCardHUD(players[0], 0);
+    // Bot HUD buffs so pickup has visible feedback
+    {
+      const bOv=document.getElementById('botOv'), bOvF=document.getElementById('botOvF'), bOvT=document.getElementById('botOvT');
+      if(bOv){ const active=bot.overcharge>0; bOv.classList.toggle('active',active); if(bOvF) bOvF.style.width=active?(bot.overcharge/240*100)+'%':'0%'; if(bOvT) bOvT.textContent=active?(bot.overcharge/60).toFixed(1)+'s':''; }
+      const bSh=document.getElementById('botSh'), bShF=document.getElementById('botShF'), bShT=document.getElementById('botShT');
+      if(bSh){ const active=!!bot.shield&&bot.shieldHp>0; bSh.classList.toggle('active',active); const max=bot.shieldMax||SHIELD_MAX_HP; const pct2=active?(bot.shieldHp/max*100):0; if(bShF) bShF.style.width=pct2+'%'; if(bShT) bShT.textContent=active?`${bot.shieldHp}/${max}`:''; const lab=bSh.querySelector('.chip-label'); if(lab) lab.textContent=active&&bot.shieldHp===1?'CRACK':'SHLD'; }
+      const bBl=document.getElementById('botBl'), bBlF=document.getElementById('botBlF'), bBlT=document.getElementById('botBlT');
+      if(bBl){ const hasDash=bot.extraDash>0, hasBoost=bot.speedBoost>0, active=hasDash||hasBoost; bBl.classList.toggle('active',active); let pctB=0, txtB=''; if(hasBoost){pctB=bot.speedBoost/180*100; txtB=(bot.speedBoost/60).toFixed(1)+'s';} else if(hasDash){pctB=100; txtB='x'+bot.extraDash;} if(bBlF) bBlF.style.width=pctB+'%'; if(bBlT) bBlT.textContent=txtB; }
+      const bAmmo=document.getElementById('botAmmo'), bAmmoT=document.getElementById('botAmmoT');
+      if(bAmmo&&bAmmoT){ const t=bot.ammoType||'standard'; let label='STD INF', cls='ammo-chip--standard'; if(t==='needle'){label=`NEEDLE x${bot.ammo}`; cls='ammo-chip--needle';} else if(t==='cannon'){label=`CANNON x${bot.ammo}`; cls='ammo-chip--cannon';} else if(t==='trick'){label=`TRICK x${bot.ammo}`; cls='ammo-chip--trick';} bAmmo.className=`ammo-chip ${cls}`; bAmmoT.textContent=label; }
+    }
     const rlTrials = document.getElementById('roundLabel');
     if(rlTrials && gameState !== 'playing') { /* keep hidden */ }
     return;
