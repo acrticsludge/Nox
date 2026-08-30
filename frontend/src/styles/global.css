@@ -1149,20 +1149,27 @@ body {
   color: var(--nox-muted);
 }
 .stage {
-  position: relative;
-  z-index: 1;
-  width: min(960px, calc(100vw - 24px));
-  aspect-ratio: 960 / 560;
-  max-height: min(560px, calc(100vh - 210px));
-  max-height: min(560px, calc(100dvh - 210px));
-  background: rgba(12, 16, 18, 0.85);
-  border: 1px solid var(--nox-border);
-  border-radius: 0;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
-  margin-bottom: 14px;
-}
+    position: relative;
+    z-index: 1;
+    width: min(960px, calc(100vw - 24px));
+    aspect-ratio: 960 / 560;
+    max-height: min(560px, calc(100vh - 210px));
+    max-height: min(560px, calc(100dvh - 210px));
+    background: rgba(12, 16, 18, 0.85);
+    border: 1px solid var(--nox-border);
+    border-radius: 0;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+
+  /* Trials responsive mobile scaling (QX-05 / I.3) */
+  #gameSvg {
+    touch-action: manipulation;
+  }
+  @media (max-width: 768px) {
+    .stage { touch-action: manipulation; }
+    #gameSvg { max-width: 100vw; height: auto; }
+  }
 #gameSvg {
   width: 100%;
   height: 100%;
@@ -2042,6 +2049,16 @@ input[type='range']::-webkit-slider-thumb {
   }
 }
 
+/* I.3 / QX-05 — Adaptive canvas/SVG sizing (devicePixelRatio aware via CSS) */
+.stage, #gameSvg {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 1920px !important;
+  max-height: min(1120px, calc(100vh - 210px)) !important;
+}
+@media (max-width: 768px) {
+  .stage, #gameSvg { max-height: 80vh !important; }
+}
 @media (max-width: 760px) {
   .game-layout {
     padding-top: 20px;
@@ -2090,3 +2107,8 @@ input[type='range']::-webkit-slider-thumb {
     flex-direction: column;
   }
 }
+
+/* Mobile controls hidden on desktop, shown only on touch/coarse pointer */
+.mobile-game-controls { display: none !important; }
+@media (pointer: coarse) { .mobile-game-controls { display: flex !important; } }
+

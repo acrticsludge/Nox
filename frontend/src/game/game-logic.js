@@ -26,7 +26,7 @@ const TRIALS_COLS = 48;
 const TRIALS_ROWS = 28;
 const TRIAL_DURATION = 600;
 const VOID_START_TIME = 450;
-const VOID_SHRINK_DURATION = 30;
+const VOID_SHRINK_DURATION = 30; // SECONDS — second-scale timer (dt/60 loop, display m:s); 30s from 7:30 to 8:00
 const BOT_MAX_HP = 12;
 const TRIALS_HAZARD_COUNT = 10;
 const TRIALS_WALL_TARGET = 16;
@@ -535,11 +535,11 @@ function damageShake(p, intensity=1){ p.squish = Math.max(p.squish, 6 + intensit
 let globalSpeed = BASE_SPEED;
 let gameMode = '1v1';
 const players = [
-  { id: 0, x: 160, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#58d8ff', alive: true, ammoType:'standard', ammo:Infinity },
-  { id: 1, x: 800, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#ff5ca8', alive: true, ammoType:'standard', ammo:Infinity },
+  { id: 0, x: 160, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, slimeCd: 0, color: '#58d8ff', alive: true, ammoType:'standard', ammo:Infinity },
+  { id: 1, x: 800, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, slimeCd: 0, color: '#ff5ca8', alive: true, ammoType:'standard', ammo:Infinity },
 ];
 
-const bot = { id: 2, x: 1600, y: 560, vx: 0, vy: 0, angle: 0, hp: BOT_MAX_HP, maxHp: BOT_MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, color: '#ffb23e', alive: true, ammoType:'standard', ammo:Infinity, isBot: true, behavior: 'patrol', behaviorTimer: 0, targetX: 0, targetY: 0, reactionDelay: 0, lastShotTime: 0, aimError: 0 };
+const bot = { id: 2, x: 1600, y: 560, vx: 0, vy: 0, angle: 0, hp: BOT_MAX_HP, maxHp: BOT_MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, slimeCd: 0, color: '#ffb23e', alive: true, ammoType:'standard', ammo:Infinity, isBot: true, behavior: 'patrol', behaviorTimer: 0, targetX: 0, targetY: 0, reactionDelay: 0, lastShotTime: 0, aimError: 0 };
 // Early event queue so React can trigger start/forfeit even before init finishes
 if (typeof window !== 'undefined') {
   window.addEventListener('nox:startGame', () => {
@@ -625,6 +625,7 @@ let forfeitLock = false;
 
 // Void Trials state
 let trialPoints = 0;
+let trialScoreBreakdown = { survival: 0, hits: 0, pickups: 0, lavaPenalty: 0, slimePenalty: 0, voidPenalty: 0, botKill: 0 };
 let trialHighScore = 0;
 let voidRect = null;
 let voidShrinkStart = 0;
@@ -671,7 +672,7 @@ function hardResetInternalState() {
   bot.dash = 0; bot.dashCd = 0; bot.inv = 0; bot.shootCd = 0;
   bot.overcharge = 0; bot.shield = false; bot.shieldHp = 0;
   bot.speedBoost = 0; bot.extraDash = 0; bot.baseSpeed = globalSpeed;
-  bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0;
+  bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0; bot.slimeCd = 0;
   bot.ammoType = 'standard'; bot.ammo = Infinity;
   bot.behavior = 'patrol'; bot.behaviorTimer = 0;
   bot.reactionDelay = 80 + Math.random() * 40;
@@ -858,6 +859,7 @@ function startTrials() {
   gameMode = 'trials';
   timeLeft = TRIAL_DURATION;
   trialPoints = 0;
+  trialScoreBreakdown = { survival: 0, hits: 0, pickups: 0, lavaPenalty: 0, slimePenalty: 0, voidPenalty: 0, botKill: 0 };
   voidRect = null;
   voidShrinkStart = 0;
   lastSaveTime = 0;
@@ -888,7 +890,7 @@ function startTrials() {
   bot.dash = 0; bot.dashCd = 0; bot.inv = 0; bot.shootCd = 0;
   bot.overcharge = 0; bot.shield = false; bot.shieldHp = 0;
   bot.speedBoost = 0; bot.extraDash = 0; bot.baseSpeed = preservedSpeed;
-  bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0;
+  bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0; bot.slimeCd = 0;
   bot.ammoType = 'standard'; bot.ammo = Infinity;
   bot.behavior = 'patrol'; bot.behaviorTimer = 0;
   bot.reactionDelay = 80 + Math.random() * 40;
@@ -918,6 +920,7 @@ function prepareTrialsMenu() {
   gameMode = 'trials';
   timeLeft = TRIAL_DURATION;
   trialPoints = 0;
+  trialScoreBreakdown = { survival: 0, hits: 0, pickups: 0, lavaPenalty: 0, slimePenalty: 0, voidPenalty: 0, botKill: 0 };
   voidRect = null;
   safeRadius = 999;
   // Ensure P2 hidden in menu preview as well
@@ -1020,6 +1023,7 @@ function update(dt) {
     if(p.squish > 0) p.squish--;
     if(p.lavaCd > 0) p.lavaCd--;
     if(p.voidCd > 0) p.voidCd--;
+    if(p.slimeCd > 0) p.slimeCd--;
     if(p.dash > 0) { p.dash--; if(p.dash === 0) p.inv = 6; }
     if(wallsCollide(p.x, p.y, PLAYER_R)) pushOutOfWalls(p);
     p.inSlime = false;
@@ -1521,6 +1525,7 @@ function updateTrials(dt) {
     if(p.squish > 0) p.squish--;
     if(p.lavaCd > 0) p.lavaCd--;
     if(p.voidCd > 0) p.voidCd--;
+    if(p.slimeCd > 0) p.slimeCd--;
     if(p.dash > 0) { p.dash--; if(p.dash === 0) p.inv = 6; }
     if(wallsCollide(p.x, p.y, PLAYER_R)) pushOutOfWalls(p);
     p.inSlime = false;
@@ -1545,7 +1550,15 @@ function updateTrials(dt) {
     let mag = Math.hypot(mx, my);
     if(mag > 0) { mx /= mag; my /= mag; p.angle = Math.atan2(my, mx); }
     let curSpeed = p.baseSpeed * (p.speedBoost > 0 ? 1.22 : 1);
-    if(p.inSlime) curSpeed *= 0.55;
+    if(p.inSlime) {
+      if(p.slimeCd <= 0) {
+        const slimePenalty = elapsedTotal >= VOID_START_TIME ? 45 : 15;
+        trialScoreBreakdown.slimePenalty += slimePenalty;
+        trialPoints = Math.max(0, trialPoints - slimePenalty);
+        p.slimeCd = 60;
+      }
+      curSpeed *= 0.55;
+    }
     let dashSpd = p.baseSpeed * 2.35;
     if(p.inSlime) dashSpd *= 0.70;
     let spd = p.dash > 0 ? dashSpd : curSpeed;
@@ -2546,6 +2559,8 @@ function showTrialsGameOver(points, reason, won) {
   }
   const govBadge = document.querySelector('#gameOverOverlay .cyber-badge');
   if(govBadge) setCyberBadgeText(govBadge, won ? '⬢ TRIAL COMPLETE' : '⬢ TRIAL FAILED');
+  const scoreSlime = document.getElementById('scoreSlime');
+  if(scoreSlime) scoreSlime.textContent = '-' + Math.floor(trialScoreBreakdown.slimePenalty || 0).toLocaleString();
 }
 
 function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();

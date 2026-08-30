@@ -37,7 +37,7 @@ function getPlayerPos() {
   // Player is always players[0] in trials
   if(typeof window !== 'undefined' && window.NOX_GAME && window.NOX_GAME.players) {
     const p = window.NOX_GAME.players[0];
-    if(p && p.alive) return { x: p.x, y: p.y, vx: p.vx, vy: p.vy };
+    if(p && p.alive) return { x: p.x, y: p.y, vx: p.lastVx || 0, vy: p.lastVy || 0 };
   }
   return null;
 }
@@ -49,6 +49,16 @@ function selectBehavior(bot, state) {
 
   // Boost weights based on situation
   const weights = { ...BOT_BEHAVIORS };
+
+  // Shield priority when HP ≤ 4 (33%)
+  if(bot.hp <= 4 && !bot.shield) {
+    weights.seekPickup = Math.max(weights.seekPickup, 0.6);
+    weights.retreat = 0.2;
+  }
+  // Overcharge priority when HP > 8
+  else if(bot.hp > 8 && !bot.overcharge) {
+    weights.seekPickup = Math.max(weights.seekPickup, 0.4);
+  }
 
   // Low HP -> retreat more
   if(hpRatio < 0.3) {
@@ -113,11 +123,11 @@ function executeBehavior(bot, behavior, state, dt) {
     }
     case 'engagePlayer': {
       if(player) {
-        // Predictive aim
+        // Predictive aim - use actual player velocity (lastVx/lastVy updated each frame)
         const bulletSpeed = 7.2;
         const travelTime = distance(bot.x, bot.y, player.x, player.y) / bulletSpeed;
-        const predX = player.x + player.vx * travelTime;
-        const predY = player.y + player.vy * travelTime;
+        const predX = player.x + (player.lastVx || 0) * travelTime;
+        const predY = player.y + (player.lastVy || 0) * travelTime;
 
         const dx = predX - bot.x;
         const dy = predY - bot.y;
@@ -135,6 +145,10 @@ function executeBehavior(bot, behavior, state, dt) {
           const strafeAngle = bot.angle + Math.PI/2 * (Math.random() < 0.5 ? 1 : -1);
           mx = Math.cos(strafeAngle) * 0.7;
           my = Math.sin(strafeAngle) * 0.7;
+          // Dash to close distance or dodge
+          if(dist > 350 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0) && Math.random() < 0.1) {
+            dash = true;
+          }
         } else if(dist < 200) {
           // Back away
           mx = -Math.cos(bot.angle) * 0.5;
@@ -192,6 +206,10 @@ function executeBehavior(bot, behavior, state, dt) {
         if(dist > 0) { mx = dx / dist; my = dy / dist; }
         // Dash away if available
         if(dist < 300 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
+          dash = true;
+        }
+        // Also dash if stuck near wall
+        if(dist < 400 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0) && Math.random() < 0.05) {
           dash = true;
         }
       }

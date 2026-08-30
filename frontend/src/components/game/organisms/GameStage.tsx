@@ -23,8 +23,8 @@ export default function GameStage({
   const cy = arenaH / 2
   const voidR = isTrials ? 900 : 420
   return (
-    <div className="stage" id="stage" style={isTrials ? { width: 'min(1180px, calc(100vw - 24px))', aspectRatio: '1920 / 1120', maxHeight: 'min(640px, calc(100vh - 210px))' } as React.CSSProperties : undefined}>
-      <svg id="gameSvg" viewBox={`0 0 ${arenaW} ${arenaH}`} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Game arena">
+    <div className="stage" id="stage" style={isTrials ? { width: '100%', maxWidth: '100vw', height: 'auto', aspectRatio: '1920 / 1120', maxHeight: 'min(640px, calc(100vh - 210px))', touchAction: 'manipulation' } as React.CSSProperties : undefined}>
+        <svg id="gameSvg" viewBox={`0 0 ${arenaW} ${arenaH}`} xmlns="http://www.w3.org/2000/svg" role="application" aria-label="NOX arena game" aria-describedby="game-desc">
         <SvgDefs isTrials={isTrials} arenaW={arenaW} arenaH={arenaH} cx={cx} cy={cy} voidR={voidR} />
 
         <rect x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="url(#arenaGrad)" />
@@ -70,7 +70,7 @@ export default function GameStage({
 
       <StartOverlay mode={mode} onPlay={onPlay} onHow={onHow} />
       <RoundOverlay mode={mode} />
-      <GameOverOverlay mode={mode} onRematch={onRematch} onMenu={onMenu} />
+      <GameOverOverlay mode={mode} onRematch={onRematch} onMenu={onMenu} total={0} high={0} time="00:00" breakdown={{ survival: 0, hits: 0, pickups: 0, lava: 0, slime: 0, void: 0, botKill: 0 }} />
     </div>
   )
 }

@@ -24,6 +24,23 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
       .catch((e) => console.error('[NOX] game-logic load failed', e))
   }, [])
 
+  const [showFPS, setShowFPS] = useState(false)
+
+  // QX-09 — Alt+F FPS debug toggle
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setShowFPS(prev => !prev);
+        // Sync with game-logic display element
+        const el = document.getElementById('fpsDisplay');
+        if (el) el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [])
+
   // Pause/Resume key handler (trials only)
   useEffect(() => {
     if (!isTrials) return
@@ -132,10 +149,14 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
 
   return (
     <>
-      <main className="nox-shell">
+      <main id="main" className="nox-shell">
+        <div id="nox-score-announcer" aria-live="polite" aria-atomic="true" className="sr-only" style={{ position: 'absolute', left: '-10000px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden' }}></div>
+        {/* QX-09 — Hidden FPS / resolution debug display (Alt+F toggles) */}
+        <div id="fpsDisplay" style={{ position: 'absolute', top: 8, left: 8, zIndex: 50, background: 'rgba(0,0,0,0.85)', color: '#c9ff2f', padding: '6px 10px', fontFamily: 'var(--nox-mono)', fontSize: 11, border: '1px solid #c9ff2f', borderRadius: 4, display: 'none', pointerEvents: 'none' }} aria-hidden="true">FPS -- / RES 1920x1120</div>
         <div className="grid-noise" aria-hidden="true" />
 
         <header className="nox-header">
+          <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-amber-400 focus:text-black focus:px-3 focus:py-1 focus:rounded focus:text-sm focus:font-mono">Skip to game</a>
           <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div className="diamond-mark"><span /></div>
             <a href="/" className="brand-lockup" style={{ textDecoration: 'none' }}>NOX</a>
@@ -157,6 +178,43 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
           <ControlsStrip mode={mode} />
 
           <GameStage mode={mode} onPlay={handlePlay} onHow={handleHow} onRematch={handleRematch} onMenu={handleMenu} />
+
+          {/* Mobile touch controls (QX-05) — hidden on desktop (hover + fine pointer) */}
+          <div className="mobile-game-controls" style={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 50, gap: 12, touchAction: 'manipulation', pointerEvents: 'none', display: 'none' }} aria-label="Mobile game controls">
+            <button
+              aria-label="Move left"
+              style={{ pointerEvents: 'auto', width: 56, height: 56, borderRadius: '50%', background: 'rgba(201,255,47,0.12)', border: '1px solid rgba(201,255,47,0.35)', color: '#c9ff2f', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+              onTouchStart={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowLeft'] = true; }}
+              onTouchEnd={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowLeft'] = false; }}
+              onMouseDown={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowLeft'] = true; }}
+              onMouseUp={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowLeft'] = false; }}
+              onMouseLeave={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowLeft'] = false; }}
+            >◀</button>
+            <button
+              aria-label="Shoot"
+              style={{ pointerEvents: 'auto', width: 72, height: 72, borderRadius: '50%', background: 'rgba(255,92,168,0.15)', border: '1.5px solid rgba(255,92,168,0.5)', color: '#ff5ca8', fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+              onTouchStart={() => { const g = (window as any).NOX_GAME; if(g && g.mobileShoot) g.mobileShoot(); }}
+              onMouseDown={() => { const g = (window as any).NOX_GAME; if(g && g.mobileShoot) g.mobileShoot(); }}
+            >●</button>
+            <button
+              aria-label="Dash"
+              style={{ pointerEvents: 'auto', width: 56, height: 56, borderRadius: '50%', background: 'rgba(88,216,255,0.12)', border: '1px solid rgba(88,216,255,0.35)', color: '#58d8ff', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+              onTouchStart={() => { const g = (window as any).NOX_GAME; if(g && g.keys) { g.keys['ShiftLeft'] = true; g.keys['Shift'] = true; } }}
+              onTouchEnd={() => { const g = (window as any).NOX_GAME; if(g && g.keys) { g.keys['ShiftLeft'] = false; g.keys['Shift'] = false; } }}
+              onMouseDown={() => { const g = (window as any).NOX_GAME; if(g && g.keys) { g.keys['ShiftLeft'] = true; g.keys['Shift'] = true; } }}
+              onMouseUp={() => { const g = (window as any).NOX_GAME; if(g && g.keys) { g.keys['ShiftLeft'] = false; g.keys['Shift'] = false; } }}
+              onMouseLeave={() => { const g = (window as any).NOX_GAME; if(g && g.keys) { g.keys['ShiftLeft'] = false; g.keys['Shift'] = false; } }}
+            >⚡</button>
+            <button
+              aria-label="Move right"
+              style={{ pointerEvents: 'auto', width: 56, height: 56, borderRadius: '50%', background: 'rgba(201,255,47,0.12)', border: '1px solid rgba(201,255,47,0.35)', color: '#c9ff2f', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+              onTouchStart={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowRight'] = true; }}
+              onTouchEnd={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowRight'] = false; }}
+              onMouseDown={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowRight'] = true; }}
+              onMouseUp={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowRight'] = false; }}
+              onMouseLeave={() => { const g = (window as any).NOX_GAME; if(g && g.keys) g.keys['ArrowRight'] = false; }}
+            >▶</button>
+          </div>
         </div>
 
         <footer className="nox-footer">
