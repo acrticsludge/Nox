@@ -1761,19 +1761,30 @@ window.addEventListener('keydown', e => {
 });
 
 function forfeitTrials() {
-  gameState = 'menu';
-  clearTrialsState();
-  try { localStorage.removeItem('nv_trials_paused'); } catch {}
   // Save high score before clearing
   const hs = parseInt(localStorage.getItem('nv_trials_highscore') || '0', 10);
   if(Math.floor(trialPoints) > hs) {
     try { localStorage.setItem('nv_trials_highscore', String(Math.floor(trialPoints))); } catch {}
   }
-  // Show start overlay again
+  gameState = 'menu';
+  clearPendingTimeouts();
+  clearInputState();
+  forfeitLock = false;
+  clearTrialsState();
+  try { localStorage.removeItem('nv_trials_paused'); } catch {}
+  // Hard reset trial state so menu is clean — HUD-only, don't touch arena walls (keep preview), just clear dynamic objects
+  bullets.length = 0; pickups.length = 0; particles.length = 0;
+  if(window.NOX_GAME){ window.NOX_GAME.bullets.length=0; window.NOX_GAME.pickups.length=0; window.NOX_GAME.particles.length=0; }
+  trialPoints = 0; timeLeft = TRIAL_DURATION; voidRect = null; safeRadius = 999; lastSaveTime = 0;
+  prevHp[0]=MAX_HP; prevHp[1]=MAX_HP; prevHp[2]=BOT_MAX_HP;
+  bot.hp = BOT_MAX_HP; bot.alive = true;
+  const voidG=document.getElementById('void'); if(voidG) voidG.setAttribute('opacity','0');
   document.getElementById('gameOverOverlay')?.classList.add('hidden');
   document.getElementById('roundOverlay')?.classList.add('hidden');
   document.getElementById('startOverlay')?.classList.remove('hidden');
-  updateHUD();
+  // Notify React to close pause/confirm overlays (HUD-only)
+  try{ window.dispatchEvent(new CustomEvent('nox:forfeitDone')); }catch{}
+  updateHUD(); render();
 }
 
 function shootBotBullet(bot, target) {
@@ -2764,12 +2775,6 @@ function updateHUD() {
       if(bot.hp <= 2) botHearts.style.filter = 'brightness(1.12)';
       else if(bot.hp <= 4) botHearts.style.filter = 'brightness(1.05)';
       else botHearts.style.filter = 'none';
-      if(botHearts && typeof prevHp !== 'undefined' && prevHp[2] != null && prevHp[2] > bot.hp){
-        botHearts.classList.remove('damage');
-        void botHearts.offsetWidth;
-        botHearts.classList.add('damage');
-        setTimeout(()=> botHearts.classList.remove('damage'),300);
-      }
       if(typeof prevHp !== 'undefined') prevHp[2]=bot.hp;
     }
     const rl = document.getElementById('roundLabel');
