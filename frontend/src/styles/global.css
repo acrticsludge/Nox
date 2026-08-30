@@ -659,7 +659,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  min-height: 148px;
+  min-height: 86px;
   height: auto;
   align-self: stretch;
   position: relative;
@@ -690,20 +690,19 @@ body {
   box-shadow: 0 0 18px rgba(255, 92, 168, 0.16);
 }
 
-/* Trials HUD (solo mode) — keep same box metrics as PlayerHUD so Image 1 boxes match */
+/* Trials HUD (solo mode) — same box metrics as PlayerHUD, HUD-only */
 .trials-hud {
   flex: 1 1 0;
   background: var(--nox-card);
   border: 1px solid var(--nox-border);
   border-radius: 0;
   padding: 12px;
-  min-height: 148px;
+  min-height: 86px;
   height: auto;
   align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  justify-content: space-between;
   position: relative;
   overflow: hidden;
   border-color: rgba(255, 178, 62, 0.22);

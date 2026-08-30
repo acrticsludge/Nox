@@ -48,11 +48,16 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
   useEffect(() => {
     const onPause = () => setShowPause(true)
     const onResume = () => setShowPause(false)
+    const onForfeitDone = () => { setShowPause(false); setShowExitConfirm(false); }
     window.addEventListener('nox:pause', onPause)
     window.addEventListener('nox:resume', onResume)
+    window.addEventListener('nox:forfeitDone', onForfeitDone as EventListener)
+    window.addEventListener('nox:forfeitTrials', onForfeitDone as EventListener)
     return () => {
       window.removeEventListener('nox:pause', onPause)
       window.removeEventListener('nox:resume', onResume)
+      window.removeEventListener('nox:forfeitDone', onForfeitDone as EventListener)
+      window.removeEventListener('nox:forfeitTrials', onForfeitDone as EventListener)
     }
   }, [])
 
