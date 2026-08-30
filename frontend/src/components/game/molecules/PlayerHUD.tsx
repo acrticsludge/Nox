@@ -35,11 +35,14 @@ export default function PlayerHUD({ player, onExit, mode = '1v1' }: { player: 1 
           <span className="ammo-chip__spark" aria-hidden="true"></span>
           <span id={`ammoT${player}`}>STD INF</span>
         </div>
-        <button className={`cyber-exit cyber-exit--${isP1 ? 'cyan' : 'pink'}`} onClick={onExit} aria-label={`Exit game for player ${player}`}>
-          <span className="cyber-exit__icon" aria-hidden="true">✕</span>
-          <span>EXIT</span>
-          <span className="cyber-exit__spark" aria-hidden="true" />
-        </button>
+        {/* trials already has centered EXIT in CenterHUD — hide redundant cyan EXIT to avoid double */}
+        {isTrials ? null : (
+          <button className={`cyber-exit cyber-exit--${isP1 ? 'cyan' : 'pink'}`} onClick={onExit} aria-label={`Exit game for player ${player}`}>
+            <span className="cyber-exit__icon" aria-hidden="true">✕</span>
+            <span>EXIT</span>
+            <span className="cyber-exit__spark" aria-hidden="true" />
+          </button>
+        )}
       </div>
       {!isP1 && (
         <div className="avatar">
