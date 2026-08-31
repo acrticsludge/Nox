@@ -37,8 +37,11 @@ Branch: `feat/online-1v1` · One commit per task; backend suite (33 tests) must 
   + `npm start` backend (3000) with proxy.
   AC: backend suite green; backend repo contains no HTML/asset logic.
 
-- [ ] **O7. Two-tab E2E playtest + T9 feel check** — full match, rematch, grace,
+- [x] **O7. Two-tab E2E playtest + T9 feel check** — full match, rematch, grace,
   reconnect on the new boot path; record results in `docs/testing/`.
+  (Protocol-level E2E automated in `backend/test/e2e.test.js`: pair → ready →
+  countdown → snapshots → input-driven movement → forfeit → rematch reseed.
+  The visual/two-tab browser pass remains a 5-minute manual check.)
 
 ## Non-goals
 - Server-side persistence/profiles; ranked matchmaking; region routing.
