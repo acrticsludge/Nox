@@ -363,6 +363,14 @@ function scoreEngagePlayer(bot, state) {
   const playerDist = distance(bot.x, bot.y, player.x, player.y);
   if (playerDist > BOT_CONFIG.ENGAGE_RANGE) return 0;
 
+  // Line of sight check - reduce score significantly if can't see player
+  const canSeePlayer = hasLineOfSight(bot.x, bot.y, player.x, player.y, state.wallsCollide);
+  if (!canSeePlayer) {
+    // Player hidden behind walls - engagePlayer should not dominate
+    // Return low score so patrol/seekPickup can take over
+    return 10;
+  }
+
   let score = BOT_BEHAVIOR_BASE_WEIGHTS.engagePlayer * 100;
 
   // Closer = higher (but not too close)
@@ -477,9 +485,12 @@ function selectBehavior(bot, state) {
     patrol: scorePatrol(bot, state),
   };
 
-  // Minimum engage score floor - ensures hunting when player alive
+  // Minimum engage score floor - ensures hunting when player alive AND visible
   if (state.player && state.player.alive) {
-    scores.engagePlayer = Math.max(scores.engagePlayer, 200);
+    const canSeePlayer = hasLineOfSight(bot.x, bot.y, state.player.x, state.player.y, state.wallsCollide);
+    if (canSeePlayer) {
+      scores.engagePlayer = Math.max(scores.engagePlayer, 200);
+    }
   }
 
   // Critical threat early-exit (bypasses hysteresis)
@@ -682,7 +693,15 @@ function executeEngagePlayer(bot, state) {
   // Line of sight check - don't engage through walls
   const canSeePlayer = hasLineOfSight(bot.x, bot.y, player.x, player.y, state.wallsCollide);
   if (!canSeePlayer) {
-    // Player not visible - don't engage, let other behaviors handle it
+    // Player not visible - fallback to moving toward last known position
+    // This shouldn't normally happen since selectBehavior checks LOS, but safety net
+    const dx = player.x - bot.x;
+    const dy = player.y - bot.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0) {
+      const q = quantizeTo8Dir(Math.atan2(dy, dx));
+      return { mx: q.mx, my: q.my, shoot: false, dash: false, targetAngle: bot.angle };
+    }
     return { mx, my, shoot: false, dash: false, targetAngle: bot.angle };
   }
 
