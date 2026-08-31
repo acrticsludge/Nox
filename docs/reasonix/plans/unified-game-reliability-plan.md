@@ -1,12 +1,7 @@
-﻿## Status
-
-- Tasks 1-14: **DONE** (see docs/testing/2026-08-31-set1-verification.md)
-- Tasks 15-22: pending (Set 2 + Phase 4)
-
 ## Status
 
 - Tasks 1-14: **DONE** (see docs/testing/2026-08-31-set1-verification.md)
-- Tasks 15-22: pending (Set 2 + Phase 4)
+- Tasks 15-22: **DONE** (see docs/testing/2026-08-31-set2-rehearsal.md; browser matrix + deployment rehearsal remain owner steps)
 # Plan: NOX Unified Reliability and Mode Contract
 
 **Spec:** `docs/reasonix/specs/unified-game-reliability.md`  
