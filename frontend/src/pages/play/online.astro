@@ -40,9 +40,12 @@ import SEO from '../../components/SEO.astro';
 
 <script>
   import { NetBridge, getNick, setNick } from '../../game/net/net-bridge.js';
-  import {
-    startOnlineMatch, applyNetSnapshot, onlineResume, stopOnlineMatch,
-  } from '../../game/game-logic.js';
+
+  // O1: the game engine is loaded ONLY when a match actually starts. Importing it
+  // eagerly booted its rAF loop during the lobby -> mutated HUD DOM before React
+  // hydration (hydration failure + 1v1 flash) and allowed arena input while queueing.
+  let gl: typeof import('../../game/game-logic.js') | null = null;
+  const engine = async () => { if (!gl) gl = await import('../../game/game-logic.js'); return gl; };
 
   const $ = (id: string) => document.getElementById(id)!;
   const bridge = new NetBridge();
@@ -122,7 +125,7 @@ import SEO from '../../components/SEO.astro';
   }
 
   function showLobby() {
-    stopOnlineMatch();
+    gl?.stopOnlineMatch();
     roomCode = null;
     buildLobby().classList.remove('hidden');
     lobbyStatus('');
@@ -141,11 +144,13 @@ import SEO from '../../components/SEO.astro';
   }
 
   // ---------- net -> game wiring ----------
-  bridge.on('room', (msg: { code: string; youSeat: number; seats: Array<{ nick: string } | null>; seed: number }) => {
+  bridge.on('room', async (msg: { code: string; youSeat: number; seats: Array<{ nick: string } | null>; seed: number }) => {
     roomCode = msg.code;
     mySeat = msg.youSeat;
     rematchAsked = false;
     showRoom(msg);
+    const g = await engine();
+    g.startOnlineMatch(msg.seed);
   });
 
   bridge.on('roomError', (m: { reason?: string }) => {
@@ -155,17 +160,19 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('queued', (m: { position: number }) => lobbyStatus('SEARCHING… POSITION ' + m.position));
 
-  bridge.on('countdown', (m: { t: number }) => {
+  bridge.on('countdown', async (m: { t: number }) => {
     if (m.t === 0 && roomCode) {
       hideLobby();
       const go = document.getElementById('gameOverOverlay');
       if (go) go.classList.add('hidden');
-      onlineResume();
+      const g = await engine();
+      g.onlineResume();
     }
   });
 
-  bridge.on('snapshot', (m: { state: string }) => {
-    applyNetSnapshot(m);
+  bridge.on('snapshot', async (m: { state: string }) => {
+    const g = await engine();
+    g.applyNetSnapshot(m);
     if (m.state === 'playing') {
       const ro = document.getElementById('roundOverlay');
       if (ro && roomCode) ro.classList.add('hidden');

@@ -10,6 +10,17 @@ const SITE = process.env.PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://$
 export default defineConfig({
   site: SITE,
   output: 'static',
+  vite: {
+    server: {
+      proxy: {
+        // Online 1v1: dev-server WS proxy -> backend game server (npm start in backend/, port 3000)
+        '/ws': {
+          target: process.env.PUBLIC_WS_URL || 'ws://localhost:3000',
+          ws: true,
+        },
+      },
+    },
+  },
   integrations: [
     react(),
     mdx(),
