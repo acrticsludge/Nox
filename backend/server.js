@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { attachNet } from './net.js';
+import { attachRooms } from './rooms.js';
 
 // Serves the Astro build output (frontend/dist). Run `npm run build` at the
 // repo root (or `npm --prefix frontend run build`) before starting.
@@ -71,7 +73,7 @@ function resolvePublicFile(urlPath) {
 }
 
 export function createServer() {
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     const started = Date.now();
     const urlPath = (req.url || '/').split('?')[0];
     const log = (status) =>
@@ -149,6 +151,11 @@ export function createServer() {
       res.end('Internal Server Error');
     }
   });
+  // T4/T5: WebSocket layer (guest sessions + rooms).
+  const net = attachNet(server);
+  server.noxNet = net;
+  attachRooms(server, net);
+  return server;
 }
 
 // Auto-start only when run directly (`npm start` / `npm run dev`).
