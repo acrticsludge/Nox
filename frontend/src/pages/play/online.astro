@@ -160,8 +160,11 @@ import SEO from '../../components/SEO.astro';
     mySeat = msg.youSeat;
     rematchAsked = false;
     showRoom(msg);
+    lobbyStatus('');
     const g = await engine();
     g.startOnlineMatch(msg.seed);
+    // server starts ticking only after ready from both seats (T7 protocol)
+    if (msg.seats.every(Boolean)) bridge.send('ready');
   });
 
   bridge.on('roomError', (m: { reason?: string }) => {
