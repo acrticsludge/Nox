@@ -20,10 +20,13 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 
   const [showExitConfirm, setShowExitConfirm] = useState(false)
 
   useEffect(() => {
+    // P0-01: online must NOT import/boot the local engine, its rAF loop, or its
+    // input handlers — the online page loads the engine lazily at match start.
+    if (mode === 'online') return;
     gameReady.current = import('../game/game-logic.js')
-      .then(() => { console.log('[NOX] game-logic loaded') })
+      .then((g) => { g.bootEngine(); console.log('[NOX] game-logic loaded') })
       .catch((e) => console.error('[NOX] game-logic load failed', e))
-  }, [])
+  }, [mode])
 
   const [showFPS, setShowFPS] = useState(false)
 

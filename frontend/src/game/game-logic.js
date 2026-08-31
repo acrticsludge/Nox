@@ -2562,6 +2562,7 @@ function init() {
   let simAccum = 0;
 
   function loop(now) {
+    engineRafId = requestAnimationFrame(loop);
     simAccum += now - simLast;
     simLast = now;
     if(simAccum > 250) simAccum = 250;
@@ -2570,9 +2571,8 @@ function init() {
       simAccum -= SIM_STEP;
     }
     render();
-    requestAnimationFrame(loop);
   }
-  requestAnimationFrame(loop);
+  engineRafId = requestAnimationFrame(loop);
 
   updateHUD();
   render();
@@ -2660,12 +2660,25 @@ function init() {
   };
 }
 
-if (typeof document !== 'undefined') {
+// T4 session boundary: the engine boots ONLY via bootEngine() - never at import
+// time - so the online lobby can load this module without starting rAF/input.
+let engineBooted = false;
+let engineRafId = 0;
+export function bootEngine() {
+  if (engineBooted || typeof document === 'undefined') return;
+  engineBooted = true;
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init)
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    init()
+    init();
   }
+}
+export function isEngineBooted() { return engineBooted; }
+export function shutdownEngine() {
+  if (engineRafId) cancelAnimationFrame(engineRafId);
+  engineRafId = 0;
+  engineBooted = false;
+  clearInputState();
 }
 
 // T3: view layer lives in game-view.js. State below is exported as ESM live

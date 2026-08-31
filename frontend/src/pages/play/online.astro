@@ -59,7 +59,13 @@ import SEO from '../../components/SEO.astro';
   // eagerly booted its rAF loop during the lobby -> mutated HUD DOM before React
   // hydration (hydration failure + 1v1 flash) and allowed arena input while queueing.
   let gl: typeof import('../../game/game-logic.js') | null = null;
-  const engine = async () => { if (!gl) gl = await import('../../game/game-logic.js'); return gl; };
+  const engine = async () => {
+    if (!gl) {
+      gl = await import('../../game/game-logic.js');
+      gl.bootEngine();   // T4: module import alone starts nothing
+    }
+    return gl;
+  };
 
   const $ = (id: string) => document.getElementById(id)!;
   const bridge = new NetBridge();
