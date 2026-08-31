@@ -23,7 +23,9 @@ import SEO from '../../components/SEO.astro';
   </body>
 </html>
 
-<style>
+<style is:global>
+  /* is:global is required — the lobby/countdown/banner DOM is injected at
+     runtime, so Astro's scoped style attribute never matches it */
   /* Lobby card — reuses site tokens; injected above the stage overlay layer */
   #noxLobby { z-index: 60; }
   #noxLobby .menu-card { width: min(430px, 92vw); padding: 28px 26px; }

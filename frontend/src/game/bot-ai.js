@@ -668,6 +668,13 @@ function executeEngagePlayer(bot, state) {
     return { mx, my, shoot, dash, targetAngle: bot.angle };
   }
 
+  // Line of sight check - don't engage through walls
+  const canSeePlayer = hasLineOfSight(bot.x, bot.y, player.x, player.y, state.wallsCollide);
+  if (!canSeePlayer) {
+    // Player not visible - don't engage, let other behaviors handle it
+    return { mx, my, shoot: false, dash: false, targetAngle: bot.angle };
+  }
+
   // Use LIVE player velocity (updated every frame in game-logic)
   const bulletSpeed = BOT_CONFIG.BULLET_SPEED;
   const travelTime = distance(bot.x, bot.y, player.x, player.y) / bulletSpeed;
@@ -725,20 +732,22 @@ function executeEngagePlayer(bot, state) {
   // Direct angle to player's current position (for movement at far range)
   const directAngle = Math.atan2(player.y - bot.y, player.x - bot.x);
 
+  let moveAngle;
   if (dist < 150) {
-    // CLOSE: Circle strafe - orbit player while shooting
-    // Return normalized vector (magnitude 1.0), game logic applies speed
-    mx = Math.cos(strafeAngle);
-    my = Math.sin(strafeAngle);
+    // CLOSE: Circle strafe - orbit player while shooting (8-directional)
+    moveAngle = strafeAngle;
   } else if (dist < 300) {
-    // MID: Aggressive strafe
-    mx = Math.cos(strafeAngle);
-    my = Math.sin(strafeAngle);
+    // MID: Aggressive strafe (8-directional)
+    moveAngle = strafeAngle;
   } else {
     // FAR: Close distance aggressively - move toward actual player position, not predicted
-    mx = Math.cos(directAngle);
-    my = Math.sin(directAngle);
+    moveAngle = directAngle;
   }
+
+  // Quantize to 8 directions (WASD + diagonals) for fair movement
+  const q = quantizeTo8Dir(moveAngle);
+  mx = q.mx;
+  my = q.my;
 
   // Dash to close distance when far
   if (dist > BOT_CONFIG.ENGAGE_DASH_RANGE && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0) && Math.random() < BOT_CONFIG.ENGAGE_DASH_PROBABILITY) {
@@ -781,7 +790,8 @@ function executeEvadeHazard(bot, state) {
     const dy = bot.y - hazard.centerY;
     const dist = Math.hypot(dx, dy);
     if (dist > 0) {
-      mx = dx / dist; my = dy / dist;
+      const q = quantizeTo8Dir(Math.atan2(dy, dx));
+      mx = q.mx; my = q.my;
     }
 
     // Dash away if very close
@@ -811,7 +821,10 @@ function executePatrol(bot, _state) {
   const dx = bot.targetX - bot.x;
   const dy = bot.targetY - bot.y;
   const dist = Math.hypot(dx, dy);
-  if (dist > 0) { mx = dx / dist; my = dy / dist; }
+  if (dist > 0) {
+    const q = quantizeTo8Dir(Math.atan2(dy, dx));
+    mx = q.mx; my = q.my;
+  }
 
   return { mx, my, shoot: false, dash: false, targetAngle: bot.angle };
 }
@@ -827,7 +840,10 @@ function executeRetreat(bot, state) {
     const dx = bot.x - player.x;
     const dy = bot.y - player.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 0) { mx = dx / dist; my = dy / dist; }
+    if (dist > 0) {
+      const q = quantizeTo8Dir(Math.atan2(dy, dx));
+      mx = q.mx; my = q.my;
+    }
 
     // Dash away
     if (dist < BOT_CONFIG.RETREAT_DASH_RANGE && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
