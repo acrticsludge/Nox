@@ -147,14 +147,16 @@ test('grace: opponent drop holds seat, rejoin resumes, rematch reseeds', async (
   const pl = await a.next('peerLeft');
   assert.equal(typeof pl.graceMs, 'number');
 
-  // b reconnects and rejoins the same room -> match resumes
-  b = makeClient('GrB2');
+  // b reconnects with its signed seat credential (task 10) -> match resumes
+  const bCred = b.box.find(m => m.type === 'reconnectCred');
+  assert.ok(bCred, 'bob must hold a reconnect credential');
+  b = makeClient('GrB');
   await new Promise(r => b.ws.on('open', r));
-  send(b.ws, hello('GrB2'));
+  send(b.ws, hello('GrB'));
   await b.next('session');
-  send(b.ws, { type: 'join', code: roomA.code });
-  const bRoom = await b.next('room');
-  assert.equal(bRoom.code, roomA.code);
+  send(b.ws, { type: 'join', code: roomA.code, reconnect: { roomCode: roomA.code, seat: bCred.seat, token: bCred.token } });
+  const bRejoined = await b.next('rejoined');
+  assert.equal(bRejoined.seat, bCred.seat);
   const resumed = await a.next('snapshot', 6000);
   assert.equal(resumed.state, 'playing');
   // drop the rejoin-time 'room' broadcasts so the rematch one is unambiguous

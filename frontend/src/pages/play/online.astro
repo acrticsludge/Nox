@@ -244,6 +244,12 @@ import SEO from '../../components/SEO.astro';
     if (msg.seats.every(Boolean)) bridge.send('ready');
   });
 
+  bridge.on('rejoined', (m: { code: string; seat: number }) => {
+    // Task 10: seat reclaimed after reconnect — wait for the fresh room broadcast
+    stageMsg('RECONNECTED — SEAT ' + (m.seat === 0 ? 'CYAN' : 'PINK'));
+    setTimeout(() => stageMsg(''), 2500);
+  });
+
   bridge.on('roomError', (m: { reason?: string }) => {
     lockLobby(false);
     lobbyError(m.reason || 'Room error.');
@@ -302,7 +308,11 @@ import SEO from '../../components/SEO.astro';
       const retry = async () => {
         if (tries++ >= 3 || bridge.authed) return;
         try { await bridge.connect(WS_BASE + '/ws'); } catch { setTimeout(retry, 1500); return; }
-        bridge.send('join', { code: roomCode! });
+        // Task 10: present the signed seat credential when we hold one
+        const cred = bridge.reconnectCred;
+        bridge.send('join', cred && cred.roomCode === roomCode
+          ? { code: roomCode, reconnect: { roomCode: cred.roomCode, seat: cred.seat, token: cred.token } }
+          : { code: roomCode });
       };
       setTimeout(retry, 1200);
     }

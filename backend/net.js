@@ -102,6 +102,8 @@ export function attachNet(server, opts = {}) {
         return;
       }
       if (!sess.authed) return;
+      // T13: one app-level ping protocol — client measures RTT to this reply
+      if (msg.type === 'ping') { ws.send(JSON.stringify({ type: 'pong', t: Date.now() })); return; }
       wss.emit('nox:message', ws, sess, msg);
     });
     ws.on('close', () => { wss.emit('nox:close', ws, sessions.get(ws)); sessions.delete(ws); roomOf.delete(ws); });
@@ -118,5 +120,5 @@ export function attachNet(server, opts = {}) {
   if (heartbeat.unref) heartbeat.unref();
   wss.on('close', () => clearInterval(heartbeat));
 
-  return { wss, sessions, roomOf, secret, verifyToken: t => verifyToken(t, secret) };
+  return { wss, sessions, roomOf, secret, verifyToken: t => verifyToken(t, secret), sign: p => signToken(p, secret) };
 }
