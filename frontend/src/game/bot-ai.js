@@ -581,7 +581,8 @@ function computeBulletDodge(bot, bullets) {
   }
 
   if (closestThreat) {
-    return { mx: dodgeX, my: dodgeY, dist: closestDist };
+    const q = quantizeTo8Dir(Math.atan2(dodgeY, dodgeX));
+    return { mx: q.mx, my: q.my, dist: closestDist };
   }
   return null;
 }
