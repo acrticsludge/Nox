@@ -150,6 +150,44 @@ const BOT_BEHAVIOR_BASE_WEIGHTS = {
 // --- Helper functions ---
 
 /**
+ * Quantize angle to 8-directional (WASD + diagonals) for fair movement
+ * @param {number} angle - Angle in radians
+ * @returns {{mx:number, my:number}} Normalized 8-direction vector
+ */
+function quantizeTo8Dir(angle) {
+  // Snap to nearest 45-degree increment (8 directions)
+  const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+  return { mx: Math.cos(snapped), my: Math.sin(snapped) };
+}
+
+/**
+ * Check line of sight between bot and target (raycast through walls)
+ * @param {number} x1 - Bot x
+ * @param {number} y1 - Bot y
+ * @param {number} x2 - Target x
+ * @param {number} y2 - Target y
+ * @param {Function} wallsCollide - Wall collision function
+ * @returns {boolean} True if clear line of sight
+ */
+function hasLineOfSight(x1, y1, x2, y2, wallsCollide) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.hypot(dx, dy);
+  if (dist === 0) return true;
+  
+  const steps = Math.ceil(dist / 16); // Step every 16px (player radius)
+  const stepX = dx / steps;
+  const stepY = dy / steps;
+  
+  for (let i = 1; i < steps; i++) {
+    const testX = x1 + stepX * i;
+    const testY = y1 + stepY * i;
+    if (wallsCollide(testX, testY, 16)) return false;
+  }
+  return true;
+}
+
+/**
  * Squared distance for comparisons (avoids sqrt)
  * @param {number} ax
  * @param {number} ay

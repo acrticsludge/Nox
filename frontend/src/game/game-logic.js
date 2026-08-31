@@ -685,6 +685,7 @@ export function onlineResume() {
 
 export function stopOnlineMatch() {
   onlineActive = false;
+  gameState = 'menu';   // unmounts RoundOverlay / GameOverOverlay (React-driven)
   simMatch = null;
 }
 
