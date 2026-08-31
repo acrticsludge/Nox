@@ -171,14 +171,14 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 
         </header>
 
         <div className="nox-content game-layout">
-          {/* online: hidden until matchmaking assigns seats — no identity before the game */}
-          <div className="game-top-bar" id="noxHudBar" style={isOnline ? { visibility: 'hidden' } : undefined}>
+          {/* online: removed from layout until matchmaking assigns seats (no dead gap) */}
+          <div className="game-top-bar" id="noxHudBar" style={isOnline ? { display: 'none' } : undefined}>
             <PlayerHUD player={1} onExit={() => handleExit(1)} mode={mode} />
             <CenterHUD mode={mode} onPause={() => { setShowPause(true); window.dispatchEvent(new CustomEvent('nox:pause')) }} />
             {isTrials ? <TrialsHUD /> : <PlayerHUD player={2} onExit={() => handleExit(2)} mode={mode} />}
           </div>
 
-          <div id="noxKeysBar" style={isOnline ? { visibility: 'hidden' } : undefined} >
+          <div id="noxKeysBar" style={isOnline ? { display: 'none' } : undefined} >
             <ControlsStrip mode={mode} />
           </div>
 

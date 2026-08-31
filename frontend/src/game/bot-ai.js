@@ -610,13 +610,16 @@ function executeAvoidVoid(bot, state) {
     const dy = bot.y - cy;
     const absDx = Math.abs(dx), absDy = Math.abs(dy);
 
+    let moveAngle;
     if (absDx - hw > absDy - hh) {
       // Closer to left/right edge
-      mx = dx > 0 ? 1 : -1;
+      moveAngle = dx > 0 ? 0 : Math.PI;
     } else {
       // Closer to top/bottom edge
-      my = dy > 0 ? 1 : -1;
+      moveAngle = dy > 0 ? Math.PI / 2 : -Math.PI / 2;
     }
+    const q = quantizeTo8Dir(moveAngle);
+    mx = q.mx; my = q.my;
   } else {
     // Circular void (1v1) - move toward center
     const vcX = gameMode === 'trials' ? BOT_CONFIG.TRIALS_W / 2 : 480;
@@ -624,7 +627,10 @@ function executeAvoidVoid(bot, state) {
     const dx = vcX - bot.x;
     const dy = vcY - bot.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 0) { mx = dx / dist; my = dy / dist; }
+    if (dist > 0) {
+      const q = quantizeTo8Dir(Math.atan2(dy, dx));
+      mx = q.mx; my = q.my;
+    }
   }
 
   // Dash toward safety if very close to void edge

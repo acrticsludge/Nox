@@ -197,7 +197,7 @@ import SEO from '../../components/SEO.astro';
   const setHud = (v: boolean) => {
     for (const id of ['noxHudBar', 'noxKeysBar']) {
       const el = document.getElementById(id);
-      if (el) el.style.visibility = v ? 'visible' : 'hidden';
+      if (el) el.style.display = v ? '' : 'none';
     }
   };
 
