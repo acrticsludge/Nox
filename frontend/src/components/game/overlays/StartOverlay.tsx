@@ -1,24 +1,36 @@
 import { useEffect, useState } from 'react'
 import CyberBadge from '../atoms/CyberBadge'
 import GlobalSpeedControl from '../atoms/GlobalSpeedControl'
+import { loadTrialsSave, TRIALS_SAVE_KEY } from '../../../game/trials-save.js'
 
+// P2-05/P2-18: the saved-trial indicator only appears for VALID saves (the
+// loader self-heals by discarding corrupt/outdated blobs), and a save
+// failure/recovery is surfaced with a visible message instead of silence.
 export default function StartOverlay({ mode = '1v1', onPlay, onHow }: { mode?: '1v1' | 'trials'; onPlay: () => void; onHow: () => void }) {
   const [hasSaved, setHasSaved] = useState(false)
   const [highScore, setHighScore] = useState(0)
+  const [saveNotice, setSaveNotice] = useState('')
 
   useEffect(() => {
     const check = () => {
       try {
-        setHasSaved(!!localStorage.getItem('nv_trials_state'))
+        setHasSaved(loadTrialsSave().ok)
         setHighScore(parseInt(localStorage.getItem('nv_trials_highscore') || '0', 10))
       } catch {}
+    }
+    const onSaveFailed = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {}
+      if (detail.reason === 'quota') setSaveNotice('Storage full — trial progress could not be saved.')
+      else setSaveNotice('Previous run was outdated or damaged and could not be restored.')
     }
     check()
     window.addEventListener('storage', check)
     window.addEventListener('nox:trialsStateChanged', check as EventListener)
+    window.addEventListener('nox:trialsSaveFailed', onSaveFailed as EventListener)
     return () => {
       window.removeEventListener('storage', check)
       window.removeEventListener('nox:trialsStateChanged', check as EventListener)
+      window.removeEventListener('nox:trialsSaveFailed', onSaveFailed as EventListener)
     }
   }, [])
 
@@ -39,7 +51,7 @@ export default function StartOverlay({ mode = '1v1', onPlay, onHow }: { mode?: '
             Solo on <strong>2x arena</strong> vs bot. Same physics as <strong>1v1</strong> — survive <strong>10:00</strong> or kill the bot. Void crushes at <strong style={{ color: 'var(--nox-amber)' }}>7:30</strong>.
           </p>
 
-          <div className="trials-score-board" style={{ margin: '6px 0', padding: '8px 10px' }}>
+          <div className="trials-score-board" style={{ margin: '6px 0', padding: '8px 10px' }} role="status">
             <div className="trials-score-board__row">
               <span>HIGH SCORE</span>
               <strong id="trialsHighScore">{highScore.toLocaleString()}</strong>
@@ -48,6 +60,12 @@ export default function StartOverlay({ mode = '1v1', onPlay, onHow }: { mode?: '
               <div className="trials-score-board__row trials-score-board__row--saved">
                 <span>SAVED TRIAL FOUND</span>
                 <strong style={{ color: 'var(--nox-lime)' }}>READY TO RESUME</strong>
+              </div>
+            )}
+            {saveNotice && (
+              <div className="trials-score-board__row" aria-live="polite">
+                <span style={{ color: 'var(--nox-pink)' }}>{saveNotice}</span>
+                <strong style={{ color: 'var(--nox-muted)' }}>NEW RUN REQUIRED</strong>
               </div>
             )}
           </div>

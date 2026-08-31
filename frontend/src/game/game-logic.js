@@ -5,6 +5,7 @@ import { updateBotAI } from './bot-ai.js';
 import { drawWalls, drawHazards, render, setCyberBadgeText, setCyberBadgeVariant, updateHUD } from './game-view.js';
 import { createMatch, simTick, simNextRound } from './sim/game-sim.js';
 import { applyLedger, createLedger, ledgerTotal, sumLedger } from './trials-ledger.js';
+import { TRIALS_SAVE_KEY, buildTrialsSaveSnapshot, loadTrialsSave } from './trials-save.js';
 
 const W = 960, H = 560;
 const PLAYER_R = 16;
@@ -2144,29 +2145,31 @@ function pickupBotPowerup(bot, pu) {
 
 function saveTrialsState() {
   try {
-    const state = {
-      gameMode, timeLeft, trialPoints, trialHighScore,
-      wallData: wallData.map(w => ({...w})),
-      hazards: hazards.map(h => ({...h})),
-      players: players.map(p => ({...p})),
-      bot: {...bot},
-      bullets: bullets.map(b => ({...b})),
-      pickups: pickups.map(p => ({...p})),
-      particles: particles.map(p => ({...p})),
+    // P2-18: small validated snapshot only — particles/cosmetics are omitted
+    const state = buildTrialsSaveSnapshot({
+      timeLeft, trialPoints, trialHighScore,
+      wallData, hazards, players, bot, bullets, pickups,
       voidRect, voidShrinkStart, safeRadius, lastSaveTime,
-    };
-    localStorage.setItem('nv_trials_state', JSON.stringify(state));
+    });
+    localStorage.setItem(TRIALS_SAVE_KEY, JSON.stringify(state));
     window.dispatchEvent(new CustomEvent('nox:trialsStateChanged'));
-  } catch {}
+  } catch (e) {
+    // P2-18: never swallow quota/serialization failures silently
+    try { window.dispatchEvent(new CustomEvent('nox:trialsSaveFailed', { detail: { reason: 'quota' } })); } catch {}
+  }
 }
 
 function loadTrialsState() {
-  try {
-    const raw = localStorage.getItem('nv_trials_state');
-    if(!raw) return null;
-    const state = JSON.parse(raw);
-    return state;
-  } catch { return null; }
+  // P2-05: stored state is never trusted — versioned schema validation;
+  // invalid/corrupt saves are discarded with a user-visible recovery signal.
+  const result = loadTrialsSave();
+  if (!result.ok) {
+    if (result.reason !== 'no-save' && result.reason !== 'storage-unavailable') {
+      try { window.dispatchEvent(new CustomEvent('nox:trialsSaveFailed', { detail: { reason: result.reason } })); } catch {}
+    }
+    return null;
+  }
+  return result.state;
 }
 
 function hasTrialsState() {
@@ -2203,11 +2206,11 @@ function resumeTrials() {
 
   bullets.length = 0; state.bullets && state.bullets.forEach(b => bullets.push(b));
   pickups.length = 0; state.pickups && state.pickups.forEach(p => pickups.push(p));
-  particles.length = 0; state.particles && state.particles.forEach(p => particles.push(p));
+  particles.length = 0; // v2 saves no longer persist particles (P2-18)
   if(window.NOX_GAME) {
     window.NOX_GAME.bullets.length = 0; state.bullets && state.bullets.forEach(b => window.NOX_GAME.bullets.push(b));
     window.NOX_GAME.pickups.length = 0; state.pickups && state.pickups.forEach(p => window.NOX_GAME.pickups.push(p));
-    window.NOX_GAME.particles.length = 0; state.particles && state.particles.forEach(p => window.NOX_GAME.particles.push(p));
+    window.NOX_GAME.particles.length = 0;
   }
 
   // Redraw pickups
