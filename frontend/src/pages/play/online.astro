@@ -37,6 +37,12 @@ import SEO from '../../components/SEO.astro';
       <p id="conn-error" class="error" role="alert" hidden></p>
     </section>
 
+    <section id="game-panel" class="panel game-panel" hidden>
+      <canvas id="game-canvas" width="960" height="560"></canvas>
+      <p id="game-status" class="status" role="status"></p>
+      <button id="btn-forfeit" class="btn">FORFEIT</button>
+    </section>
+
     <section id="room-panel" class="panel" hidden>
       <p class="room-code-line">ROOM CODE: <strong id="room-code" class="room-code"></strong></p>
       <p class="hint">Share: <span id="share-link" class="share-link"></span></p>
@@ -65,16 +71,108 @@ import SEO from '../../components/SEO.astro';
   .room-code { letter-spacing: 0.35em; font-size: 1.4rem; }
   .share-link { user-select: all; font-family: monospace; font-size: 0.8rem; opacity: 0.75; }
   .seats { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+  .game-panel { width: min(980px, 100%); }
+  #game-canvas { width: 100%; border: 1px solid var(--border, #333); border-radius: 8px; }
 </style>
 
 <script>
   import { NetBridge, getNick, setNick } from '../../game/net/net-bridge.js';
+  import { createMatch, W, H } from '../../game/sim/game-sim.js';
 
   const $ = (id) => document.getElementById(id);
   const bridge = new NetBridge();
   const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
 
-  function wsPath() { return wsUrl + '/ws'; }
+  // --- online match state ---
+  let localMap = null;      // createMatch(seed) for walls/hazards drawing only
+  let mySeat = 0;
+  let roomCode = null;
+  const INPUT = { up: false, down: false, left: false, right: false, dash: false, shoot: false };
+  const KEYMAP = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', ShiftLeft: 'dash', Space: 'shoot' };
+
+  const COLORS = { standard: '#f1f4f3', needle: '#a78bfa', cannon: '#ffb23e', trick: '#58d8ff' };
+  const PCOLORS = ['#58d8ff', '#ff5ca8'];
+
+  function buildMap(seed) {
+    localMap = createMatch(seed, {});
+    // drop dynamic entities; keep walls/hazards for drawing
+    localMap.players.length = 0; localMap.bullets.length = 0; localMap.pickups.length = 0; localMap.fx.length = 0;
+  }
+
+  function startGameView() {
+    $('room-panel').hidden = true;
+    $('game-panel').hidden = false;
+    $('game-status').textContent = 'GET READY…';
+    requestAnimationFrame(draw);
+  }
+
+  function endGameView() {
+    $('game-panel').hidden = true;
+    backToLobby();
+  }
+
+  // --- input: local keys -> server mask @30Hz ---
+  addEventListener('keydown', e => { const k = KEYMAP[e.code]; if (k) { INPUT[k] = true; if (e.code === 'Space') e.preventDefault(); } });
+  addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) INPUT[k] = false; });
+
+  let inputSeq = 0;
+  setInterval(() => {
+    if (!bridge.authed || roomCode === null) return;
+    const mask = (INPUT.up ? 1 : 0) | (INPUT.down ? 2 : 0) | (INPUT.left ? 4 : 0)
+      | (INPUT.right ? 8 : 0) | (INPUT.dash ? 16 : 0) | (INPUT.shoot ? 32 : 0);
+    bridge.send('input', { seq: ++inputSeq, m: mask });
+  }, 1000 / 30);
+
+  // --- renderer ---
+  const canvas = $('game-canvas');
+  const ctx = canvas.getContext('2d');
+  let lastSnap = null;
+
+  function draw() {
+    if ($('game-panel').hidden) return;
+    requestAnimationFrame(draw);
+    ctx.fillStyle = '#0a0c10';
+    ctx.fillRect(0, 0, W, H);
+    if (!localMap) return;
+    ctx.fillStyle = '#2a2f38';
+    for (const w of localMap.walls) ctx.fillRect(w.x, w.y, w.w, w.h);
+    for (const hz of localMap.hazards) {
+      ctx.fillStyle = hz.kind === 'lava' ? 'rgba(251,146,60,0.25)' : 'rgba(110,231,183,0.2)';
+      ctx.fillRect(hz.x, hz.y, hz.w, hz.h);
+    }
+    if (!lastSnap) return;
+    ctx.fillStyle = '#7dd3fc';
+    for (const pk of lastSnap.pk) ctx.fillRect(pk[0] - 6, pk[1] - 6, 12, 12);
+    for (const b of lastSnap.b) {
+      ctx.fillStyle = COLORS[b[4]] || '#fff';
+      ctx.beginPath(); ctx.arc(b[0], b[1], 4, 0, Math.PI * 2); ctx.fill();
+    }
+    lastSnap.p.forEach((p, i) => {
+      ctx.fillStyle = PCOLORS[i];
+      ctx.beginPath(); ctx.arc(p[0], p[1], 16, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p[0], p[1]);
+      ctx.lineTo(p[0] + Math.cos(p[2]) * 16, p[1] + Math.sin(p[2]) * 16); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
+      ctx.fillText('P' + (i + 1) + ' ' + p[3] + 'HP', p[0] - 20, p[1] - 24);
+    });
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 20px monospace';
+    ctx.fillText(lastSnap.score[0] + '  :  ' + lastSnap.score[1], W / 2 - 40, 30);
+    ctx.fillText('' + Math.ceil(lastSnap.time), W / 2 - 10, 56);
+  }
+
+  // --- server messages ---
+  bridge.on('room', (msg) => { roomCode = msg.code; mySeat = msg.youSeat; buildMap(msg.seed); });
+  bridge.on('countdown', (m) => { if (m.t === 0) { inputSeq = 0; startGameView(); } });
+  bridge.on('snapshot', (m) => { lastSnap = m; });
+  bridge.on('roundEnd', (m) => {
+    $('game-status').textContent = m.winner === mySeat ? 'ROUND WON' : m.winner == null ? 'DRAW' : 'ROUND LOST';
+  });
+  bridge.on('matchEnd', (m) => {
+    $('game-status').textContent = m.winner === mySeat ? 'VICTORY ' + m.scores[mySeat] + ':' + m.scores[1 - mySeat] : 'DEFEAT ' + m.scores[mySeat] + ':' + m.scores[1 - mySeat];
+    setTimeout(endGameView, 4000);
+  });
+  bridge.on('peerLeft', () => { $('game-status').textContent = 'OPPONENT LEFT'; });
 
   async function ensureConnected() {
     $('conn-error').hidden = true;
@@ -83,7 +181,7 @@ import SEO from '../../components/SEO.astro';
     setNick(nick);
     if (bridge.authed) return true;
     try {
-      await bridge.connect(wsPath());
+      await bridge.connect(wsUrl + '/ws');
       return true;
     } catch {
       showLobbyError('Cannot reach the game server. Try again shortly.');
@@ -154,6 +252,7 @@ import SEO from '../../components/SEO.astro';
     bridge.send('join', { code });
   });
   $('btn-leave').addEventListener('click', () => { bridge.send('leave'); backToLobby(); });
+  $('btn-forfeit').addEventListener('click', () => { bridge.send('forfeit'); });
 
   // Share-link deep join
   const roomParam = new URLSearchParams(location.search).get('room');
