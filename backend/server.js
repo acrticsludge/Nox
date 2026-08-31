@@ -31,9 +31,22 @@ export function createServer() {
   server.noxNet = net;
   const roomsApi = attachRooms(server, net, {
     onRoomFull: room => startMatch(room, net, {
-      // a finished match destroys its room — no stale seats/codes linger
-      onEnd: () => {
-        for (const s of room.seats) if (s) roomsApi.leave(s);
+      // Task 12: terminal room behavior — a naturally finished match keeps the
+      // room in rematchWait (mutual rematch re-fires onRoomFull); anything
+      // else tears the room down silently (no peerLeft after matchEnd)
+      onEnd: (room, keep) => {
+        if (keep) {
+          room.state = 'rematchWait';
+          room.rematch = new Set();
+          for (const s of room.seats) if (s) roomsApi.sendRoomTo(s, room);
+          return;
+        }
+        for (const s of room.seats) {
+          if (s) {
+            try { s.send(JSON.stringify({ type: 'roomClosed' })); } catch {}
+            roomsApi.leave(s, false, false);
+          }
+        }
         roomsApi.rooms.delete(room.code);
       },
     }),

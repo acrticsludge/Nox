@@ -33,6 +33,7 @@ function snapshotOf(m) {
 }
 
 export function startMatch(room, net, opts = {}) {
+  room.state = 'playing';   // Task 12: room state machine is server-owned
   const graceMs = opts.graceMs ?? 20000;
   const send = (ws, obj) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); };
   const broadcast = obj => { for (const s of room.seats) send(s, obj); };
@@ -64,8 +65,11 @@ export function startMatch(room, net, opts = {}) {
   function endMatch(winner, reason) {
     broadcast({ type: 'matchEnd', winner, reason, scores: match.scores.slice() });
     stop();
-    // match is over either way — the room has no purpose left; server.js tears it down
-    opts.onEnd?.(room);
+    // Task 12: terminal semantics — if both seats are still healthy and the
+    // match ended naturally (not forfeit/disconnect), the room survives into
+    // rematchWait; otherwise the server tears it down silently
+    const keep = room.seats.every(s => s && s.readyState === 1) && !/FORFEIT|DISCONNECT|LEFT/i.test(reason);
+    opts.onEnd?.(room, keep);
   }
 
   function tick() {

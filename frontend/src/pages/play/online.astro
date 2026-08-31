@@ -108,6 +108,9 @@ import SEO from '../../components/SEO.astro';
           <p class="seat-line" id="noxIdentity"></p>
           <p class="seat-line" id="noxSeats"></p>
           <p class="share-link" id="noxShare"></p>
+          <div class="btn-row" id="noxRematchRow" hidden>
+            <button class="btn btn-primary" id="noxRematch" style="flex:1;">REMATCH</button>
+          </div>
           <div class="btn-row"><button class="btn btn-ghost" id="noxLeave">LEAVE ROOM</button></div>
         </div>
       </div>`;
@@ -133,7 +136,11 @@ import SEO from '../../components/SEO.astro';
       if (code.length !== 5) { lobbyError('Room code is 5 characters.'); return; }
       run('join', code);
     });
-    el.querySelector('#noxLeave')!.addEventListener('click', () => { bridge.send('leave'); showLobby(); });
+    el.querySelector('#noxLeave')!.addEventListener('click', () => { bridge.send('leave'); bridge.reconnectCred = null; showLobby(); });
+    el.querySelector('#noxRematch')!.addEventListener('click', () => {
+      bridge.send('rematchReq');
+      lobbyStatus('REMATCH REQUESTED — WAITING FOR OPPONENT…');
+    });
     return el;
   }
 
@@ -159,6 +166,13 @@ import SEO from '../../components/SEO.astro';
       lockLobby(false);
       lobbyError('Cannot reach the game server. Is the backend running? (npm start in backend/)');
     }
+  }
+
+  // post-match: keep the session + room, show the room panel (rematch/leave)
+  function showLobbyPanel() {
+    const lob = buildLobby();
+    lob.classList.remove('hidden');
+    if (roomCode) { noxRoomInfo.hidden = false; }
   }
 
   function showLobby() {
@@ -233,15 +247,29 @@ import SEO from '../../components/SEO.astro';
   };
 
   // ---------- net -> game wiring ----------
-  bridge.on('room', async (msg: { code: string; youSeat: number; seats: Array<{ nick: string } | null>; seed: number }) => {
+  bridge.on('room', async (msg: { code: string; youSeat: number; seats: Array<{ nick: string } | null>; seed: number; rematchWait?: boolean }) => {
     roomCode = msg.code;
     mySeat = msg.youSeat;
     showRoom(msg);
     lobbyStatus('');
+    const row = document.getElementById('noxRematchRow');
+    if (row) row.hidden = !msg.rematchWait;
+    if (msg.rematchWait) {
+      // Task 12: post-match room survives for mutual rematch — no engine, no ready
+      lobbyStatus(msg.seats.every(Boolean) ? 'REMATCH? PRESS REMATCH WHEN READY' : 'WAITING FOR OPPONENT…');
+      showLobbyPanel();
+      return;
+    }
     const g = await engine();
     g.startOnlineMatch(msg.seed);
     // server starts ticking only after ready from both seats (T7 protocol)
     if (msg.seats.every(Boolean)) bridge.send('ready');
+  });
+
+  bridge.on('roomClosed', () => {
+    bridge.reconnectCred = null;
+    showLobby();
+    lobbyStatus('ROOM CLOSED');
   });
 
   bridge.on('rejoined', (m: { code: string; seat: number }) => {
@@ -292,7 +320,7 @@ import SEO from '../../components/SEO.astro';
     g?.stopOnlineMatch();
     const sc = (m as { scores?: number[] }).scores;
     stageMsg(text + (sc ? `  //  ${sc[0]} — ${sc[1]}` : ''));
-    setTimeout(showLobby, 2600);
+    setTimeout(() => { stageMsg(''); showLobbyPanel(); }, 2600);
   });
 
   bridge.on('peerLeft', (m: { graceMs?: number }) => {

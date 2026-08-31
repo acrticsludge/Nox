@@ -47,6 +47,7 @@ export function attachRooms(server, net, opts = {}) {
       youSeat: room.seats.indexOf(ws),
       seats: seatsView(room),
       seed: room.seed,
+      rematchWait: room.state === 'rematchWait',   // Task 12: post-match room survives for mutual rematch
     });
   }
 
@@ -71,6 +72,7 @@ export function attachRooms(server, net, opts = {}) {
       seats: [wsA, wsB],
       seed: crypto.randomBytes(4).readUInt32LE(0),
       createdAt: Date.now(),
+      state: 'waiting',
     };
     rooms.set(code, room);
     for (const s of room.seats) if (s) net.roomOf.set(s, code);
@@ -181,15 +183,22 @@ export function attachRooms(server, net, opts = {}) {
         return;
       }
       case 'rematchReq': {
-        // T10: both seats request -> fresh seed + new match (seat order kept)
+        // Task 12 (P0-04/P1-04): rematch only from the server-owned
+        // post-match state — never while a match is live, never a second sim
         const code = net.roomOf.get(ws);
         const room = code && rooms.get(code);
         if (!room || !room.seats.every(s => s)) return;
+        if (room.match || room.state === 'playing') {
+          send(ws, { type: 'roomError', reason: 'match in progress' });
+          return;
+        }
+        if (room.state !== 'rematchWait') return;
         room.rematch = room.rematch || new Set();
         room.rematch.add(ws);
         if (room.rematch.size === 2) {
           room.rematch.clear();
           room.fullNotified = false;
+          room.state = 'waiting';
           room.seed = crypto.randomBytes(4).readUInt32LE(0);
           broadcastRoom(room);   // re-fires onRoomFull -> startMatch with new seed
         } else {
@@ -215,5 +224,5 @@ export function attachRooms(server, net, opts = {}) {
   const sweepTimer = setInterval(sweep, 5000);
   if (sweepTimer.unref) sweepTimer.unref();
 
-  return { rooms, queue, leave, createsByIp, reservations };
+  return { rooms, queue, leave, createsByIp, reservations, sendRoomTo: sendRoom };
 }

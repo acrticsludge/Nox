@@ -46,7 +46,23 @@ const send = (c, o) => c.ws.send(typeof o === 'string' ? o : JSON.stringify(o));
 test.before(async () => {
   server = http.createServer();
   net = attachNet(server, {});
-  rooms = attachRooms(server, net, { onRoomFull: (room) => startMatch(room, net) });
+  rooms = attachRooms(server, net, {
+    // mirror server.js terminal semantics (task 12) so the E2E exercises them
+    onRoomFull: (room) => startMatch(room, net, {
+      onEnd: (r, keep) => {
+        if (keep) {
+          r.state = 'rematchWait';
+          r.rematch = new Set();
+          for (const s of r.seats) if (s) rooms.sendRoomTo(s, r);
+          return;
+        }
+        for (const s of r.seats) {
+          if (s) { try { s.send(JSON.stringify({ type: 'roomClosed' })); } catch {} rooms.leave(s, false, false); }
+        }
+        rooms.rooms.delete(r.code);
+      },
+    }),
+  });
   net.noxRooms = rooms.rooms;
   attachMatchRouting(net);
   await new Promise((r) => server.listen(PORT, r));
@@ -123,6 +139,7 @@ async function e2eFlow() {
 
   // -- forfeit: B concedes, A wins the match
   console.error('[e2e] phase: forfeit');
+  const oldSeed = rooms.rooms.get(roomA.code).seed;
   send(b, { type: 'forfeit' });
   const endA = await a.next('matchEnd');
   const endB = await b.next('matchEnd');
@@ -131,24 +148,17 @@ async function e2eFlow() {
   assert.equal(endB.winner, 0);
   assert.equal(endA.reason, 'OPPONENT FORFEITED');
 
-  // -- rematch handshake: both request -> fresh seed -> new match -> snapshots again
-  const oldSeed = rooms.rooms.get(roomA.code).seed;
-  console.error('[e2e] phase: rematchReq A');
-  send(a, { type: 'rematchReq' });
-  await b.next('rematchReq');
-  console.error('[e2e] phase: rematchReq B');
-  send(b, { type: 'rematchReq' });
-  const room2 = await a.next('room');
-  await b.next('room');
-  console.error('[e2e] phase: room2 ok');
-  assert.equal(room2.code, roomA.code);
-  assert.notEqual(room2.seed, oldSeed, 'rematch must reseed the map');
-  send(a, { type: 'ready' });
-  send(b, { type: 'ready' });
-  const snap2 = await a.next('snapshot', 8000);
-  console.error('[e2e] phase: snap2 ok');
-  assert.equal(snap2.state, 'playing');
-  rooms.rooms.get(roomA.code).match.stop();
+  // -- terminal semantics (task 12): a forfeit ENDS the room — no rematch
+  // handshake is possible, and both sockets get roomClosed after matchEnd
+  console.error('[e2e] phase: roomClosed');
+  const closedA = await a.next('roomClosed');
+  const closedB = await b.next('roomClosed');
+  console.error('[e2e] phase: roomClosed ok');
+  assert.equal(closedA.type, 'roomClosed');
+  assert.equal(closedB.type, 'roomClosed');
+  assert.ok(!rooms.rooms.get(roomA.code), 'forfeited room must be destroyed');
+  send(a, { type: 'rematchReq' }); // no room -> silently ignored (no crash, no second sim)
+  await new Promise((r) => setTimeout(r, 150));
   a.ws.close();
   b.ws.close();
 }
