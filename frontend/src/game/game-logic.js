@@ -743,6 +743,10 @@ function hardResetInternalState() {
   bot.behaviorCommitment = 0;
   bot.reactionDelay = 80 + Math.random() * 40;
   bot.aimError = 0;
+  bot.strafeDir = 0;
+  bot.lastBurstAimError = undefined;
+  bot.lastBehavior = 'patrol';
+  bot.lastPlayerDash = 0;
   try { localStorage.removeItem('nv_trials_state'); } catch {}
 }
 
@@ -962,6 +966,10 @@ function startTrials() {
   bot.behaviorCommitment = 0;
   bot.reactionDelay = 80 + Math.random() * 40;
   bot.aimError = 0;
+  bot.strafeDir = 0;
+  bot.lastBurstAimError = undefined;
+  bot.lastBehavior = 'patrol';
+  bot.lastPlayerDash = 0;
 
   pushOutOfWalls(players[0]);
   pushOutOfWalls(bot);

@@ -37,6 +37,9 @@
  * @property {number} reactionDelay
  * @property {number} lastShotTime
  * @property {number} aimError
+ * @property {number} strafeDir - -1 or +1, set when entering engagePlayer
+ * @property {number} lastBurstAimError - persisted aim error for overcharge burst
+ * @property {string} lastBehavior - track behavior transitions
  */
 
 /**
@@ -79,20 +82,20 @@ const BOT_CONFIG = {
 
   // Threat thresholds
   CRITICAL_HP_RATIO: 0.25,
-  HAZARD_EVADE_RANGE: 100,
-  HAZARD_DASH_RANGE: 60,
+  HAZARD_EVADE_RANGE: 200,
+  HAZARD_DASH_RANGE: 100,
   VOID_AVOID_RANGE: 100,
 
   // Engagement ranges
-  ENGAGE_RANGE: 800,
-  ENGAGE_STRAFE_MIN: 200,
-  ENGAGE_STRAFE_MAX: 500,
-  ENGAGE_BACKOFF_RANGE: 200,
-  ENGAGE_DASH_RANGE: 350,
-  ENGAGE_DASH_PROBABILITY: 0.1,
+  ENGAGE_RANGE: 1200,
+  ENGAGE_STRAFE_MIN: 150,
+  ENGAGE_STRAFE_MAX: 300,
+  ENGAGE_BACKOFF_RANGE: 150,
+  ENGAGE_DASH_RANGE: 250,
+  ENGAGE_DASH_PROBABILITY: 0.3,
 
   // Pickup ranges
-  PICKUP_SEEK_RANGE: 300,
+  PICKUP_SEEK_RANGE: 500,
   PICKUP_PRIORITY_BOOST: 0.5,
 
   // Retreat
@@ -107,7 +110,7 @@ const BOT_CONFIG = {
   // Aiming
   BASE_REACTION_DELAY_MIN: 80,
   BASE_REACTION_DELAY_MAX: 120,
-  BASE_AIM_ERROR: 0.15,
+  BASE_AIM_ERROR: 0.08,
   BULLET_SPEED: 7.2,
 
   // Difficulty multipliers
@@ -134,12 +137,12 @@ const BOT_CONFIG = {
 
 // Legacy behavior base weights (used for scoring reference)
 const BOT_BEHAVIOR_BASE_WEIGHTS = {
-  seekPickup: 0.35,
-  engagePlayer: 0.30,
-  evadeHazard: 0.20,
-  patrol: 0.10,
-  retreat: 0.05,
-  avoidVoid: 0.00,
+  seekPickup: 0.40,
+  engagePlayer: 0.60,
+  evadeHazard: 0.35,
+  patrol: 0.05,
+  retreat: 0.20,
+  avoidVoid: 0.50,
 };
 
 // --- Helper functions ---
@@ -287,8 +290,8 @@ function scoreSeekPickup(bot, state) {
   score += (1 - pickup.dist / BOT_CONFIG.PICKUP_SEEK_RANGE) * 50;
 
   // Shield/overcharge pickups get priority when needed
-  if (pickup.target.kind === 'shield' && bot.hp <= BOT_CONFIG.SHIELD_ACTIVATE_HP && !bot.shield) score += 100;
-  if (pickup.target.kind === 'overcharge' && bot.hp > 8 && !bot.overcharge) score += 80;
+  if (pickup.target.kind === 'shield' && bot.hp <= BOT_CONFIG.SHIELD_ACTIVATE_HP && !bot.shield) score += 200;
+  if (pickup.target.kind === 'overcharge' && bot.hp > 8 && !bot.overcharge) score += 150;
   if (pickup.target.kind === 'heal' && bot.hp < bot.maxHp) score += 60;
 
   return score;
@@ -344,7 +347,13 @@ function scoreEvadeHazard(bot, state) {
   if (hazard.hazard.kind === 'lava') {
     const mod = hazard.hazard.t % 300;
     const isActive = mod >= 120 && mod < 228;
-    if (isActive) score *= 1.5;
+    const timeToActive = isActive ? 0 : (120 - (mod % 120));
+    if (isActive) {
+      score *= 1.5;
+    } else if (timeToActive < 120) {
+      // Lava activating within 2 seconds - start avoiding early
+      score *= 1.3;
+    }
   }
 
   return score;
@@ -414,6 +423,11 @@ function selectBehavior(bot, state) {
     patrol: scorePatrol(bot, state),
   };
 
+  // Minimum engage score floor - ensures hunting when player alive
+  if (state.player && state.player.alive) {
+    scores.engagePlayer = Math.max(scores.engagePlayer, 200);
+  }
+
   // Critical threat early-exit (bypasses hysteresis)
   if (scores.avoidVoid > 500) return 'avoidVoid';
   if (scores.evadeHazard > 500) return 'evadeHazard';
@@ -437,6 +451,18 @@ function selectBehavior(bot, state) {
       bestBehavior = name;
     }
   }
+
+  // Set strafe direction when entering engagePlayer
+  if (bestBehavior === 'engagePlayer' && bot.behavior !== 'engagePlayer') {
+    bot.strafeDir = Math.random() < 0.5 ? -1 : 1;
+  }
+  // Clear strafeDir when leaving engagePlayer
+  if (bot.behavior === 'engagePlayer' && bestBehavior !== 'engagePlayer') {
+    bot.strafeDir = 0;
+  }
+
+  // Track behavior for aim error stability
+  bot.lastBehavior = bot.behavior;
 
   return bestBehavior;
 }
@@ -530,11 +556,13 @@ function executeEngagePlayer(bot, state) {
   // Account for dash speed boost and slime slow
   let playerVx = player.vx || 0;
   let playerVy = player.vy || 0;
-  if (player.dash > 0) {
+  const wasDashing = bot.lastPlayerDash > 0;
+  const isDashing = player.dash > 0;
+  if (isDashing) {
     playerVx *= 2.35;
     playerVy *= 2.35;
   }
-  // Note: slime slow would be on bot, not player (player.inSlime not tracked in state)
+  bot.lastPlayerDash = isDashing ? 1 : 0;
 
   const predX = player.x + playerVx * (travelTime + bot.reactionDelay / 1000);
   const predY = player.y + playerVy * (travelTime + bot.reactionDelay / 1000);
@@ -546,34 +574,45 @@ function executeEngagePlayer(bot, state) {
   if (dist > 0) {
     bot.targetAngle = Math.atan2(dy, dx);
 
-    // Aim error: persist for burst (overcharge), re-roll for single shots
-    if (bot.overcharge > 0 && bot.lastBurstAimError !== undefined) {
+    // Aim error: ONLY re-roll when:
+    // 1. Just switched TO engagePlayer (lastBehavior != 'engagePlayer')
+    // 2. Overcharge just activated
+    // 3. Player started dashing (velocity spike)
+    const behaviorJustSwitched = bot.lastBehavior !== 'engagePlayer';
+    const overchargeJustActivated = bot.overcharge > 0 && bot.lastBurstAimError === undefined;
+    const playerJustDashed = isDashing && !wasDashing;
+    const shouldRerollAim = behaviorJustSwitched || overchargeJustActivated || playerJustDashed;
+
+    if (bot.overcharge > 0 && bot.lastBurstAimError !== undefined && !shouldRerollAim) {
       bot.aimError = bot.lastBurstAimError;
-    } else {
+    } else if (shouldRerollAim) {
       bot.aimError = (Math.random() - 0.5) * BOT_CONFIG.BASE_AIM_ERROR;
       if (bot.overcharge > 0) bot.lastBurstAimError = bot.aimError;
     }
     bot.angle = bot.targetAngle + bot.aimError;
   }
 
-  // Movement: strafe at mid range, back away at close range
-  if (dist > BOT_CONFIG.ENGAGE_BACKOFF_RANGE && dist < BOT_CONFIG.ENGAGE_STRAFE_MAX) {
-    const strafeAngle = bot.angle + Math.PI / 2 * (Math.random() < 0.5 ? 1 : -1);
+  // Movement: circle strafe at close range, aggressive strafe at mid, close distance at far
+  const strafeDir = bot.strafeDir || 1; // fallback to 1 if not set
+  const strafeAngle = bot.angle + Math.PI / 2 * strafeDir;
+
+  if (dist < 150) {
+    // CLOSE: Circle strafe at 0.8 speed - orbit player while shooting
+    mx = Math.cos(strafeAngle) * 0.8;
+    my = Math.sin(strafeAngle) * 0.8;
+  } else if (dist < 300) {
+    // MID: Aggressive strafe at 0.7 speed
     mx = Math.cos(strafeAngle) * 0.7;
     my = Math.sin(strafeAngle) * 0.7;
-
-    // Dash to close distance
-    if (dist > BOT_CONFIG.ENGAGE_DASH_RANGE && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0) && Math.random() < BOT_CONFIG.ENGAGE_DASH_PROBABILITY) {
-      dash = true;
-    }
-  } else if (dist < BOT_CONFIG.ENGAGE_BACKOFF_RANGE) {
-    // Back away
-    mx = -Math.cos(bot.angle) * 0.5;
-    my = -Math.sin(bot.angle) * 0.5;
-  } else if (dist > BOT_CONFIG.ENGAGE_STRAFE_MAX) {
-    // Close distance
+  } else {
+    // FAR: Close distance aggressively at 1.0 speed
     mx = Math.cos(bot.angle);
     my = Math.sin(bot.angle);
+  }
+
+  // Dash to close distance when far
+  if (dist > BOT_CONFIG.ENGAGE_DASH_RANGE && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0) && Math.random() < BOT_CONFIG.ENGAGE_DASH_PROBABILITY) {
+    dash = true;
   }
 
   // Shoot with reaction delay (ms-based)
@@ -730,6 +769,17 @@ function updateBotAI(bot, state, dt = 1) {
 
   // Execute behavior
   let output = executeBehavior(bot, bot.behavior, state);
+
+  // Blend engage + evade when hunting but hazard nearby
+  if (bot.behavior === 'engagePlayer') {
+    const hazard = findNearestHazard(bot, state.hazards);
+    if (hazard && hazard.dist < BOT_CONFIG.HAZARD_EVADE_RANGE) {
+      const evadeOutput = executeEvadeHazard(bot, state);
+      // Blend: 70% engage, 30% evade
+      output.mx = 0.7 * output.mx + 0.3 * evadeOutput.mx;
+      output.my = 0.7 * output.my + 0.3 * evadeOutput.my;
+    }
+  }
 
   // Apply wall-aware movement
   output = getSafeMovementVector(bot, output, state);
