@@ -108,26 +108,33 @@ import SEO from '../../components/SEO.astro';
   const lobbyError = (m: string) => { const e = $('noxError'); if (e) e.textContent = m; };
   const lobbyStatus = (m: string) => { const s = $('noxStatus'); if (s) s.textContent = m; };
 
+  function lockLobby(v: boolean) {
+    buildLobby().querySelectorAll('button').forEach((b) => { (b as HTMLButtonElement).disabled = v; });
+  }
+
   async function run(kind: 'quick' | 'create' | 'join', code?: string) {
     lobbyError('');
     const nick = ($('noxNick') as HTMLInputElement).value.trim();
     if (nick.length < 2) { lobbyError('Nickname must be 2-16 characters.'); return; }
     setNick(nick);
+    lockLobby(true);           // O5: no double-queue/double-join during a transition
     lobbyStatus('CONNECTING…');
     try {
       if (!bridge.authed) await bridge.connect(WS_BASE + '/ws');
+      lobbyStatus(kind === 'quick' ? 'SEARCHING…' : '…');
+      bridge.send(kind, code ? { code } : {});
     } catch {
-      lobbyError('Cannot reach the game server. It deploys on Render — see /play/online notes.');
-      return;
+      lockLobby(false);
+      lobbyError('Cannot reach the game server. Is the backend running? (npm start in backend/)');
     }
-    lobbyStatus(kind === 'quick' ? 'SEARCHING…' : '…');
-    bridge.send(kind, code ? { code } : {});
   }
 
   function showLobby() {
     gl?.stopOnlineMatch();
     roomCode = null;
-    buildLobby().classList.remove('hidden');
+    const lob = buildLobby();
+    lob.classList.remove('hidden');
+    lockLobby(false);
     lobbyStatus('');
   }
 
@@ -139,6 +146,10 @@ import SEO from '../../components/SEO.astro';
     $('noxSeats').textContent = msg.seats.every(Boolean)
       ? 'VS ' + (msg.seats[1 - msg.youSeat]?.nick ?? '?') + ' — starting…'
       : 'WAITING FOR OPPONENT…';
+    // opponent card shows the remote player's nick (audit R1)
+    const opp = msg.seats[1 - msg.youSeat];
+    const p2name = document.querySelector('#cardP2 .hud-name');
+    if (p2name) p2name.textContent = opp ? opp.nick.toUpperCase() : 'WAITING…';
     const link = new URL(location.href); link.search = '?room=' + msg.code;
     $('noxShare').textContent = link.href;
   }
@@ -154,6 +165,7 @@ import SEO from '../../components/SEO.astro';
   });
 
   bridge.on('roomError', (m: { reason?: string }) => {
+    lockLobby(false);
     lobbyError(m.reason || 'Room error.');
     lobbyStatus('');
   });

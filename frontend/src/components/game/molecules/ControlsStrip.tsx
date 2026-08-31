@@ -1,10 +1,11 @@
-export default function ControlsStrip({ mode = '1v1' }: { mode?: '1v1' | 'trials' }) {
+export default function ControlsStrip({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 'online' }) {
   const isTrials = mode === 'trials'
+  const isOnline = mode === 'online'
   return (
     <div className="controls-strip" aria-label="Controls">
       <div className="controls-group">
         <span className="controls-label" style={{ color: isTrials ? 'var(--nox-amber)' : 'var(--nox-cyan)' }}>
-          {isTrials ? 'P1 // CYAN' : 'P1 // CYAN'}
+          {isOnline ? 'YOU // CYAN' : 'P1 // CYAN'}
         </span>
         <span className="keycap">W</span>
         <span className="keycap">A</span>
@@ -15,7 +16,8 @@ export default function ControlsStrip({ mode = '1v1' }: { mode?: '1v1' | 'trials
           SPACE
         </span>
       </div>
-      {isTrials ? null : (
+      {/* online: opponent is remote — their local keybinds are meaningless here */}
+      {isTrials || isOnline ? null : (
         <div className="controls-group">
           <span className="controls-label" style={{ color: 'var(--nox-pink)' }}>
             P2 // PINK
