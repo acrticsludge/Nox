@@ -1,7 +1,7 @@
-{
+﻿{
   "name": "nox-backend",
   "version": "0.1.0",
-  "description": "Nox (NEON VOID) — Node backend foundation: static preview server + /health. Zero dependencies. Serves the built frontend from ../frontend/dist; future home of the multiplayer WebSocket server.",
+  "description": "NOX online 1v1 game server: WebSocket protocol + /health. Zero dependencies. Does not serve the site - frontend deploys separately (Astro/Vercel).",
   "type": "module",
   "private": true,
   "main": "server.js",
