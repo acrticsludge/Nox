@@ -1,0 +1,167 @@
+---
+// T6: Online 1v1 lobby — guest nick, Create/Join/Quick, room state, ping display.
+// Standalone page; gameplay render bridge lands in T8.
+import '../../styles/global.css';
+import SEO from '../../components/SEO.astro';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <SEO
+      title="NOX // Online 1v1 - guest matchmaking, no login"
+      description="NOX online 1v1 arena. Quick match or private room codes. Guest identity, no signup."
+      canonical="/play/online"
+    />
+    <slot name="head" />
+  </head>
+  <body>
+  <main id="online-root" class="online-root">
+    <h1 class="online-title">ONLINE 1V1</h1>
+
+    <section id="lobby" class="panel">
+      <label class="field">
+        <span class="field-label">NICKNAME</span>
+        <input id="nick" maxlength="16" minlength="2" placeholder="2-16 chars" autocomplete="off" />
+      </label>
+      <div class="btn-row">
+        <button id="btn-quick" class="btn btn-primary">QUICK MATCH</button>
+        <button id="btn-create" class="btn">CREATE ROOM</button>
+      </div>
+      <div class="btn-row">
+        <input id="join-code" maxlength="5" placeholder="CODE" class="code-input" autocomplete="off" />
+        <button id="btn-join" class="btn">JOIN</button>
+      </div>
+      <p id="lobby-status" class="status" role="status"></p>
+      <p id="conn-error" class="error" role="alert" hidden></p>
+    </section>
+
+    <section id="room-panel" class="panel" hidden>
+      <p class="room-code-line">ROOM CODE: <strong id="room-code" class="room-code"></strong></p>
+      <p class="hint">Share: <span id="share-link" class="share-link"></span></p>
+      <ul id="seats" class="seats"></ul>
+      <p id="room-status" class="status" role="status"></p>
+      <button id="btn-leave" class="btn">LEAVE</button>
+    </section>
+  </main>
+  </body>
+</html>
+
+<style>
+  .online-root { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem; padding: 2rem 1rem; }
+  .online-title { letter-spacing: 0.2em; }
+  .panel { display: flex; flex-direction: column; gap: 0.9rem; width: min(420px, 100%); padding: 1.5rem; border: 1px solid var(--border, #333); border-radius: 10px; }
+  .field, .btn-row { display: flex; gap: 0.6rem; }
+  .field { flex-direction: column; }
+  .field-label { font-size: 0.75rem; letter-spacing: 0.15em; opacity: 0.7; }
+  input { padding: 0.6rem 0.8rem; border-radius: 6px; border: 1px solid var(--border, #444); background: transparent; color: inherit; }
+  .code-input { text-transform: uppercase; letter-spacing: 0.3em; width: 8rem; }
+  .btn { padding: 0.65rem 1rem; border-radius: 6px; border: 1px solid var(--border, #444); background: transparent; color: inherit; cursor: pointer; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-primary { border-color: currentColor; font-weight: 700; }
+  .status { min-height: 1.2em; opacity: 0.8; }
+  .error { color: #ff5470; min-height: 1.2em; }
+  .room-code { letter-spacing: 0.35em; font-size: 1.4rem; }
+  .share-link { user-select: all; font-family: monospace; font-size: 0.8rem; opacity: 0.75; }
+  .seats { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+</style>
+
+<script>
+  import { NetBridge, getNick, setNick } from '../../game/net/net-bridge.js';
+
+  const $ = (id) => document.getElementById(id);
+  const bridge = new NetBridge();
+  const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
+
+  function wsPath() { return wsUrl + '/ws'; }
+
+  async function ensureConnected() {
+    $('conn-error').hidden = true;
+    const nick = $('nick').value.trim();
+    if (nick.length < 2) { showLobbyError('Nickname must be 2-16 characters.'); return false; }
+    setNick(nick);
+    if (bridge.authed) return true;
+    try {
+      await bridge.connect(wsPath());
+      return true;
+    } catch {
+      showLobbyError('Cannot reach the game server. Try again shortly.');
+      return false;
+    }
+  }
+
+  function showLobbyError(msg) { const el = $('conn-error'); el.textContent = msg; el.hidden = false; }
+
+  function enterRoom(msg) {
+    $('lobby').hidden = true;
+    $('room-panel').hidden = false;
+    $('room-code').textContent = msg.code;
+    const link = new URL(location.href);
+    link.search = '?room=' + msg.code;
+    $('share-link').textContent = link.href;
+    renderSeats(msg);
+    $('room-status').textContent = msg.seats.every(s => s)
+      ? 'Opponent found. Starting soon…'
+      : 'Waiting for an opponent to join…';
+  }
+
+  function renderSeats(msg) {
+    const ul = $('seats');
+    ul.textContent = '';
+    msg.seats.forEach((seat, i) => {
+      const li = document.createElement('li');
+      const label = document.createElement('strong');
+      label.textContent = seat ? seat.nick : '— waiting —';
+      li.appendChild(label);
+      const tag = document.createElement('span');
+      tag.className = 'seat-tag';
+      tag.textContent = i === msg.youSeat ? ' (you)' : ' (opponent)';
+      li.appendChild(tag);
+      ul.appendChild(li);
+    });
+  }
+
+  function backToLobby() {
+    $('room-panel').hidden = true;
+    $('lobby').hidden = false;
+    $('lobby-status').textContent = '';
+  }
+
+  bridge.on('room', enterRoom);
+  bridge.on('roomError', (m) => {
+    if (!$('room-panel').hidden) backToLobby();
+    showLobbyError(m.reason || 'Room error.');
+    $('lobby-status').textContent = '';
+  });
+  bridge.on('queued', (m) => { $('lobby-status').textContent = 'Searching… position ' + m.position; });
+  bridge.on('peerLeft', () => { $('room-status').textContent = 'Opponent left. Waiting…'; });
+  bridge.on('disconnected', () => { backToLobby(); showLobbyError('Disconnected from server.'); });
+
+  $('btn-quick').addEventListener('click', async () => {
+    if (!(await ensureConnected())) return;
+    $('lobby-status').textContent = 'Searching…';
+    bridge.send('quick');
+  });
+  $('btn-create').addEventListener('click', async () => {
+    if (!(await ensureConnected())) return;
+    bridge.send('create');
+  });
+  $('btn-join').addEventListener('click', async () => {
+    if (!(await ensureConnected())) return;
+    const code = $('join-code').value.trim().toUpperCase();
+    if (code.length !== 5) { showLobbyError('Room code is 5 characters.'); return; }
+    bridge.send('join', { code });
+  });
+  $('btn-leave').addEventListener('click', () => { bridge.send('leave'); backToLobby(); });
+
+  // Share-link deep join
+  const roomParam = new URLSearchParams(location.search).get('room');
+  if (roomParam && /^[A-Z0-9]{5}$/i.test(roomParam)) {
+    $('join-code').value = roomParam.toUpperCase();
+    $('nick').value = getNick();
+    ensureConnected().then(ok => { if (ok) bridge.send('join', { code: roomParam.toUpperCase() }); });
+  } else {
+    $('nick').value = getNick();
+  }
+</script>
