@@ -120,6 +120,7 @@ function startTrials() {
   bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0;
   bot.ammoType = 'standard'; bot.ammo = Infinity;
   bot.behavior = 'patrol'; bot.behaviorTimer = 0;
+  bot.behaviorCommitment = 0;
   bot.reactionDelay = 80 + Math.random() * 40;
   bot.aimError = 0;
 

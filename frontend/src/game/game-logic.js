@@ -553,7 +553,7 @@ const players = [
   { id: 1, x: 800, y: 280, vx: 0, vy: 0, angle: 0, hp: MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, slimeCd: 0, color: '#ff5ca8', alive: true, ammoType:'standard', ammo:Infinity },
 ];
 
-const bot = { id: 2, x: 1600, y: 560, vx: 0, vy: 0, angle: 0, hp: BOT_MAX_HP, maxHp: BOT_MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, slimeCd: 0, color: '#ffb23e', alive: true, ammoType:'standard', ammo:Infinity, isBot: true, behavior: 'patrol', behaviorTimer: 0, targetX: 0, targetY: 0, reactionDelay: 0, lastShotTime: 0, aimError: 0 };
+const bot = { id: 2, x: 1600, y: 560, vx: 0, vy: 0, angle: 0, hp: BOT_MAX_HP, maxHp: BOT_MAX_HP, dash: 0, dashCd: 0, inv: 0, shootCd: 0, overcharge: 0, shield: false, shieldHp: 0, shieldMax: SHIELD_MAX_HP, speedBoost: 0, extraDash: 0, baseSpeed: BASE_SPEED, squish: 0, inSlime: false, lavaCd: 0, voidCd: 0, slimeCd: 0, color: '#ffb23e', alive: true, ammoType:'standard', ammo:Infinity, isBot: true, behavior: 'patrol', behaviorTimer: 0, targetX: 0, targetY: 0, reactionDelay: 0, lastShotTime: 0, aimError: 0, behaviorCommitment: 0 };
 // Early event queue so React can trigger start/forfeit even before init finishes
 if (typeof window !== 'undefined') {
   window.addEventListener('nox:startGame', () => {
@@ -693,6 +693,7 @@ function hardResetInternalState() {
   bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0; bot.slimeCd = 0;
   bot.ammoType = 'standard'; bot.ammo = Infinity;
   bot.behavior = 'patrol'; bot.behaviorTimer = 0;
+  bot.behaviorCommitment = 0;
   bot.reactionDelay = 80 + Math.random() * 40;
   bot.aimError = 0;
   try { localStorage.removeItem('nv_trials_state'); } catch {}
@@ -911,6 +912,7 @@ function startTrials() {
   bot.squish = 0; bot.inSlime = false; bot.lavaCd = 0; bot.voidCd = 0; bot.slimeCd = 0;
   bot.ammoType = 'standard'; bot.ammo = Infinity;
   bot.behavior = 'patrol'; bot.behaviorTimer = 0;
+  bot.behaviorCommitment = 0;
   bot.reactionDelay = 80 + Math.random() * 40;
   bot.aimError = 0;
 
@@ -1224,6 +1226,10 @@ function update(dt) {
     let ny = p.y + my * spd;
     if(mx || my || p.dash > 0) tryMove(p, nx, ny);
     else { pushOutOfWalls(p); }
+
+    // Track player velocity for bot predictive aim (updated every frame)
+    p.lastVx = nx - p.x;
+    p.lastVy = ny - p.y;
 
     const hz = hazardAt(p.x, p.y);
     if(hz && hz.kind === 'lava' && isLavaActive(hz) && p.lavaCd === 0) {
@@ -1577,27 +1583,36 @@ function updateTrials(dt) {
     if(window.NOX_GAME) { window.NOX_GAME.pickups.length = 0; kept.forEach(v => window.NOX_GAME.pickups.push(v)); }
   }
 
-  // Bot ticks — same lifecycle as 1v1 P2 so shootCd actually ticks
-  if(bot.dashCd > 0) bot.dashCd--;
-  if(bot.inv > 0) bot.inv--;
-  if(bot.shootCd > 0) bot.shootCd--;
-  if(bot.overcharge > 0) bot.overcharge--;
-  if(bot.speedBoost > 0) bot.speedBoost--;
-  if(bot.squish > 0) bot.squish--;
-  if(bot.lavaCd > 0) bot.lavaCd--;
-  if(bot.voidCd > 0) bot.voidCd--;
-  if(bot.dash > 0) { bot.dash--; if(bot.dash === 0) bot.inv = 6; }
-  if(wallsCollide(bot.x, bot.y, PLAYER_R)) pushOutOfWalls(bot);
-  bot.inSlime = false;
+  // Assemble GameState for new bot AI (decoupled from globals)
+  const gameStateForBot = {
+    player: {
+      x: players[0].x,
+      y: players[0].y,
+      vx: players[0].vx || 0,
+      vy: players[0].vy || 0,
+      dash: players[0].dash || 0,
+      inv: players[0].inv || 0,
+      alive: players[0].alive,
+    },
+    pickups,
+    hazards,
+    walls: wallData,
+    voidRect,
+    safeRadius,
+    gameMode: 'trials',
+    wallsCollide: (x, y, r) => wallsCollide(x, y, r),
+  };
 
-  // Bot AI
-  const botState = { pickups, hazards };
-  const botResult = updateBotAI(bot, botState);
+  // Bot AI - new priority-based system
+  const botResult = updateBotAI(bot, gameStateForBot);
 
-  // Apply bot movement — reuse same physics as 1v1 P2
+  // Apply bot cooldowns (frame-based, handled in updateBotAI but keep for compatibility)
+  if(bot.dash > 0) { bot.dash--; if(bot.dash <= 0) { bot.dash = 0; bot.inv = 6; } }
+
+  // Apply bot movement with wall-aware physics
   bot.vx = botResult.mx; bot.vy = botResult.my;
-  // keep angle in sync for shooting (bot aims at player)
   if (botResult.mx || botResult.my) bot.angle = Math.atan2(botResult.my, botResult.mx);
+
   let botSpd = bot.baseSpeed * (bot.speedBoost > 0 ? 1.22 : 1);
   if(bot.inSlime) botSpd *= 0.55;
   let botDashSpd = bot.baseSpeed * 2.35;
@@ -1611,14 +1626,29 @@ function updateTrials(dt) {
   } else {
     pushOutOfWalls(bot);
   }
-  // bot dash — same as P2 dash in 1v1
+
+  // Bot dash from AI
   if (botResult.dash && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
     if(bot.extraDash > 0) bot.extraDash--; else bot.dashCd = DASH_COOLDOWN;
     bot.dash = DASH_TIME; bot.inv = DASH_TIME + 4;
     for(let i = 0; i < 8; i++) particles.push({x: bot.x, y: bot.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 10, max: 10, r: 2, color: bot.color, type: 'dash'});
   }
 
-  // Bot hazard avoidance (slime/lava) - not void
+  // Bot powerup activations from AI
+  if (botResult.activateShield && bot.shield && bot.shieldHp > 0) {
+    // Shield activates automatically via existing pickup logic
+  }
+  if (botResult.activateOvercharge && bot.overcharge === 0) {
+    // Overcharge will be picked up via seekPickup behavior
+  }
+  if (botResult.useBlinkDash && bot.extraDash > 0 && bot.dash === 0) {
+    bot.extraDash--;
+    bot.dash = DASH_TIME;
+    bot.inv = DASH_TIME + 4;
+    for(let i = 0; i < 8; i++) particles.push({x: bot.x, y: bot.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 10, max: 10, r: 2, color: bot.color, type: 'dash'});
+  }
+
+  // Bot hazard detection (slime/lava) - not void (handled by avoidVoid behavior)
   const hz = hazardAt(bot.x, bot.y);
   if(hz && hz.kind === 'slime') bot.inSlime = true;
   if(hz && hz.kind === 'lava' && isLavaActive(hz) && bot.lavaCd === 0 && bot.inv === 0) {
@@ -1648,14 +1678,9 @@ function updateTrials(dt) {
     }
   }
 
-  // Bot shooting — reuse same shoot() as 1v1 (supports overcharge/ammo types)
+  // Bot shooting — handled by AI (predictive aim, reaction delay already applied)
   if(botResult.shoot && bot.shootCd <= 0) {
-    const target = players[0];
-    if(target && target.alive) {
-      const ang = Math.atan2(target.y - bot.y, target.x - bot.x) + (Math.random() - 0.5) * 0.15;
-      bot.angle = ang;
-      shoot(bot);
-    }
+    shoot(bot);
   }
 
   // Bot powerup pickup
@@ -1720,6 +1745,10 @@ function updateTrials(dt) {
     let ny = p.y + my * spd;
     if(mx || my || p.dash > 0) tryMove(p, nx, ny);
     else { pushOutOfWalls(p); }
+
+    // Track player velocity for bot predictive aim (updated every frame)
+    p.lastVx = nx - p.x;
+    p.lastVy = ny - p.y;
 
     // Lava damage
     const hz = hazardAt(p.x, p.y);
