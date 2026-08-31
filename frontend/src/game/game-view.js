@@ -267,6 +267,7 @@ function render() {
     g.appendChild(hpArc);
     // ammo indicator in arena - tiny text above hp if typed
     if(p.ammoType && p.ammoType !== 'standard'){
+      const finite = Number.isFinite(p.ammo);
       const ammoArc = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       ammoArc.setAttribute('x', '0'); ammoArc.setAttribute('y', p.hp > 6 ? '38' : '36');
       ammoArc.setAttribute('text-anchor', 'middle');
@@ -275,7 +276,7 @@ function render() {
       ammoArc.setAttribute('fill', p.ammoType==='needle'?'#a78bfa':p.ammoType==='cannon'?'#ffb23e':'#58d8ff');
       ammoArc.setAttribute('opacity', '0.9');
       ammoArc.setAttribute('transform', `rotate(${-p.angle * 180 / Math.PI})`);
-      ammoArc.textContent = p.ammoType==='needle' ? `Nx${p.ammo}` : p.ammoType==='cannon' ? `Cx${p.ammo}` : `Tx${p.ammo}`;
+      ammoArc.textContent = (p.ammoType==='needle' ? 'N' : p.ammoType==='cannon' ? 'C' : 'T') + (finite ? `x${p.ammo}` : '');
       g.appendChild(ammoArc);
     }
 
@@ -651,10 +652,13 @@ function updatePlayerCardHUD(p, pi) {
   const ammoT = document.getElementById(`ammoT${pi + 1}`);
   if(ammoChip && ammoT){
     const t = p.ammoType || 'standard';
+    // never render a non-finite count — an older server build may omit the
+    // ammo field; show the type alone instead of "xInfinity"
+    const n = Number.isFinite(p.ammo) ? p.ammo : null;
     let label = 'STD INF'; let cls = 'ammo-chip--standard';
-    if(t==='needle'){ label = `NEEDLE x${p.ammo}`; cls='ammo-chip--needle'; }
-    else if(t==='cannon'){ label = `CANNON x${p.ammo}`; cls='ammo-chip--cannon'; }
-    else if(t==='trick'){ label = `TRICK x${p.ammo} ${'.'.repeat(Math.max(0, 5 - (p.ammo !== Infinity ? (6 - p.ammo) : 0)))}`; cls='ammo-chip--trick'; }
+    if(t==='needle'){ label = n != null ? `NEEDLE x${n}` : 'NEEDLE'; cls='ammo-chip--needle'; }
+    else if(t==='cannon'){ label = n != null ? `CANNON x${n}` : 'CANNON'; cls='ammo-chip--cannon'; }
+    else if(t==='trick'){ label = n != null ? `TRICK x${n} ${'.'.repeat(Math.max(0, 5 - (6 - n)))}` : 'TRICK'; cls='ammo-chip--trick'; }
     ammoChip.className = `ammo-chip ${cls}`;
     ammoT.textContent = label;
   }

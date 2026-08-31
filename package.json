@@ -2,13 +2,13 @@
   "name": "nox",
   "version": "0.1.0",
   "private": true,
-  "description": "Nox (NEON VOID) Ã¢â‚¬â€ 2-player arena duel. Monorepo: Astro frontend (Vercel) + Node backend (Render).",
+  "description": "Nox (NEON VOID) — 2-player arena duel. Monorepo: Astro frontend (Vercel) + Node backend (Render).",
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend install --include=dev && npm --prefix frontend run build",
     "check": "npm --prefix frontend run check",
     "preview": "npm --prefix frontend run preview",
     "start": "npm run build && npm --prefix backend start",
-    "test": "npm run build && node --test \"frontend/src/game/*.test.js\" \"frontend/src/game/core/*.test.js\" \"frontend/src/game/sim/*.test.js\" && npm --prefix backend test"
+    "test": "npm run build && node --test \"frontend/src/game/*.test.js\" \"frontend/src/game/core/*.test.js\" \"frontend/src/game/sim/*.test.js\" \"frontend/src/game/vfx/*.test.js\" && npm --prefix backend test"
   }
 }

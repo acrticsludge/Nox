@@ -167,6 +167,7 @@ import SEO from '../../components/SEO.astro';
   function showLobbyPanel() {
     const lob = buildLobby();
     lob.classList.remove('hidden');
+    setOnlineHud({ hudVisible: false });   // never leave arena HUD/keys visible in the lobby
     if (roomCode) { $('noxRoomInfo').hidden = false; }
   }
 
@@ -188,7 +189,7 @@ import SEO from '../../components/SEO.astro';
 
   function hideLobby() { buildLobby().classList.add('hidden'); }
 
-  function showRoom(msg: { code: string; seats: Array<{ nick: string } | null>; youSeat: number }) {
+  function showRoom(msg: { code: string; seats: Array<{ nick: string } | null>; youSeat: number; rematchWait?: boolean }) {
     $('noxRoomInfo').hidden = false;
     $('noxRoomCode').textContent = msg.code;
     // identity is explicit BEFORE the match: seat 0 = cyan, seat 1 = pink
@@ -197,9 +198,11 @@ import SEO from '../../components/SEO.astro';
     $('noxIdentity').innerHTML =
       'YOU ARE <strong class="' + (mine === 'CYAN' ? 'id-cyan' : 'id-pink') + '">' + mine + '</strong>' +
       ' // OPPONENT IS <strong class="' + (theirs === 'CYAN' ? 'id-cyan' : 'id-pink') + '">' + theirs + '</strong>';
-    $('noxSeats').textContent = msg.seats.every(Boolean)
-      ? 'VS ' + (msg.seats[1 - msg.youSeat]?.nick ?? '?').toUpperCase() + ' — starting…'
-      : 'WAITING FOR OPPONENT…';
+    $('noxSeats').textContent = !msg.seats.every(Boolean)
+      ? 'WAITING FOR OPPONENT…'
+      : msg.rematchWait
+        ? 'MATCH OVER — REMATCH OR LEAVE'
+        : 'VS ' + (msg.seats[1 - msg.youSeat]?.nick ?? '?').toUpperCase() + ' — starting…';
     // P1-05: seat identity/opponent live in the store — no React DOM writes
     const opp = msg.seats[1 - msg.youSeat];
     setOnlineHud({
@@ -299,7 +302,9 @@ import SEO from '../../components/SEO.astro';
   bridge.on('roundEnd', () => { resetInput(); /* roundOverlay shown by game-logic endRound via snapshot state */ });
 
   // match over (win, forfeit or disconnect): one result message, then a full
-  // reset back to the lobby — the server has already destroyed the room
+  // reset back to the lobby — the server has already destroyed the room.
+  // stopOnlineMatch() clears pending engine timers and hides the round/gameOver
+  // overlays so the 1v1 game-over UI can never bleed into the online lobby.
   bridge.on('matchEnd', (m: { winner: number | null; reason?: string }) => {
     setMatchLive(false);
     const win = m.winner === mySeat;
@@ -311,7 +316,17 @@ import SEO from '../../components/SEO.astro';
     g?.stopOnlineMatch();
     const sc = (m as { scores?: number[] }).scores;
     stageMsg(text + (sc ? `  //  ${sc[0]} — ${sc[1]}` : ''));
-    setTimeout(() => { stageMsg(''); showLobbyPanel(); }, 2600);
+    setTimeout(() => {
+      stageMsg('');
+      if (roomCode) {
+        showLobbyPanel();
+        // replace the stale "VS … — starting…" seat line from match start
+        const seats = document.getElementById('noxSeats');
+        if (seats) seats.textContent = 'MATCH OVER — REMATCH OR LEAVE';
+      } else {
+        showLobby();
+      }
+    }, 2600);
   });
 
   bridge.on('peerLeft', (m: { graceMs?: number }) => {

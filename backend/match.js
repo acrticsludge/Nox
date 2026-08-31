@@ -1,6 +1,7 @@
 // T7: Headless server sim — 60Hz tick, 30Hz snapshots, validated inputs.
 // Reuses the exact isomorphic sim (game-sim.js) that offline 1v1 runs.
 import { createMatch, simTick, simNextRound, WIN_SCORE } from '../frontend/src/game/sim/game-sim.js';
+import { drainVfx } from '../frontend/src/game/vfx/events.js';
 
 const TICK_MS = 1000 / 60;
 const SNAPSHOT_EVERY = 2;          // 30Hz
@@ -16,7 +17,7 @@ function maskToInputs(mask) {
 
 const r1 = n => Math.round(n * 10) / 10;
 
-function snapshotOf(m) {
+function snapshotOf(m, evBatch) {
   return {
     type: 'snapshot',
     tick: m.tick,
@@ -24,9 +25,24 @@ function snapshotOf(m) {
     round: m.round,
     score: m.scores,
     time: r1(m.timeLeft),
-    p: m.players.map(p => [r1(p.x), r1(p.y), r1(p.angle), p.hp, p.ammoType, p.shield ? p.shieldHp : 0, p.ammoType === 'standard' ? -1 : p.ammo]),
-    b: m.bullets.map(b => [r1(b.x), r1(b.y), Math.round(b.vx * 10) / 10, Math.round(b.vy * 10) / 10, b.type, b.owner]),
+    p: m.players.map(p => [
+      r1(p.x), r1(p.y), r1(p.angle), p.hp, p.ammoType, p.shield ? p.shieldHp : 0,
+      p.ammoType === 'standard' ? -1 : p.ammo,
+      // visual-state flags for parity rendering (dash flame, cooldown bar,
+      // invuln blink, overcharge ring, blink charges, squish)
+      [p.dash | 0, Math.max(0, Math.round(p.dashCd)), Math.max(0, Math.round(p.inv)),
+        Math.max(0, Math.round(p.overcharge)), Math.max(0, Math.round(p.speedBoost)),
+        p.extraDash | 0, Math.max(0, Math.round(p.squish))],
+    ]),
+    // stable bullet id (index 6) for interpolation continuity + trick bounce
+    // count (index 7) for the pip label
+    b: m.bullets.map(b => [r1(b.x), r1(b.y), Math.round(b.vx * 10) / 10, Math.round(b.vy * 10) / 10, b.type, b.owner, b.id, b.bounces ?? 0]),
     pk: m.pickups.map(pu => [r1(pu.x), r1(pu.y), pu.kind]),
+    // void ring + relocated hazards so the client arena matches the server sim
+    sr: Math.round(m.safeRadius),
+    hz: m.hazards.map(h => [r1(h.x), r1(h.y), h.kind]),
+    // ordered visual events since the last snapshot (monotonic id + tick)
+    ev: evBatch,
     rr: m.roundResult,
     mw: m.matchWinner,
   };
@@ -50,6 +66,9 @@ export function startMatch(room, net, opts = {}) {
   const readySeats = new Set();
   let countdownArmed = false;
   const startTimers = [];
+  // visual events emitted by the sim since the last snapshot; flushed in
+  // order (monotonic ids) with every snapshot batch
+  let evBatch = [];
 
   function stop() {
     if (stopped) return;
@@ -89,11 +108,12 @@ export function startMatch(room, net, opts = {}) {
     if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; broadcast({ type: 'peerBack' }); }
     const inputs = inputState.map(st => maskToInputs(st.mask));
     simTick(match, inputs, 1);
+    evBatch.push(...drainVfx(match));
 
-    if (++snapCounter % SNAPSHOT_EVERY === 0) broadcast(snapshotOf(match));
+    if (++snapCounter % SNAPSHOT_EVERY === 0) broadcast(snapshotOf(match, evBatch.splice(0)));
 
     if (match.state !== 'playing') {
-      broadcast(snapshotOf(match));
+      broadcast(snapshotOf(match, evBatch.splice(0)));
       if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
       if (match.matchWinner != null) {
         endMatch(match.matchWinner, match.roundResult?.reason ?? 'MATCH OVER');

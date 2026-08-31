@@ -1,8 +1,13 @@
 // NOX 1v1 pure simulation core (isomorphic: browser + Node).
 // Extracted from game-logic.js — zero DOM/window/navigator references.
 // Determinism contract: same seed + same input stream => identical state.
-// Cosmetic particles are emitted to match.fx (view drains; uses fxRng so the
-// gameplay rng stream is never consumed by cosmetics).
+// Cosmetic effects are emitted as visual EVENTS (spec:
+// docs/reasonix/specs/visual-parity-sync.md) into m.vfx at the exact branch
+// where the gameplay effect occurs; clients convert them via vfx/recipes.js.
+// Event seeds come from fxRng so the gameplay rng stream is never consumed
+// by cosmetics.
+
+import { emitVfx } from '../vfx/events.js';
 
 export const W = 960, H = 560;
 export const PLAYER_R = 16;
@@ -57,30 +62,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const len2 = (ax, ay, bx, by) => { const dx = ax - bx, dy = ay - by; return Math.hypot(dx, dy); };
 function trickDmgAt(bounces) { const t = [2.5, 2, 1.6, 1.2, 0.8, 0.5]; return t[Math.min(bounces, 5)]; }
 
-// --- FX generators (cosmetic only; fxRng) ---
-const fx = (m, x, y, n, spMin, spMax, life, lifeJitter, rMin, rMax, color, type) => {
-  for (let i = 0; i < n; i++) {
-    const a = m.fxRng() * Math.PI * 2, s = spMin + m.fxRng() * (spMax - spMin);
-    m.fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: life + (lifeJitter ? Math.floor(m.fxRng() * lifeJitter) : 0), max: life, r: rMin + m.fxRng() * (rMax - rMin), color, type });
-  }
-};
-const fxText = (m, x, y, color, text) => m.fx.push({ x, y: y - 18, vx: 0, vy: -0.7, life: 26, max: 26, r: 0, color, type: 'healText', text });
-
-const fxMuzzle = (m, x, y, color, ang) => fx(m, x, y, 6, 2, 5, 12, 0, 2, 2, color, 'spark');
-const fxHit = (m, x, y, color) => fx(m, x, y, 10, 1, 5, 18, 10, 1.5, 3.5, color, 'hit');
-const fxPickup = (m, x, y, color) => fx(m, x, y, 16, 2, 5, 22, 0, 2.2, 2.2, color || '#ffb23e', 'star');
-const fxBounceSpark = (m, x, y, color) => fx(m, x, y, 6, 1, 3.2, 12, 0, 1.4, 1.4, color || '#58d8ff', 'spark');
-const fxHitStandard = (m, x, y, color) => fx(m, x, y, 10, 1, 4.8, 16, 0, 1.6, 3.4, color, 'hit');
-const fxHitNeedleBlock = (m, x, y) => { fx(m, x, y, 6, 1, 2.2, 10, 0, 1.1, 1.9, '#a78bfa', 'hit'); fxText(m, x, y, '#a78bfa', 'BLOCK'); };
-const fxHitNeedleCrit = (m, x, y) => {
-  fx(m, x, y, 12, 1.2, 5.4, 20, 0, 1.8, 3.4, '#a78bfa', 'star');
-  fx(m, x, y, 4, 0, 1.2, 14, 0, 3.2, 3.2, '#ede9fe', 'hit');
-  fxText(m, x, y, '#a78bfa', 'CRIT +6');
-};
-const fxHitCannon = (m, x, y, color) => { fx(m, x, y, 14, 1, 5.6, 22, 0, 2.2, 4, color || '#ffb23e', 'hit'); fx(m, x, y, 4, 0, 1.6, 18, 0, 1.4, 1.4, '#fb923c', 'spark'); fxText(m, x, y, '#ffb23e', 'BOOM -4'); };
-const fxHitTrick = (m, x, y, color, bounces) => { fx(m, x, y, 8, 1, 4.2, 16, 0, 1.5, 2.7, color || '#58d8ff', 'hit'); fxText(m, x, y, '#58d8ff', `-${trickDmgAt(bounces)}`); };
-const fxHitLava = (m, x, y) => { fx(m, x, y, 10, 1, 4, 18, 0, 1.7, 3.1, '#fb923c', 'hit'); fxText(m, x, y, '#fb923c', '-2 LAVA'); };
-const fxHitVoid = (m, x, y) => { fx(m, x, y, 9, 1, 3.8, 18, 0, 1.5, 2.7, '#c9ff2f', 'hit'); fxText(m, x, y, '#c9ff2f', 'VOID -1'); };
+// --- FX emission (cosmetic only; seeds from fxRng via emitVfx) ---
 
 // --- Geometry / collision ---
 export function wallGap(a, b) {
@@ -242,11 +224,11 @@ function relocateRandomHazards(m) {
       if (!clash) ok = {c, r};
     }
     if (!ok) continue;
-    fx(m, h.x + 18, h.y + 18, 12, 1, 3.5, 16, 0, 1.8, 1.8, h.kind === 'lava' ? '#fb923c' : '#6ee7b7', 'hit');
+    const fromKind = h.kind;
     if (m.rng() < 0.3) h.kind = m.rng() < 0.5 ? 'lava' : 'slime';
     h.c = ok.c; h.r = ok.r; h.x = ok.c * GRID + 2; h.y = ok.r * GRID + 2;
     h.t = m.rng() * 300; h.lavaCd = 0;
-    fx(m, h.x + 18, h.y + 18, 14, 1, 3.2, 18, 0, 2, 2, h.kind === 'lava' ? '#f97316' : '#10b981', 'star');
+    emitVfx(m, 'hazardMove', h.x + 18, h.y + 18, { tx: h.x + 18, ty: h.y + 18, meta: { from: fromKind, to: h.kind } });
   }
 }
 
@@ -313,6 +295,7 @@ function shoot(m, p) {
     const ang = p.angle + s + (m.rng() - 0.5) * 0.03;
     const dmg = active === 'trick' ? trickDmgAt(0) : (cfg.dmg ?? 2);
     m.bullets.push({
+      id: ++m._bulletSeq,
       x: mx, y: my,
       vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
       owner: p.id, life, trail: [], type: active, r, dmg, bounces: 0, bouncesMax: cfg.bouncesMax ?? 0
@@ -322,8 +305,7 @@ function shoot(m, p) {
     p.ammo--;
     if (p.ammo <= 0) { p.ammoType = 'standard'; p.ammo = Infinity; }
   }
-  const muzzleColor = active === 'needle' ? '#a78bfa' : active === 'cannon' ? '#ffb23e' : active === 'trick' ? '#58d8ff' : p.color;
-  fxMuzzle(m, mx, my, muzzleColor, p.angle);
+  emitVfx(m, 'muzzle', mx, my, { actor: p.id, bulletType: active });
 }
 
 // --- Round flow ---
@@ -331,6 +313,7 @@ function endRound(m, winner, reason) {
   if (m.state !== 'playing') return;
   if (winner !== null) m.scores[winner]++;
   m.roundResult = { winner, reason: reason || '' };
+  emitVfx(m, 'roundEnd', 480, 280, { actor: winner, meta: { reason: reason || '' } });
   if (Math.max(m.scores[0], m.scores[1]) >= WIN_SCORE) {
     m.state = 'matchEnd';
     m.matchWinner = m.scores[0] > m.scores[1] ? 0 : 1;
@@ -369,6 +352,7 @@ export function simNextRound(m) {
     m.players[1].y = 120 + m.rng() * 320; pushOutOfWalls(m, m.players[1]); tries++;
   }
   m.bullets.length = 0; m.pickups.length = 0; m.fx.length = 0;
+  m.vfx.length = 0;
   m.timeLeft = ROUND_TIME;
   m.hazardRelocateTimer = HAZARD_RELOCATE_MIN + m.rng() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
   spawnPickup(m, true);
@@ -396,6 +380,9 @@ export function createMatch(seed, opts = {}) {
     hazards: [],
     walls: [],
     fx: [],
+    vfx: [],
+    _vfxSeq: 0,
+    _bulletSeq: 0,
     safeRadius: 999,
     hazardRelocateTimer: 0,
     roundResult: null,
@@ -476,7 +463,7 @@ export function simTick(m, inputs, dt = 1) {
       if (canDash) {
         if (p.extraDash > 0) p.extraDash--; else p.dashCd = DASH_COOLDOWN;
         p.dash = DASH_TIME; p.inv = DASH_TIME + 4;
-        fx(m, p.x, p.y, 8, 0, 3, 10, 0, 2, 2, p.color, 'dash');
+        emitVfx(m, 'dash', p.x, p.y, { actor: p.id });
       }
     }
     if (inp.shoot) shoot(m, p);
@@ -501,19 +488,19 @@ export function simTick(m, inputs, dt = 1) {
     if (hz && hz.kind === 'lava' && isLavaActive(hz) && p.lavaCd <= 0) {
       if (p.shield && p.shieldHp > 0) {
         p.shieldHp--; p.lavaCd = 60; p.inv = Math.max(p.inv, 12);
-        fxHitLava(m, p.x, p.y);
+        emitVfx(m, 'lavaHit', p.x, p.y, { actor: p.id });
         p.squish = Math.max(p.squish, 6 + 0.6 * 4);
         if (p.shieldHp <= 0) {
           p.shield = false; p.shieldHp = 0;
-          fx(m, p.x, p.y, 10, 2, 4.5, 18, 0, 1.9, 1.9, '#ffd9a6', 'star');
+          emitVfx(m, 'shieldBreak', p.x, p.y, { actor: p.id });
         }
       } else if (p.inv <= 0) {
         p.hp = Math.max(0, p.hp - 2); p.lavaCd = 60; p.inv = 26;
-        fxHitLava(m, p.x, p.y);
+        emitVfx(m, 'lavaHit', p.x, p.y, { actor: p.id });
         p.squish = Math.max(p.squish, 10);
         if (p.hp <= 0) {
           p.alive = false;
-          fx(m, p.x, p.y, 16, 1, 5, 20, 0, 2, 2, p.color, 'hit');
+          emitVfx(m, 'death', p.x, p.y, { actor: p.id });
           endRound(m, p.id === 0 ? 1 : 0, 'LAVA // BURNED');
           return m;
         }
@@ -526,16 +513,19 @@ export function simTick(m, inputs, dt = 1) {
         p.voidCd = 54;
         if (p.shield && p.shieldHp > 0) {
           p.shieldHp--; p.inv = Math.max(p.inv, 10);
-          fxHitVoid(m, p.x, p.y);
+          emitVfx(m, 'voidHit', p.x, p.y, { actor: p.id });
           p.squish = Math.max(p.squish, 8);
-          if (p.shieldHp <= 0) { p.shield = false; p.shieldHp = 0; }
+          if (p.shieldHp <= 0) {
+            p.shield = false; p.shieldHp = 0;
+            emitVfx(m, 'shieldBreak', p.x, p.y, { actor: p.id });
+          }
         } else if (p.inv <= 0) {
           p.hp = Math.max(0, p.hp - 1); p.inv = 22;
-          fxHitVoid(m, p.x, p.y);
+          emitVfx(m, 'voidHit', p.x, p.y, { actor: p.id });
           p.squish = Math.max(p.squish, 9);
           if (p.hp <= 0) {
             p.alive = false;
-            fx(m, p.x, p.y, 16, 1, 5, 20, 0, 2, 2, p.color, 'hit');
+            emitVfx(m, 'death', p.x, p.y, { actor: p.id });
             endRound(m, p.id === 0 ? 1 : 0, 'VOID // CRUSHED');
             return m;
           }
@@ -551,8 +541,7 @@ export function simTick(m, inputs, dt = 1) {
           if (cfg) {
             p.ammoType = cfg.bullet;
             p.ammo = cfg.ammo;
-            fxPickup(m, pu.x, pu.y, cfg.color);
-            fxText(m, p.x, p.y, cfg.color, cfg.bullet.toUpperCase() + ` x${cfg.ammo}`);
+            emitVfx(m, 'pickup', pu.x, pu.y, { actor: p.id, pickup: pu.kind, tx: p.x, ty: p.y, amount: cfg.ammo });
             p.squish = 10;
           }
           m.pickups.splice(idx, 1);
@@ -561,27 +550,27 @@ export function simTick(m, inputs, dt = 1) {
         const pt = POWER_TYPES[pu.kind];
         if (pu.kind === 'overcharge') {
           p.overcharge = pt.duration;
-          fxPickup(m, pu.x, pu.y, pt.color);
+          emitVfx(m, 'pickup', pu.x, pu.y, { actor: p.id, pickup: pu.kind });
           m.pickups.splice(idx, 1);
         } else if (pu.kind === 'shield') {
           p.shield = true; p.shieldHp = SHIELD_MAX_HP; p.inv = Math.max(p.inv, 8);
-          fxPickup(m, pu.x, pu.y, pt.color);
+          emitVfx(m, 'pickup', pu.x, pu.y, { actor: p.id, pickup: pu.kind });
           m.pickups.splice(idx, 1);
         } else if (pu.kind === 'blink') {
           p.extraDash = Math.min(2, p.extraDash + 1);
           p.dashCd = 0;
           p.speedBoost = pt.duration;
-          fxPickup(m, pu.x, pu.y, pt.color);
+          emitVfx(m, 'pickup', pu.x, pu.y, { actor: p.id, pickup: pu.kind });
           m.pickups.splice(idx, 1);
         } else if (pu.kind === 'heal') {
+          let healed = false;
           if (p.hp < MAX_HP) {
             p.hp = Math.min(MAX_HP, p.hp + HEAL_AMOUNT);
-            fxText(m, p.x, p.y, '#22c55e', `+${HEAL_AMOUNT}`);
+            healed = true;
           } else {
             if (p.overcharge < 60) p.overcharge = Math.min(240, p.overcharge + 30);
           }
-          fxPickup(m, pu.x, pu.y, pt.color);
-          fx(m, pu.x, pu.y, 8, 1, 3.2, 18, 0, 1.8, 1.8, '#22c55e', 'hit');
+          emitVfx(m, 'heal', pu.x, pu.y, { actor: p.id, tx: p.x, ty: p.y, amount: healed ? HEAL_AMOUNT : 0 });
           m.pickups.splice(idx, 1);
         }
       }
@@ -624,7 +613,7 @@ export function simTick(m, inputs, dt = 1) {
     b.life -= dt;
     let hitWall = null;
     for (const w of m.walls) { if (rectCircleCollide(b.x, b.y, br, w.x, w.y, w.w, w.h)) { hitWall = w; break; } }
-    if (hitWall) {
+      if (hitWall) {
       if (b.type === 'trick' && (b.bounces ?? 0) < (b.bouncesMax ?? 5)) {
         const closestX = clamp(b.x, hitWall.x, hitWall.x + hitWall.w);
         const closestY = clamp(b.y, hitWall.y, hitWall.y + hitWall.h);
@@ -643,13 +632,10 @@ export function simTick(m, inputs, dt = 1) {
         b.y += ny * (br + 2);
         b.bounces = (b.bounces ?? 0) + 1;
         b.dmg = trickDmgAt(b.bounces);
-        fxBounceSpark(m, b.x, b.y, '#58d8ff');
+        emitVfx(m, 'trickBounce', b.x, b.y, { actor: b.owner, bulletType: 'trick', amount: b.bounces });
         continue;
       }
-      if (b.type === 'cannon') fxHitCannon(m, b.x, b.y, '#ffb23e');
-      else if (b.type === 'needle') fxHit(m, b.x, b.y, '#a78bfa');
-      else if (b.type === 'trick') fxBounceSpark(m, b.x, b.y, '#58d8ff');
-      else fxHit(m, b.x, b.y, b.owner === 0 ? '#58d8ff' : '#ff5ca8');
+      emitVfx(m, 'wallHit', b.x, b.y, { actor: b.owner, bulletType: b.type });
       m.bullets.splice(i, 1); continue;
     }
     if (b.life <= 0 || b.x < -20 || b.x > 980 || b.y < -20 || b.y > 580) {
@@ -672,19 +658,17 @@ export function simTick(m, inputs, dt = 1) {
           } else if (b.type === 'trick') shieldDmg = 1;
           if (shieldDmg === 0) {
             p.inv = 8;
-            fxHitNeedleBlock(m, b.x, b.y);
+            emitVfx(m, 'needleBlock', b.x, b.y, { actor: b.owner, target: p.id, bulletType: 'needle' });
             m.bullets.splice(i, 1); break;
           }
           p.shieldHp = (p.shieldHp || SHIELD_MAX_HP) - shieldDmg;
           if (p.shieldHp < 0) p.shieldHp = 0;
           p.inv = b.type === 'cannon' ? 18 : 16;
-          fxHit(m, b.x, b.y, '#58d8ff');
           p.squish = Math.max(p.squish, 6 + (shieldDmg > 1 ? 1.2 : 0.8) * 4);
-          const crackCount = p.shieldHp <= 1 ? 10 : p.shieldHp <= 2 ? 8 : 14;
-          fx(m, p.x, p.y, crackCount, 1.5, 4.7, 16, 8, 1.9, 2.4, p.shieldHp <= 0 ? '#a9e9ff' : '#58d8ff', 'hit');
+          emitVfx(m, 'shieldHit', b.x, b.y, { actor: b.owner, target: p.id, bulletType: b.type, tx: p.x, ty: p.y, amount: p.shieldHp });
           if (p.shieldHp <= 0) {
             p.shield = false; p.shieldHp = 0;
-            fx(m, p.x, p.y, 12, 2, 6, 20, 0, 2.2, 2.2, '#a9e9ff', 'star');
+            emitVfx(m, 'shieldBreak', p.x, p.y, { actor: p.id });
           }
           m.bullets.splice(i, 1); break;
         }
@@ -697,7 +681,7 @@ export function simTick(m, inputs, dt = 1) {
           if (dot > 0.5) { dmg = 6; inv = 30; shake = 1.6; fxKind = 'needleCrit'; }
           else {
             p.inv = 6;
-            fxHitNeedleBlock(m, b.x, b.y);
+            emitVfx(m, 'needleBlock', b.x, b.y, { actor: b.owner, target: p.id, bulletType: 'needle' });
             p.squish = Math.max(p.squish, 6 + 0.4 * 4);
             m.bullets.splice(i, 1); break;
           }
@@ -707,14 +691,14 @@ export function simTick(m, inputs, dt = 1) {
         else { dmg = b.dmg ?? 2; }
         p.hp = Math.max(0, p.hp - dmg); p.inv = inv;
         p.squish = Math.max(p.squish, 6 + shake * 4);
-        if (fxKind === 'needleCrit') fxHitNeedleCrit(m, p.x, p.y);
-        else if (fxKind === 'cannon') fxHitCannon(m, p.x, p.y, p.color);
-        else if (fxKind === 'trick') fxHitTrick(m, p.x, p.y, p.color, b.bounces ?? 0);
-        else fxHitStandard(m, b.x, b.y, p.color);
+        if (fxKind === 'needleCrit') emitVfx(m, 'needleCrit', p.x, p.y, { actor: b.owner, target: p.id, bulletType: 'needle', amount: 6 });
+        else if (fxKind === 'cannon') emitVfx(m, 'cannonHit', p.x, p.y, { actor: b.owner, target: p.id, bulletType: 'cannon', amount: 4 });
+        else if (fxKind === 'trick') emitVfx(m, 'trickHit', p.x, p.y, { actor: b.owner, target: p.id, bulletType: 'trick', amount: dmg });
+        else emitVfx(m, 'hitStandard', b.x, b.y, { actor: b.owner, target: p.id, bulletType: 'standard' });
         m.bullets.splice(i, 1);
         if (p.hp <= 0) {
           p.alive = false;
-          fx(m, p.x, p.y, 18, 1, 6, 24, 0, 2, 4, p.color, 'hit');
+          emitVfx(m, 'death', p.x, p.y, { actor: p.id });
           endRound(m, b.owner, 'ELIMINATION');
         }
         break;
@@ -723,7 +707,8 @@ export function simTick(m, inputs, dt = 1) {
     if (m.state !== 'playing') return m;
   }
 
-  // fx integration (cosmetic)
+  // fx integration (cosmetic) — m.fx is retained for API compatibility but
+  // the sim no longer writes particles directly; effects flow as events.
   for (const pt of m.fx) { pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.96; pt.vy *= 0.96; pt.life -= dt; }
   {
     const kept = m.fx.filter(pt => pt.life > 0);

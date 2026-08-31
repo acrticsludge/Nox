@@ -3,7 +3,10 @@
 
 import { updateBotAI } from './bot-ai.js';
 import { drawWalls, drawHazards, render, setCyberBadgeText, setCyberBadgeVariant, updateHUD } from './game-view.js';
-import { createMatch, simTick, simNextRound } from './sim/game-sim.js';
+import { createMatch, simTick, simNextRound, mulberry32 } from './sim/game-sim.js';
+import { emitVfx, drainVfx } from './vfx/events.js';
+import { EffectTimeline } from './vfx/timeline.js';
+import { TRICK_DMG } from './vfx/recipes.js';
 import { applyLedger, createLedger, ledgerTotal, sumLedger } from './trials-ledger.js';
 import { TRIALS_SAVE_KEY, buildTrialsSaveSnapshot, loadTrialsSave } from './trials-save.js';
 // P2-06 migration slice 1: gameplay constants are owned by core/constants.js
@@ -605,11 +608,49 @@ let forfeitLock = false;
 let simMatch = null;
 let onlineActive = false;
 
-// --- Online 1v1 (T8): server snapshots drive the same render pipeline ---
+// --- Visual effect timelines (spec: docs/reasonix/specs/visual-parity-sync.md) ---
+// One shared timeline for the sim-driven modes (local 1v1 + online) and one for
+// Trials. Display-only: they age at frame rate and are never touched by state
+// application. simVfxSeed is a dedicated cosmetic rng for Trials event seeds.
+const simFxTimeline = new EffectTimeline();
+const trialsFxTimeline = new EffectTimeline();
+const trialsVfxState = { vfx: [], _vfxSeq: 0, tick: 0, fxRng: mulberry32(0x7411d5f) };
+
+function emitTrialsVfx(kind, x, y, opts = {}) {
+  return emitVfx(trialsVfxState, kind, x, y, opts);
+}
+
+// Copy visible timeline particles into the legacy render array (same array
+// reference the view + NOX_GAME hold). Held particles (online display
+// scheduling) stay invisible until released.
+function mirrorTimelineToParticles(tl) {
+  particles.length = 0;
+  for (const p of tl.parts) {
+    if (p._hold > 0) continue;
+    particles.push(p);
+  }
+}
+
+// --- Online 1v1 (T8): server snapshots + ordered visual events drive the same
+// render pipeline. Effects are NEVER synthesized from snapshot diffs; remote
+// state renders from a small interpolation buffer (100ms delay) while the
+// EffectTimeline ages at frame rate between 30Hz snapshots.
+const NET_INTERP_TICKS = 6;   // 100 ms at 60 Hz server ticks (spec default; measure before tuning)
+let netBuf = [];              // recent snapshots for interpolation
+let pendingEv = [];           // { due, ev } events scheduled against server tick
+let netDisplayTick = 0;       // server-tick clock the client renders at
+let netBulletViews = new Map(); // stable bullet id -> interpolated view + trail
+let netPickupT = 0;
+
 export function startOnlineMatch(seed) {
   onlineActive = true;
   simMatch = createMatch(seed >>> 0, { baseSpeed: globalSpeed });
-  applyNetSnapshot._prev = {};
+  netBuf = [];
+  pendingEv = [];
+  netDisplayTick = 0;
+  netBulletViews = new Map();
+  netPickupT = 0;
+  simFxTimeline.clear();
   mirrorSimToLegacy();
   drawWalls();
   drawHazards();
@@ -618,54 +659,156 @@ export function startOnlineMatch(seed) {
 
 export function applyNetSnapshot(s) {
   if (!simMatch || !onlineActive) return;
-  simMatch.tick = s.tick;
+  netBuf.push(s);
+  if (netBuf.length > 12) netBuf.shift();
+  // authoritative discrete state — drives overlays, scores and the timer
   simMatch.state = s.state;
   if (s.score) { simMatch.scores[0] = s.score[0]; simMatch.scores[1] = s.score[1]; }
   simMatch.timeLeft = s.time;
   simMatch.roundResult = s.rr ?? null;
   simMatch.matchWinner = s.mw ?? null;
-  (s.p || []).forEach((d, i) => {
-    const p = simMatch.players[i];
-    if (!p) return;
-    p.x = d[0]; p.y = d[1]; p.angle = d[2]; p.hp = d[3]; p.ammoType = d[4];
-    p.shield = d[5] > 0; p.shieldHp = d[5];
-    p.ammo = d[6] === -1 || d[6] == null ? Infinity : d[6];   // -1 = standard/infinite
-  });
-  // cosmetic parity: synthesise the fx the server sim would have emitted,
-  // from snapshot diffs (new bullets, hp drops, deaths, pickups)
-  const prev = applyNetSnapshot._prev || (applyNetSnapshot._prev = {});
-  const colors = ['#58d8ff', '#ff5ca8'];
-  for (let bi = (prev.bLen || 0); bi < (s.b || []).length; bi++) {
-    const b = s.b[bi];
-    const owner = b[5] ?? 0;
-    const ang = Math.atan2(b[3], b[2]);
-    for (let k = 0; k < 6; k++) simMatch.fx.push({ x: b[0], y: b[1], vx: Math.cos(ang + (Math.random() - 0.5) * 0.9) * (2 + Math.random() * 3), vy: Math.sin(ang + (Math.random() - 0.5) * 0.9) * (2 + Math.random() * 3), life: 12, max: 12, r: 2, color: colors[owner] || '#fff', type: 'spark' });
+  if (typeof s.round === 'number') round = s.round;
+  if (typeof s.sr === 'number') simMatch.safeRadius = s.sr;
+  if (Array.isArray(s.hz)) {
+    simMatch.hazards.length = 0;
+    for (const h of s.hz) simMatch.hazards.push({ x: h[0], y: h[1], w: 36, h: 36, kind: h[2], t: 0, lavaCd: 0 });
+    hazards.length = 0;
+    for (const h of simMatch.hazards) hazards.push(h);
+    drawHazards();
   }
-  (s.p || []).forEach((d, i) => {
-    const php = prev.hp?.[i], palive = prev.alive?.[i];
-    if (php != null && d[3] < php) {
-      for (let k = 0; k < 10; k++) simMatch.fx.push({ x: d[0], y: d[1], vx: Math.cos(Math.random() * Math.PI * 2) * (1 + Math.random() * 3.8), vy: Math.sin(Math.random() * Math.PI * 2) * (1 + Math.random() * 3.8), life: 16, max: 16, r: 1.6 + Math.random() * 1.8, color: colors[i], type: 'hit' });
-    }
-    if (palive && d[3] <= 0) {
-      for (let k = 0; k < 22; k++) simMatch.fx.push({ x: d[0], y: d[1], vx: Math.cos(Math.random() * Math.PI * 2) * (2 + Math.random() * 5), vy: Math.sin(Math.random() * Math.PI * 2) * (2 + Math.random() * 5), life: 26, max: 26, r: 2 + Math.random() * 2.5, color: colors[i], type: 'hit' });
+  // ordered visual events: display each exactly once, aligned to server tick
+  // plus the same interpolation delay used for remote state
+  for (const ev of (s.ev || [])) {
+    if (!ev || typeof ev.tick !== 'number') continue;
+    pendingEv.push({ due: ev.tick + NET_INTERP_TICKS, ev });
+  }
+  pendingEv.sort((a, b) => a.due - b.due || a.ev.id - b.ev.id);
+  if (pendingEv.length > 256) pendingEv.splice(0, pendingEv.length - 256);
+  const target = s.tick - NET_INTERP_TICKS;
+  if (target > netDisplayTick) netDisplayTick = target;
+}
+
+// One frame of online presentation: release due events into the timeline,
+// age effects at frame rate, then render interpolated remote state.
+function netFrame(dt) {
+  netDisplayTick += dt;
+  while (pendingEv.length && pendingEv[0].due <= netDisplayTick) {
+    simFxTimeline.ingest(pendingEv.shift().ev);   // dedupe by id inside the timeline
+  }
+  simFxTimeline.step(dt);
+  netInterpolate();
+  mirrorNetStateToLegacy();
+  mirrorTimelineToParticles(simFxTimeline);
+  simVoidVisuals();
+}
+
+const lerp = (a, b, t) => a + (b - a) * t;
+function lerpAngle(a, b, t) {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+
+function netInterpolate() {
+  if (!simMatch || netBuf.length === 0) return;
+  const buf = netBuf;
+  let ai = 0;
+  for (let i = buf.length - 1; i >= 0; i--) {
+    if (buf[i].tick <= netDisplayTick) { ai = i; break; }
+  }
+  const a = buf[ai], b = buf[ai + 1] || null;
+  const span = b && b.tick > a.tick ? b.tick - a.tick : 0;
+  const alpha = span ? Math.min(1, Math.max(0, (netDisplayTick - a.tick) / span)) : 1;
+
+  // players: position/angle interpolated, discrete state from the snapshot at
+  // or before the display tick (state changes appear exactly when their tick
+  // is rendered — never before the corresponding effect)
+  (a.p || []).forEach((d, i) => {
+    const sp = simMatch.players[i];
+    if (!sp) return;
+    const e = (b && b.p && b.p[i]) || d;
+    sp.x = lerp(d[0], e[0], alpha);
+    sp.y = lerp(d[1], e[1], alpha);
+    sp.angle = lerpAngle(d[2], e[2], alpha);
+    sp.hp = d[3];
+    sp.alive = d[3] > 0;
+    sp.ammoType = d[4];
+    sp.shield = d[5] > 0;
+    sp.shieldHp = d[5];
+    sp.ammo = d[6] === -1 || d[6] == null ? Infinity : d[6];
+    // visual flags: [dash, dashCd, inv, overcharge, speedBoost, extraDash, squish]
+    const f = d[7];
+    if (Array.isArray(f)) {
+      sp.dash = f[0]; sp.dashCd = f[1]; sp.inv = f[2];
+      sp.overcharge = f[3]; sp.speedBoost = f[4]; sp.extraDash = f[5]; sp.squish = f[6];
     }
   });
-  const nowPk = (s.pk || []).map(pk => pk[0] + ',' + pk[1]);
-  for (const key of (prev.pk || [])) {
-    if (!nowPk.includes(key)) {
-      const [px, py] = key.split(',').map(Number);
-      for (let k = 0; k < 16; k++) simMatch.fx.push({ x: px, y: py, vx: Math.cos(Math.random() * Math.PI * 2) * (2 + Math.random() * 3), vy: Math.sin(Math.random() * Math.PI * 2) * (2 + Math.random() * 3), life: 22, max: 22, r: 2.2, color: '#ffb23e', type: 'star' });
-    }
+
+  // bullets: interpolated by stable id; trails built from rendered positions
+  const seen = new Set();
+  const aB = a.b || [], bB = (b && b.b) || [];
+  const bMap = new Map();
+  for (const row of bB) if (row[6] != null) bMap.set(row[6], row);
+  for (const row of aB) {
+    const id = row[6] != null ? row[6] : `x${a.tick}:${row[0]}:${row[1]}:${row[4]}`;
+    seen.add(id);
+    const o = bMap.get(id);
+    const x = o ? lerp(row[0], o[0], alpha) : row[0];
+    const y = o ? lerp(row[1], o[1], alpha) : row[1];
+    let v = netBulletViews.get(id);
+    if (!v) { v = { trail: [] }; netBulletViews.set(id, v); }
+    v.type = row[4];
+    v.owner = row[5] ?? 0;
+    v.bounces = row[7] ?? 0;
+    v.trail.push({ x, y });
+    const trailLen = v.type === 'cannon' ? 6 : v.type === 'needle' ? 2 : v.type === 'trick' ? 5 : 4;
+    while (v.trail.length > trailLen) v.trail.shift();
+    v.x = x; v.y = y; v.last = netDisplayTick;
   }
-  prev.bLen = (s.b || []).length;
-  prev.hp = (s.p || []).map(d => d[3]);
-  prev.alive = (s.p || []).map(d => d[3] > 0);
-  prev.pk = nowPk;
-  simMatch.bullets.length = 0;
-  for (const b of (s.b || [])) simMatch.bullets.push({ x: b[0], y: b[1], vx: b[2], vy: b[3], type: b[4], owner: b[5] ?? 0, life: 90, r: 4, dmg: 2, bounces: 0, trail: Array.from({ length: 5 }, (_, k) => ({ x: b[0] - b[2] * k * 1.2, y: b[1] - b[3] * k * 1.2 })) });
+  for (const [id, v] of netBulletViews) {
+    // a vanished id is dead server-side; its death/impact event covers the FX.
+    // Keep it briefly so the trail fades instead of popping out.
+    if (!seen.has(id) && netDisplayTick - v.last > 2) netBulletViews.delete(id);
+  }
+
+  // pickups: positions from the display snapshot (they never move), pulse
+  // clock advances locally so the animation never freezes
+  netPickupT += 0.14;
   simMatch.pickups.length = 0;
-  for (const pk of (s.pk || [])) simMatch.pickups.push({ x: pk[0], y: pk[1], kind: pk[2], t: 0, life: 9999 });
-  mirrorSimToLegacy();
+  for (const row of (a.pk || [])) simMatch.pickups.push({ x: row[0], y: row[1], kind: row[2], t: netPickupT, life: 9999 });
+}
+
+// Write the interpolated remote state into the legacy render structures.
+function mirrorNetStateToLegacy() {
+  const m = simMatch;
+  if (!m) return;
+  for (let i = 0; i < 2; i++) {
+    const sp = m.players[i], lp = players[i];
+    if (!sp || !lp) continue;
+    lp.x = sp.x; lp.y = sp.y; lp.angle = sp.angle; lp.hp = sp.hp; lp.alive = sp.alive;
+    lp.dash = sp.dash; lp.dashCd = sp.dashCd; lp.inv = sp.inv; lp.shootCd = sp.shootCd;
+    lp.overcharge = sp.overcharge; lp.shield = sp.shield; lp.shieldHp = sp.shieldHp;
+    lp.speedBoost = sp.speedBoost; lp.extraDash = sp.extraDash; lp.squish = sp.squish;
+    lp.ammoType = sp.ammoType; lp.ammo = sp.ammo;
+  }
+  scores[0] = m.scores[0]; scores[1] = m.scores[1];
+  timeLeft = m.timeLeft;
+  safeRadius = m.safeRadius;
+  bullets.length = 0;
+  for (const v of netBulletViews.values()) {
+    bullets.push({
+      x: v.x, y: v.y, type: v.type, owner: v.owner, bounces: v.bounces,
+      r: BULLET_TYPES[v.type] ? BULLET_TYPES[v.type].r : BULLET_R,
+      dmg: TRICK_DMG[Math.min(v.bounces, 5)],
+      trail: v.trail,
+    });
+  }
+  pickups.length = 0;
+  for (const pu of m.pickups) pickups.push(pu);
+  hazards.length = 0;
+  for (const h of m.hazards) hazards.push(h);
+  wallData = m.walls;
 }
 
 export function onlineResume() {
@@ -681,7 +824,42 @@ export function onlineResume() {
 export function stopOnlineMatch() {
   onlineActive = false;
   gameState = 'menu';   // unmounts RoundOverlay / GameOverOverlay (React-driven)
+  clearPendingTimeouts();   // never let a queued showGameOver fire into the lobby
+  const ro = document.getElementById('roundOverlay');
+  if (ro) ro.classList.add('hidden');
+  const gov = document.getElementById('gameOverOverlay');
+  if (gov) gov.classList.add('hidden');
   simMatch = null;
+  netBuf = [];
+  pendingEv = [];
+  netBulletViews = new Map();
+  simFxTimeline.clear();
+}
+
+// Online round end: display-only. The server owns round advancement and the
+// match flow — no local timers, no showGameOver (online.astro owns the
+// match-end presentation).
+function showRoundEndOnline(winner, reason) {
+  gameState = 'roundEnd';
+  clearInputState();
+  const ro = document.getElementById('roundOverlay');
+  if (!ro) return;
+  ro.classList.remove('hidden');
+  announce(winner === null ? 'Round drawn.' : `Player ${winner + 1} wins the round. Score ${scores[0]} to ${scores[1]}.`);
+  const badge = document.getElementById('roundBadge');
+  const title = document.getElementById('roundTitle');
+  const sub = document.getElementById('roundSub');
+  if (winner === null) {
+    setCyberBadgeText(badge, `ROUND ${round} // DRAW`);
+    setCyberBadgeVariant(badge, 'lime');
+    if (title) { title.textContent = 'DRAW!'; title.className = 'result-score winner-draw'; }
+    if (sub) sub.textContent = reason + ' • No points';
+  } else {
+    setCyberBadgeText(badge, `ROUND ${round} // ${reason}`);
+    setCyberBadgeVariant(badge, winner === 0 ? 'cyan' : 'pink');
+    if (title) { title.textContent = `PLAYER ${winner + 1} WINS ROUND!`; title.className = 'result-score ' + (winner === 0 ? 'winner-p1' : 'winner-p2'); }
+    if (sub) sub.textContent = `${scores[0]} // ${scores[1]} • First to ${WIN_SCORE}`;
+  }
 }
 
 // Void Trials state. trialPoints is the EXACT running sum of the ledger
@@ -827,13 +1005,8 @@ function shoot(p) {
       if (p.ammo <= 0) { p.ammoType = 'standard'; p.ammo = Infinity; }
     }
   }
-  // typed muzzle: cannon bigger ember, needle thin violet, trick cyan spark
-  const muzzleColor = active === 'needle' ? '#a78bfa' : active === 'cannon' ? '#ffb23e' : active === 'trick' ? '#58d8ff' : p.color;
-  const muzzle = spawnMuzzle(mx, my, muzzleColor, p.angle);
-  // cannon muzzle boost 1.4x
-  if (active === 'cannon') muzzle.forEach(mm => { mm.r = 2.6; mm.life = 14; mm.max = 14; });
-  if (active === 'needle') muzzle.forEach(mm => { mm.r = 1.4; });
-  particles.push(...muzzle);
+  // typed muzzle: same canonical recipe as every mode (color by bullet type)
+  emitTrialsVfx('muzzle', mx, my, { actor: p.id, bulletType: active });
   if(navigator.vibrate) navigator.vibrate(active==='cannon'? 20 : active==='needle'? 8 : 10);
 }
 
@@ -922,6 +1095,7 @@ function resetRound(regenerateWalls = false) {
     players[1].y = 120 + Math.random() * 320; pushOutOfWalls(players[1]); tries++;
   }
   bullets.length = 0; particles.length = 0; pickups.length = 0;
+  simFxTimeline.clear(); trialsFxTimeline.clear();
   // keep NOX_GAME refs in sync
   if (window.NOX_GAME) {
     window.NOX_GAME.bullets.length = 0;
@@ -992,6 +1166,7 @@ function startTrials() {
   pushOutOfWalls(bot);
 
   bullets.length = 0; particles.length = 0; pickups.length = 0;
+  simFxTimeline.clear(); trialsFxTimeline.clear();
   if (window.NOX_GAME) {
     window.NOX_GAME.bullets.length = 0;
     window.NOX_GAME.pickups.length = 0;
@@ -1042,7 +1217,8 @@ function mirrorSimToLegacy() {
   pickups.length = 0; for (const pu of m.pickups) pickups.push(pu);
   hazards.length = 0; for (const h of m.hazards) hazards.push(h);
   wallData = m.walls;
-  particles.length = 0; for (const f of m.fx) particles.push(f);
+  // Effects come from the shared EffectTimeline — never overwritten by state.
+  mirrorTimelineToParticles(simFxTimeline);
 }
 
 function simInputs() {
@@ -1120,13 +1296,14 @@ function simVoidVisuals() {
 function simUpdate(dt) {
   const m = simMatch;
   if (onlineActive) {
-    // server-authoritative: no local ticking, snapshots arrive via applyNetSnapshot
-    mirrorSimToLegacy();
-    simVoidVisuals();
+    // server-authoritative: no local ticking. Snapshots arrive via
+    // applyNetSnapshot; effects age on the timeline at frame rate.
+    netFrame(dt);
     drawHazards();
     if (m.state !== 'playing' && gameState === 'playing') {
-      if (m.state === 'roundEnd' || m.state === 'matchEnd') {
-        endRound(m.roundResult?.winner ?? null, m.roundResult?.reason ?? '');
+      // display-only round overlay; match end is owned by online.astro
+      if (m.state === 'roundEnd' && m.matchWinner == null) {
+        showRoundEndOnline(m.roundResult?.winner ?? null, m.roundResult?.reason ?? '');
       }
     }
     updateHUD();
@@ -1134,6 +1311,10 @@ function simUpdate(dt) {
   }
   const [i0, i1] = simInputs();
   simTick(m, [i0, i1], dt);
+  // the sim now emits visual events instead of particles — drain them into
+  // the shared timeline and age them at the same cadence the old fx had
+  for (const ev of drainVfx(m)) simFxTimeline.ingest(ev);
+  simFxTimeline.step(dt);
   mirrorSimToLegacy();
   simVoidVisuals();
   drawHazards();
@@ -1163,7 +1344,13 @@ function simAdvanceRound() {
 }
 
 function update(dt) {
-  if(gameState !== 'playing') return;
+  if(gameState !== 'playing') {
+    // Online presentation keeps running through round breaks so queued
+    // effects age out and display on time (the arena state itself is frozen
+    // at the last snapshot — the server owns the break).
+    if (onlineActive && simMatch && gameState === 'roundEnd') { simUpdate(dt); return; }
+    return;
+  }
 
   if(gameMode === 'trials') {
     updateTrials(dt);
@@ -1572,6 +1759,7 @@ function update(dt) {
 
 function updateTrials(dt) {
   if(gameState !== 'playing') return;
+  trialsVfxState.tick++;
 
   // Timer
   timeLeft -= dt / 60;
@@ -1723,7 +1911,7 @@ function updateTrials(dt) {
   if (botResult.dash && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
     if(bot.extraDash > 0) bot.extraDash--; else bot.dashCd = DASH_COOLDOWN;
     bot.dash = DASH_TIME; bot.inv = DASH_TIME + 4;
-    for(let i = 0; i < 8; i++) particles.push({x: bot.x, y: bot.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 10, max: 10, r: 2, color: bot.color, type: 'dash'});
+    emitTrialsVfx('dash', bot.x, bot.y, { actor: 'bot' });
   }
 
   // Bot powerup activations from AI
@@ -1737,7 +1925,7 @@ function updateTrials(dt) {
     bot.extraDash--;
     bot.dash = DASH_TIME;
     bot.inv = DASH_TIME + 4;
-    for(let i = 0; i < 8; i++) particles.push({x: bot.x, y: bot.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 10, max: 10, r: 2, color: bot.color, type: 'dash'});
+    emitTrialsVfx('dash', bot.x, bot.y, { actor: 'bot' });
   }
 
   // Bot hazard detection (slime/lava) - not void (handled by avoidVoid behavior)
@@ -1746,7 +1934,7 @@ function updateTrials(dt) {
   if(hz && hz.kind === 'lava' && isLavaActive(hz) && bot.lavaCd === 0 && bot.inv === 0) {
     bot.hp = Math.max(0, bot.hp - 2);
     bot.lavaCd = 60; bot.inv = 26;
-    particles.push(...spawnHitLava(bot.x, bot.y));
+    emitTrialsVfx('lavaHit', bot.x, bot.y, { actor: 'bot' });
     damageShake(bot, 1);
     if(bot.hp <= 0) {
       bot.alive = false;
@@ -1760,7 +1948,7 @@ function updateTrials(dt) {
   if(voidRect && (bot.x < voidRect.x || bot.x > voidRect.x + voidRect.w || bot.y < voidRect.y || bot.y > voidRect.y + voidRect.h) && bot.inv === 0) {
     bot.voidCd = 54;
     bot.hp = Math.max(0, bot.hp - 1);
-    particles.push(...spawnHitVoid(bot.x, bot.y));
+    emitTrialsVfx('voidHit', bot.x, bot.y, { actor: 'bot' });
     damageShake(bot, 0.8);
     if(bot.hp <= 0) {
       bot.alive = false;
@@ -1810,7 +1998,7 @@ function updateTrials(dt) {
     if(dashKey && canDash) {
       if(p.extraDash > 0) p.extraDash--; else p.dashCd = DASH_COOLDOWN;
       p.dash = DASH_TIME; p.inv = DASH_TIME + 4;
-      for(let i = 0; i < 8; i++) particles.push({x: p.x, y: p.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, life: 10, max: 10, r: 2, color: p.color, type: 'dash'});
+      emitTrialsVfx('dash', p.x, p.y, { actor: 0 });
     }
     if(isDownCode('Space') || isDown(' ') || isDown('space')) shoot(p);
 
@@ -1848,17 +2036,21 @@ function updateTrials(dt) {
     if(hz && hz.kind === 'lava' && isLavaActive(hz) && p.lavaCd === 0) {
       if(p.shield && p.shieldHp > 0) {
         p.shieldHp--; p.lavaCd = 60; p.inv = Math.max(p.inv, 12);
-        particles.push(...spawnHitLava(p.x, p.y));
+        emitTrialsVfx('lavaHit', p.x, p.y, { actor: 0 });
         damageShake(p, 0.6);
-        if(p.shieldHp <= 0) { p.shield = false; p.shieldHp = 0; /* shield break particles */ }
+        if(p.shieldHp <= 0) {
+          p.shield = false; p.shieldHp = 0;
+          emitTrialsVfx('shieldBreak', p.x, p.y, { actor: 0 });
+        }
       } else if(p.inv === 0) {
         const penalty = elapsedTotal >= VOID_START_TIME ? 60 : 30; // 3x after 7:30
         p.hp = Math.max(0, p.hp - 2); p.lavaCd = 60; p.inv = 26;
         awardTrials('lavaPenalty', -penalty);
-        particles.push(...spawnHitLava(p.x, p.y));
+        emitTrialsVfx('lavaHit', p.x, p.y, { actor: 0 });
         damageShake(p, 1);
         if(p.hp <= 0) {
           p.alive = false;
+          emitTrialsVfx('death', p.x, p.y, { actor: 0 });
           gameState = 'gameOver';
           clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(), 'LAVA BURNED'); showTrialsGameOver(trialsFinal(), 'LAVA BURNED', false);
           return;
@@ -1880,17 +2072,21 @@ function updateTrials(dt) {
           const dmg = Math.min(6, Math.floor(Math.pow(2, depth / 150))); // 1 at edge, lethal deeper
           if(p.shield && p.shieldHp > 0) {
             p.shieldHp--; p.inv = Math.max(p.inv, 10);
-            particles.push(...spawnHitVoid(p.x, p.y));
+            emitTrialsVfx('voidHit', p.x, p.y, { actor: 0 });
             damageShake(p, 0.5);
-            if(p.shieldHp <= 0) { p.shield = false; p.shieldHp = 0; }
+            if(p.shieldHp <= 0) {
+              p.shield = false; p.shieldHp = 0;
+              emitTrialsVfx('shieldBreak', p.x, p.y, { actor: 0 });
+            }
           } else if(p.inv === 0) {
             p.hp = Math.max(0, p.hp - dmg); p.inv = 22;
             const penalty = dmg * (elapsedTotal >= VOID_START_TIME ? 3 : 1);
             awardTrials('voidPenalty', -penalty);
-            particles.push(...spawnHitVoid(p.x, p.y));
+            emitTrialsVfx('voidHit', p.x, p.y, { actor: 0 });
             damageShake(p, 0.8);
             if(p.hp <= 0) {
               p.alive = false;
+              emitTrialsVfx('death', p.x, p.y, { actor: 0 });
               gameState = 'gameOver';
               clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(), 'VOID CRUSHED'); showTrialsGameOver(trialsFinal(), 'VOID CRUSHED', false);
               return;
@@ -1913,7 +2109,7 @@ function updateTrials(dt) {
           const cfg = AMMO_PICKUP_CFG[pu.kind];
           if(cfg) {
             p.ammoType = cfg.bullet; p.ammo = cfg.ammo;
-            particles.push(...spawnPickupEffect(pu.x, pu.y, cfg.color));
+            emitTrialsVfx('pickup', pu.x, pu.y, { actor: 0, pickup: pu.kind, tx: p.x, ty: p.y, amount: cfg.ammo });
             p.squish = 10;
           }
         } else if(pt) {
@@ -1921,10 +2117,10 @@ function updateTrials(dt) {
           else if(pu.kind === 'shield') { p.shield = true; p.shieldHp = SHIELD_MAX_HP; p.inv = Math.max(p.inv, 8); }
           else if(pu.kind === 'blink') { p.extraDash = Math.min(2, p.extraDash + 1); p.dashCd = 0; p.speedBoost = pt.duration; }
           else if(pu.kind === 'heal') {
-            if(p.hp < MAX_HP) p.hp = Math.min(MAX_HP, p.hp + HEAL_AMOUNT);
+            if(p.hp < MAX_HP) { p.hp = Math.min(MAX_HP, p.hp + HEAL_AMOUNT); emitTrialsVfx('heal', pu.x, pu.y, { actor: 0, tx: p.x, ty: p.y, amount: HEAL_AMOUNT }); }
             else if(p.overcharge < 60) p.overcharge = Math.min(240, p.overcharge + 30);
           }
-          particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color));
+          if(pu.kind !== 'heal') emitTrialsVfx('pickup', pu.x, pu.y, { actor: 0, pickup: pu.kind });
         }
         pickups.splice(idx, 1);
       }
@@ -1956,13 +2152,10 @@ function updateTrials(dt) {
         b.vx = (b.vx - 2*dot*nx2) * 0.97; b.vy = (b.vy - 2*dot*ny2) * 0.97;
         b.x += nx2 * (br + 2); b.y += ny2 * (br + 2);
         b.bounces = (b.bounces ?? 0) + 1; b.dmg = trickDmgAt(b.bounces);
-        particles.push(...spawnBounceSpark(b.x, b.y, '#58d8ff'));
+        emitTrialsVfx('trickBounce', b.x, b.y, { actor: b.owner, bulletType: 'trick', amount: b.bounces });
         continue;
       }
-      if(b.type === 'cannon') particles.push(...spawnHitCannon(b.x, b.y, '#ffb23e'));
-      else if(b.type === 'needle') particles.push(...spawnHit(b.x, b.y, '#a78bfa'));
-      else if(b.type === 'trick') particles.push(...spawnBounceSpark(b.x,b.y,'#58d8ff'));
-      else particles.push(...spawnHit(b.x, b.y, b.owner === 0 ? '#58d8ff' : '#ffb23e'));
+      emitTrialsVfx('wallHit', b.x, b.y, { actor: b.owner, bulletType: b.type });
       bullets.splice(i, 1); continue;
     }
     if(b.life <= 0 || b.x < -20 || b.x > TRIALS_W + 20 || b.y < -20 || b.y > TRIALS_H + 20) { bullets.splice(i, 1); continue; }
@@ -1974,21 +2167,26 @@ function updateTrials(dt) {
         // shield absorb same as 1v1
         if(p.shield && p.shieldHp > 0) {
           let sd = 1; if(b.type==='cannon') sd=2; else if(b.type==='needle'){ const f=Math.cos(p.angle), ff=Math.sin(p.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; sd = dot2>0.5?2:0; } else if(b.type==='trick') sd=1;
-          if(sd===0){ p.inv=8; particles.push(...spawnHitNeedleBlock(b.x,b.y)); bullets.splice(i,1); continue; }
-          p.shieldHp-=sd; p.inv= b.type==='cannon'?18:16; particles.push(...spawnHit(b.x,b.y,'#58d8ff')); damageShake(p, sd>1?1.2:0.8);
-          if(p.shieldHp<=0){ p.shield=false; p.shieldHp=0; }
+          if(sd===0){ p.inv=8; emitTrialsVfx('needleBlock', b.x, b.y, { actor: 2, target: 0, bulletType: 'needle' }); bullets.splice(i,1); continue; }
+          p.shieldHp-=sd; p.inv= b.type==='cannon'?18:16; damageShake(p, sd>1?1.2:0.8);
+          emitTrialsVfx('shieldHit', b.x, b.y, { actor: 2, target: 0, bulletType: b.type, tx: p.x, ty: p.y, amount: Math.max(0, p.shieldHp) });
+          if(p.shieldHp<=0){ p.shield=false; p.shieldHp=0; emitTrialsVfx('shieldBreak', p.x, p.y, { actor: 0 }); }
           bullets.splice(i,1); continue;
         }
         // direct
-        let dmg=2, inv=28, fx=null, shake=1;
-        if(b.type==='standard'){ dmg=2; inv=28; fx=spawnHitStandard(b.x,b.y,p.color); }
-        else if(b.type==='needle'){ const f=Math.cos(p.angle), ff=Math.sin(p.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; if(dot2>0.5){ dmg=6; inv=30; fx=spawnHitNeedleCrit(p.x,p.y); shake=1.6; } else { p.inv=6; particles.push(...spawnHitNeedleBlock(b.x,b.y)); damageShake(p,0.4); bullets.splice(i,1); continue; } }
-        else if(b.type==='cannon'){ dmg=4; inv=34; fx=spawnHitCannon(p.x,p.y,p.color); shake=1.5; }
-        else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fx=spawnHitTrick(p.x,p.y,p.color,b.bounces??0); }
-        p.hp = Math.max(0, p.hp - dmg); p.inv = inv; if(fx) particles.push(...fx); damageShake(p,shake);
+        let dmg=2, inv=28, shake=1, fxKind='standard';
+        if(b.type==='standard'){ dmg=2; inv=28; }
+        else if(b.type==='needle'){ const f=Math.cos(p.angle), ff=Math.sin(p.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; if(dot2>0.5){ dmg=6; inv=30; fxKind='needleCrit'; shake=1.6; } else { p.inv=6; emitTrialsVfx('needleBlock', b.x, b.y, { actor: 2, target: 0, bulletType: 'needle' }); damageShake(p,0.4); bullets.splice(i,1); continue; } }
+        else if(b.type==='cannon'){ dmg=4; inv=34; fxKind='cannon'; shake=1.5; }
+        else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fxKind='trick'; }
+        p.hp = Math.max(0, p.hp - dmg); p.inv = inv; damageShake(p,shake);
+        if(fxKind==='needleCrit') emitTrialsVfx('needleCrit', p.x, p.y, { actor: 2, target: 0, bulletType: 'needle', amount: 6 });
+        else if(fxKind==='cannon') emitTrialsVfx('cannonHit', p.x, p.y, { actor: 2, target: 0, bulletType: 'cannon', amount: 4 });
+        else if(fxKind==='trick') emitTrialsVfx('trickHit', p.x, p.y, { actor: 2, target: 0, bulletType: 'trick', amount: dmg });
+        else emitTrialsVfx('hitStandard', b.x, b.y, { actor: 2, target: 0, bulletType: 'standard' });
         awardTrials('botHitPenalty', -(elapsedTotal >= VOID_START_TIME ? 6 : 3));
         bullets.splice(i, 1);
-        if(p.hp <= 0) { p.alive=false; gameState='gameOver'; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(),'BOT HIT'); showTrialsGameOver(trialsFinal(),'KILLED BY THE BOT',false); return; }
+        if(p.hp <= 0) { p.alive=false; emitTrialsVfx('death', p.x, p.y, { actor: 0 }); gameState='gameOver'; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(),'BOT HIT'); showTrialsGameOver(trialsFinal(),'KILLED BY THE BOT',false); return; }
         continue;
       }
     } else if(b.owner === 0) {
@@ -1996,20 +2194,24 @@ function updateTrials(dt) {
       if(distance(b.x, b.y, bot.x, bot.y) < br + PLAYER_R) {
         if(bot.shield && bot.shieldHp > 0) {
           let sd=1; if(b.type==='cannon') sd=2; else if(b.type==='needle'){ const f=Math.cos(bot.angle), ff=Math.sin(bot.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; sd=dot2>0.5?2:0; }
-          if(sd===0){ bot.inv=8; particles.push(...spawnHitNeedleBlock(b.x,b.y)); bullets.splice(i,1); continue; }
-          bot.shieldHp-=sd; bot.inv=16; particles.push(...spawnHit(b.x,b.y,'#58d8ff')); damageShake(bot,0.8);
-          if(bot.shieldHp<=0){ bot.shield=false; bot.shieldHp=0; }
+          if(sd===0){ bot.inv=8; emitTrialsVfx('needleBlock', b.x, b.y, { actor: 0, target: 'bot', bulletType: 'needle' }); bullets.splice(i,1); continue; }
+          bot.shieldHp-=sd; bot.inv=16; damageShake(bot,0.8);
+          emitTrialsVfx('shieldHit', b.x, b.y, { actor: 0, target: 'bot', bulletType: b.type, tx: bot.x, ty: bot.y, amount: Math.max(0, bot.shieldHp) });
+          if(bot.shieldHp<=0){ bot.shield=false; bot.shieldHp=0; emitTrialsVfx('shieldBreak', bot.x, bot.y, { actor: 'bot' }); }
           bullets.splice(i,1); continue;
         }
-        let dmg=b.dmg??2, inv=28, fx=null;
-        if(b.type==='needle'){ const f=Math.cos(bot.angle), ff=Math.sin(bot.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; if(dot2>0.5){ dmg=6; inv=30; fx=spawnHitNeedleCrit(bot.x,bot.y); } else { bot.inv=6; particles.push(...spawnHitNeedleBlock(b.x,b.y)); bullets.splice(i,1); continue; } }
-        else if(b.type==='cannon'){ dmg=4; inv=34; fx=spawnHitCannon(bot.x,bot.y,bot.color); }
-        else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fx=spawnHitTrick(bot.x,bot.y,bot.color,b.bounces??0); }
-        else { fx=spawnHitStandard(b.x,b.y,bot.color); }
-        bot.hp = Math.max(0, bot.hp - dmg); bot.inv = inv; if(fx) particles.push(...fx); damageShake(bot,1);
+        let dmg=b.dmg??2, inv=28, fxKind='standard';
+        if(b.type==='needle'){ const f=Math.cos(bot.angle), ff=Math.sin(bot.angle), dn=Math.hypot(b.vx,b.vy)||1, dot2=f*b.vx/dn+ff*b.vy/dn; if(dot2>0.5){ dmg=6; inv=30; fxKind='needleCrit'; } else { bot.inv=6; emitTrialsVfx('needleBlock', b.x, b.y, { actor: 0, target: 'bot', bulletType: 'needle' }); bullets.splice(i,1); continue; } }
+        else if(b.type==='cannon'){ dmg=4; inv=34; fxKind='cannon'; }
+        else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fxKind='trick'; }
+        bot.hp = Math.max(0, bot.hp - dmg); bot.inv = inv; damageShake(bot,1);
+        if(fxKind==='needleCrit') emitTrialsVfx('needleCrit', bot.x, bot.y, { actor: 0, target: 'bot', bulletType: 'needle', amount: 6 });
+        else if(fxKind==='cannon') emitTrialsVfx('cannonHit', bot.x, bot.y, { actor: 0, target: 'bot', bulletType: 'cannon', amount: 4 });
+        else if(fxKind==='trick') emitTrialsVfx('trickHit', bot.x, bot.y, { actor: 0, target: 'bot', bulletType: 'trick', amount: dmg });
+        else emitTrialsVfx('hitStandard', b.x, b.y, { actor: 0, target: 'bot', bulletType: 'standard' });
         awardTrials('hitBonus', (elapsedTotal >= VOID_START_TIME ? 50 : 25));
         bullets.splice(i, 1);
-        if(bot.hp <= 0) { bot.alive=false; gameState='gameOver'; awardTrials('botKill', 500); clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(trialsFinal()); showTrialsGameOver(trialsFinal(),'BOT DESTROYED',true); return; }
+        if(bot.hp <= 0) { bot.alive=false; emitTrialsVfx('death', bot.x, bot.y, { actor: 'bot' }); gameState='gameOver'; awardTrials('botKill', 500); clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(trialsFinal()); showTrialsGameOver(trialsFinal(),'BOT DESTROYED',true); return; }
         continue;
       }
     }
@@ -2024,13 +2226,11 @@ function updateTrials(dt) {
     }
   }
 
-  // Particles
-  particles.forEach(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.96; pt.vy *= 0.96; pt.life--; });
-  {
-    const kept = particles.filter(pt => pt.life > 0);
-    particles.length = 0; kept.forEach(v => particles.push(v));
-    if(window.NOX_GAME) { window.NOX_GAME.particles.length = 0; kept.forEach(v => window.NOX_GAME.particles.push(v)); }
-  }
+  // Particles — Trials emits visual events like every other mode; the shared
+  // timeline ages them (drain -> ingest -> step -> mirror to the render array).
+  for (const ev of drainVfx(trialsVfxState)) trialsFxTimeline.ingest(ev);
+  trialsFxTimeline.step(1);
+  mirrorTimelineToParticles(trialsFxTimeline);
 
   updateHUD();
 }
@@ -2065,6 +2265,7 @@ function forfeitTrials() {
   try { localStorage.removeItem('nv_trials_paused'); } catch {}
   // Hard reset trial state so menu is clean — HUD-only, don't touch arena walls (keep preview), just clear dynamic objects
   bullets.length = 0; pickups.length = 0; particles.length = 0;
+  simFxTimeline.clear(); trialsFxTimeline.clear();
   if(window.NOX_GAME){ window.NOX_GAME.bullets.length=0; window.NOX_GAME.pickups.length=0; window.NOX_GAME.particles.length=0; }
   trialPoints = 0; trialsLedger = createLedger(); timeLeft = TRIAL_DURATION; voidRect = null; safeRadius = 999; lastSaveTime = 0;
   prevHp[0]=MAX_HP; prevHp[1]=MAX_HP; prevHp[2]=BOT_MAX_HP;
@@ -2090,22 +2291,20 @@ function pickupBotPowerup(bot, pu) {
   if(pu.kind && pu.kind.indexOf('ammo_') === 0) {
     const cfg = AMMO_PICKUP_CFG[pu.kind];
     if(cfg) { bot.ammoType = cfg.bullet; bot.ammo = cfg.ammo; }
-    particles.push(...spawnPickupEffect(pu.x, pu.y, cfg ? cfg.color : '#a78bfa'));
+    emitTrialsVfx('pickup', pu.x, pu.y, { actor: 'bot', pickup: pu.kind, tx: bot.x, ty: bot.y, amount: cfg ? cfg.ammo : undefined });
     bot.squish = 10;
-    particles.push({x: bot.x, y: bot.y - 22, vx:0, vy:-0.9, life:36, max:36, r:0, color: cfg ? cfg.color : '#a78bfa', type:'healText', text: cfg ? cfg.bullet.toUpperCase()+` x${cfg.ammo}` : 'AMMO'});
     damageShake(bot, 0.6);
     return;
   }
   const pt = POWER_TYPES[pu.kind];
   if(!pt) return;
-  if(pu.kind === 'overcharge') { bot.overcharge = pt.duration; particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color)); bot.squish = 10; damageShake(bot,0.5); }
-  else if(pu.kind === 'shield') { bot.shield = true; bot.shieldHp = SHIELD_MAX_HP; particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color)); bot.squish = 10; damageShake(bot,0.5); }
-  else if(pu.kind === 'blink') { bot.extraDash = Math.min(2, bot.extraDash + 1); bot.dashCd = 0; bot.speedBoost = pt.duration; particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color)); bot.squish = 10; damageShake(bot,0.5); }
+  if(pu.kind === 'overcharge') { bot.overcharge = pt.duration; emitTrialsVfx('pickup', pu.x, pu.y, { actor: 'bot', pickup: pu.kind }); bot.squish = 10; damageShake(bot,0.5); }
+  else if(pu.kind === 'shield') { bot.shield = true; bot.shieldHp = SHIELD_MAX_HP; emitTrialsVfx('pickup', pu.x, pu.y, { actor: 'bot', pickup: pu.kind }); bot.squish = 10; damageShake(bot,0.5); }
+  else if(pu.kind === 'blink') { bot.extraDash = Math.min(2, bot.extraDash + 1); bot.dashCd = 0; bot.speedBoost = pt.duration; emitTrialsVfx('pickup', pu.x, pu.y, { actor: 'bot', pickup: pu.kind }); bot.squish = 10; damageShake(bot,0.5); }
   else if(pu.kind === 'heal') {
     const before = bot.hp;
     bot.hp = Math.min(bot.maxHp, bot.hp + HEAL_AMOUNT);
-    particles.push(...spawnPickupEffect(pu.x, pu.y, pt.color));
-    if(bot.hp > before) particles.push({x: bot.x, y: bot.y - 26, vx:0, vy:-0.9, life:36, max:36, r:0, color:'#22c55e', type:'healText', text:`+${bot.hp-before}`});
+    emitTrialsVfx('heal', pu.x, pu.y, { actor: 'bot', tx: bot.x, ty: bot.y, amount: bot.hp > before ? bot.hp - before : 0 });
     bot.squish = 10;
   }
 }
@@ -2174,6 +2373,7 @@ function resumeTrials() {
   bullets.length = 0; state.bullets && state.bullets.forEach(b => bullets.push(b));
   pickups.length = 0; state.pickups && state.pickups.forEach(p => pickups.push(p));
   particles.length = 0; // v2 saves no longer persist particles (P2-18)
+  trialsFxTimeline.clear();
   if(window.NOX_GAME) {
     window.NOX_GAME.bullets.length = 0; state.bullets && state.bullets.forEach(b => window.NOX_GAME.bullets.push(b));
     window.NOX_GAME.pickups.length = 0; state.pickups && state.pickups.forEach(p => window.NOX_GAME.pickups.push(p));
