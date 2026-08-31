@@ -27,10 +27,13 @@ import SEO from '../../components/SEO.astro';
   /* Lobby card — reuses site tokens; injected above the stage overlay layer */
   #noxLobby { z-index: 60; }
   #noxLobby .menu-card { width: min(430px, 92vw); padding: 28px 26px; }
-  #noxLobby .lob-label { display: block; margin: 16px 0 6px; font: 10px var(--nox-mono, monospace); letter-spacing: 0.2em; color: var(--nox-muted, #9aa); }
+  #noxLobby .lob-label { display: block; margin: 16px 0 6px; font: 10px var(--nox-mono, monospace); letter-spacing: 0.2em; color: var(--nox-muted, #9aa); text-align: left; }
   #noxLobby input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.15); color: var(--nox-fg, #fff); font: 13px var(--nox-mono, monospace); padding: 10px 12px; border-radius: 6px; box-sizing: border-box; }
   #noxLobby input:focus { outline: 1px solid var(--nox-lime, #c9ff2f); }
   #noxLobby .code-input { text-transform: uppercase; letter-spacing: 0.3em; }
+  #noxLobby .btn-row { display: flex; gap: 10px; width: 100%; justify-content: flex-start; }
+  #noxLobby .btn-row .btn { white-space: nowrap; }
+  #noxLobby .btn-row input { flex: 1; min-width: 0; }
   #noxLobby .lob-divider { margin: 18px 0 0; border: 0; border-top: 1px dashed rgba(255,255,255,0.12); }
   #noxLobby .lob-status { min-height: 1.3em; margin-top: 12px; color: var(--nox-muted, #9aa); font: 12px var(--nox-mono, monospace); }
   #noxLobby .lob-error { min-height: 1.3em; margin-top: 6px; color: #ff5470; font: 12px var(--nox-mono, monospace); }
@@ -101,6 +104,14 @@ import SEO from '../../components/SEO.astro';
 
     const input = el.querySelector('#noxNick') as HTMLInputElement;
     input.value = getNick();
+    // HUD self card mirrors the nick live as it is typed; opponent stays empty
+    // until a room pairs someone (empty state: —)
+    const applyNick = () => {
+      const p1 = document.querySelector('#cardP1 .hud-name');
+      if (p1) p1.textContent = input.value.trim().toUpperCase() || 'YOU';
+    };
+    input.addEventListener('input', applyNick);
+    applyNick();
 
     el.querySelector('#noxQuick')!.addEventListener('click', () => run('quick'));
     el.querySelector('#noxCreate')!.addEventListener('click', () => run('create'));
@@ -143,7 +154,7 @@ import SEO from '../../components/SEO.astro';
     const cd = document.getElementById('noxCd'); if (cd) cd.style.display = 'none';
     const msg = document.getElementById('noxMsg'); if (msg) msg.style.display = 'none';
     const p2name = document.querySelector('#cardP2 .hud-name');
-    if (p2name) p2name.textContent = 'PLAYER 2';
+    if (p2name) p2name.textContent = '—';
     const lob = buildLobby();
     lob.classList.remove('hidden');
     $('noxRoomInfo').hidden = true;
@@ -298,6 +309,8 @@ import SEO from '../../components/SEO.astro';
       const msg = document.createElement('div');
       msg.id = 'noxMsg'; msg.style.display = 'none';
       stage.appendChild(msg);
+      const p2 = document.querySelector('#cardP2 .hud-name');
+      if (p2) p2.textContent = '—';   // opponent slot empty until paired
     }
     if (!document.getElementById('noxLobby')) mount.appendChild(buildLobby());
     return true;
