@@ -1,0 +1,53 @@
+name: CI
+
+# P2-15: quality gates — build, typecheck, backend + frontend unit tests,
+# and production dependency audits. Gates run on every push/PR to main
+# and on feature branches.
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**", "chore/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck (astro check)
+        working-directory: frontend
+        run: npm run check
+
+      - name: Build (incl. OG prebuild)
+        working-directory: frontend
+        run: npm run build
+
+      - name: Frontend unit tests (sim/bot/ledger/save/constants)
+        working-directory: frontend
+        run: node --test "src/game/*.test.js" "src/game/core/*.test.js" "src/game/sim/*.test.js"
+
+      - name: Backend tests
+        working-directory: backend
+        run: npm test
+
+      - name: Frontend production dependency audit
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Backend production dependency audit
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=high

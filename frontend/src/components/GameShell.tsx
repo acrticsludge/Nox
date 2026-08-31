@@ -189,7 +189,7 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 
         </div>
 
         <footer className="nox-footer">
-          <span>BUILT WITH SVG • NO CANVAS • 60FPS • <a href="/docs" style={{ color: 'var(--nox-lime)', textDecoration: 'none', borderBottom: '1px solid rgba(201,255,47,0.3)' }}>MANUAL // DOCS</a></span>
+          <span>BUILT WITH SVG • NO CANVAS • LOCAL 60FPS {isOnline ? '// NET 30HZ' : ''} • <a href="/docs" style={{ color: 'var(--nox-lime)', textDecoration: 'none', borderBottom: '1px solid rgba(201,255,47,0.3)' }}>MANUAL // DOCS</a></span>
           <span>MADE FOR BORED LEGENDS AT 2AM</span>
         </footer>
       </main>
