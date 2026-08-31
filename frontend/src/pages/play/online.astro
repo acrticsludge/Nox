@@ -282,12 +282,18 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('countdown', async (m: { t: number }) => {
     if (!roomCode) return;
-    if (m.t > 0) { setHud(true); setMatchLive(true); bigCount(String(m.t)); return; }
+    // 1v1 parity: the lobby/start overlay is removed the moment the countdown
+    // begins — the numbers must never render behind the form.
     hideLobby();
-    bigCount('GO');
-    setTimeout(() => { const el = document.getElementById('noxCd'); if (el && (el.firstChild as HTMLElement)?.textContent === 'GO') el.style.display = 'none'; }, 700);
-    const g = await engine();
-    g.onlineResume();
+    if (m.t > 0) { setHud(true); setMatchLive(true); bigCount(String(m.t)); return; }
+    bigCount('FIGHT!');
+    // 1v1 parity: movement starts after the FIGHT! beat (420 ms), not at it
+    setTimeout(async () => {
+      const el = document.getElementById('noxCd');
+      if (el && (el.firstChild as HTMLElement)?.textContent === 'FIGHT!') el.style.display = 'none';
+      const g = await engine();
+      g.onlineResume();
+    }, 420);
   });
 
   bridge.on('snapshot', async (m: { state: string }) => {
@@ -334,6 +340,13 @@ import SEO from '../../components/SEO.astro';
   });
 
   bridge.on('peerBack', () => stageMsg(''));
+
+  // The running backend predates visual parity (no event batches / bullet ids /
+  // HUD flags in its snapshots). Everything HUD- or effect-related needs the
+  // new build — say so loudly instead of failing mysteriously.
+  window.addEventListener('nox:serverOutdated', () => {
+    stageMsg('SERVER BUILD OUT OF DATE — RESTART THE BACKEND (npm start in backend/)', 6000);
+  });
 
   bridge.on('disconnected', () => {
     setMatchLive(false);

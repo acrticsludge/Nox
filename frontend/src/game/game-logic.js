@@ -649,6 +649,8 @@ export function startOnlineMatch(seed) {
   pendingEv = [];
   netDisplayTick = 0;
   netBulletViews = new Map();
+  netFallbackSeq = 0;
+  applyNetSnapshot._buildWarned = false;
   netPickupT = 0;
   simFxTimeline.clear();
   mirrorSimToLegacy();
@@ -659,6 +661,15 @@ export function startOnlineMatch(seed) {
 
 export function applyNetSnapshot(s) {
   if (!simMatch || !onlineActive) return;
+  // Backend build detection: snapshots without event batches / player flags /
+  // bullet ids come from a server that predates visual parity. Warn once,
+  // loudly — chips, dash bar, void ring, wall effects and stable bullets all
+  // require the new build.
+  if (!applyNetSnapshot._buildWarned && (!Array.isArray(s.ev) || !(s.p || []).length || !Array.isArray(s.p[0][7]))) {
+    applyNetSnapshot._buildWarned = true;
+    try { console.warn('[nox] SERVER BUILD OUT OF DATE — the running backend predates visual parity. Restart it (npm start in backend/) or redeploy. Missing: visual events, stable bullet ids, HUD flags, safeRadius.'); } catch {}
+    try { window.dispatchEvent(new CustomEvent('nox:serverOutdated')); } catch {}
+  }
   netBuf.push(s);
   if (netBuf.length > 12) netBuf.shift();
   // authoritative discrete state — drives overlays, scores and the timer
@@ -668,7 +679,13 @@ export function applyNetSnapshot(s) {
   simMatch.roundResult = s.rr ?? null;
   simMatch.matchWinner = s.mw ?? null;
   if (typeof s.round === 'number') round = s.round;
-  if (typeof s.sr === 'number') simMatch.safeRadius = s.sr;
+  if (typeof s.sr === 'number') {
+    simMatch.safeRadius = s.sr;
+  } else {
+    // old-server fallback: the shrink schedule is deterministic in time
+    const elapsed = ROUND_TIME - s.time;
+    simMatch.safeRadius = elapsed < 45 ? 999 : Math.max(110, 400 - ((elapsed - 45) / 15) * (400 - 110));
+  }
   if (Array.isArray(s.hz)) {
     simMatch.hazards.length = 0;
     for (const h of s.hz) simMatch.hazards.push({ x: h[0], y: h[1], w: 36, h: 36, kind: h[2], t: 0, lavaCd: 0 });
@@ -708,6 +725,23 @@ function lerpAngle(a, b, t) {
   if (d > Math.PI) d -= Math.PI * 2;
   if (d < -Math.PI) d += Math.PI * 2;
   return a + d * t;
+}
+
+// Old-server compat: snapshots without bullet ids would otherwise spawn a new
+// view per snapshot (the same bullet rendered twice). Match each id-less row
+// to the closest existing fallback view (same owner + type within one
+// snapshot's travel distance) so a bullet stays a single entity.
+let netFallbackSeq = 0;
+function matchFallbackBulletId(row) {
+  const owner = row[5] ?? 0, type = row[4], x = row[0], y = row[1];
+  let best = null, bestD = 1e9;
+  for (const [id, v] of netBulletViews) {
+    if (!v.fallback || v.owner !== owner || v.type !== type) continue;
+    const d = Math.hypot(v.x - x, v.y - y);
+    if (d < bestD) { bestD = d; best = id; }
+  }
+  if (best != null && bestD < 26) return best;
+  return `f${netFallbackSeq++}`;
 }
 
 function netInterpolate() {
@@ -751,13 +785,14 @@ function netInterpolate() {
   const bMap = new Map();
   for (const row of bB) if (row[6] != null) bMap.set(row[6], row);
   for (const row of aB) {
-    const id = row[6] != null ? row[6] : `x${a.tick}:${row[0]}:${row[1]}:${row[4]}`;
+    const id = row[6] != null ? row[6] : matchFallbackBulletId(row);
     seen.add(id);
     const o = bMap.get(id);
     const x = o ? lerp(row[0], o[0], alpha) : row[0];
     const y = o ? lerp(row[1], o[1], alpha) : row[1];
     let v = netBulletViews.get(id);
     if (!v) { v = { trail: [] }; netBulletViews.set(id, v); }
+    if (row[6] == null) v.fallback = true;
     v.type = row[4];
     v.owner = row[5] ?? 0;
     v.bounces = row[7] ?? 0;

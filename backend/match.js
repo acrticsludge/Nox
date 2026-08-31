@@ -5,7 +5,12 @@ import { drainVfx } from '../frontend/src/game/vfx/events.js';
 
 const TICK_MS = 1000 / 60;
 const SNAPSHOT_EVERY = 2;          // 30Hz
-const ROUND_BREAK_MS = 2500;       // roundEnd -> next round
+// Countdown cadence is 1v1 parity: 650ms per 3/2/1 beat, a FIGHT! beat of
+// 420ms (movement starts AFTER it, not at it), and a round break that equals
+// the 1v1 roundEnd overlay (1600ms) followed by the same countdown replay.
+const ROUND_BREAK_MS = 1600;
+const COUNTDOWN_BEAT_MS = 650;
+const FIGHT_HOLD_MS = 420;
 
 // input mask: 1=up 2=down 4=left 8=right 16=dash 32=shoot
 function maskToInputs(mask) {
@@ -70,6 +75,24 @@ export function startMatch(room, net, opts = {}) {
   // order (monotonic ids) with every snapshot batch
   let evBatch = [];
 
+  // 1v1-parity countdown: 3 (now) -> 2 -> 1 -> FIGHT! -> movement starts
+  // FIGHT_HOLD_MS later. Used for match start AND round breaks.
+  function runCountdown() {
+    broadcast({ type: 'countdown', t: 3 });
+    for (const [t, delay] of [[2, COUNTDOWN_BEAT_MS], [1, COUNTDOWN_BEAT_MS * 2], [0, COUNTDOWN_BEAT_MS * 3]]) {
+      startTimers.push(setTimeout(() => {
+        if (stopped) return;
+        broadcast({ type: 'countdown', t });
+        if (t === 0) {
+          startTimers.push(setTimeout(() => {
+            if (stopped || tickTimer) return;
+            tickTimer = setInterval(tick, TICK_MS);
+          }, FIGHT_HOLD_MS));
+        }
+      }, delay));
+    }
+  }
+
   function stop() {
     if (stopped) return;
     stopped = true;
@@ -127,8 +150,8 @@ export function startMatch(room, net, opts = {}) {
         breakTimer = setTimeout(() => {
           if (stopped) return;
           simNextRound(match);
-          broadcast({ type: 'countdown', t: 0 });
-          tickTimer = setInterval(tick, TICK_MS);
+          // replay the same 1v1-parity countdown between rounds
+          runCountdown();
         }, ROUND_BREAK_MS);
       }
       return;
@@ -144,15 +167,8 @@ export function startMatch(room, net, opts = {}) {
         readySeats.add(seat);
         if (readySeats.size < room.seats.filter(Boolean).length) return;
         countdownArmed = true;
-        // 3-2-1-GO, one beat per second, then the server starts ticking
-        broadcast({ type: 'countdown', t: 3 });
-        for (const t of [2, 1, 0]) {
-          startTimers.push(setTimeout(() => {
-            if (stopped) return;
-            broadcast({ type: 'countdown', t });
-            if (t === 0 && !tickTimer) tickTimer = setInterval(tick, TICK_MS);
-          }, (3 - t) * 1000));
-        }
+        // 3-2-1-FIGHT, 1v1 cadence, then the server starts ticking
+        runCountdown();
         return;
       }
       case 'input': {
