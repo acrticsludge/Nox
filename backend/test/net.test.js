@@ -13,7 +13,7 @@ const hello = (guestId = 'guest-abcd1234', nick = 'PlayerOne') =>
   JSON.stringify({ type: 'hello', guestId, nick });
 
 function connect(origin = `http://localhost:${PORT}`) {
-  return new WebSocket(`ws://127.0.0.1:${PORT}`, { origin });
+  return new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { origin });
 }
 function once(ws, type) {
   return new Promise((resolve, reject) => {

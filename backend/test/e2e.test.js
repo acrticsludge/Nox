@@ -14,7 +14,7 @@ const PORT = 3107;
 let server, net, rooms;
 
 function client(nick) {
-  const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { origin: `http://localhost:${PORT}` });
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { origin: `http://localhost:${PORT}` });
   const box = [];
   ws.on('message', (d) => { try { box.push(JSON.parse(d.toString())); } catch (e) { console.error('[parse-err]', e.message, d.toString().slice(0, 120)); } });
   const c = {

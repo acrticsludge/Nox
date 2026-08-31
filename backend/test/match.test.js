@@ -12,7 +12,7 @@ const PORT = 3106;
 let server, net, rooms;
 
 function connect() {
-  return new WebSocket(`ws://127.0.0.1:${PORT}`, { origin: `http://localhost:${PORT}` });
+  return new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { origin: `http://localhost:${PORT}` });
 }
 const send = (ws, o) => ws.send(typeof o === 'string' ? o : JSON.stringify(o));
 const hello = nick => JSON.stringify({ type: 'hello', nick, guestId: 'guest-' + nick.toLowerCase() + '123' });

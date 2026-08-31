@@ -23,7 +23,7 @@ const inboxes = new WeakMap();
 const waiters = new WeakMap();
 
 function connect(origin = `http://localhost:${PORT}`) {
-  const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { origin });
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { origin });
   inboxes.set(ws, []);
   waiters.set(ws, []);
   ws.on('message', d => {
