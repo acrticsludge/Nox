@@ -216,10 +216,23 @@ export function attachRooms(server, net, opts = {}) {
     leave(ws);
   });
 
-  // Task 14 support: expiry sweep for seat reservations
+  // Task 14: bounded state — reservations, stale queues, half-empty waiting
+  // rooms, and limiter entries all expire; nothing grows without bound
   const sweep = () => {
     const now = Date.now();
     for (const [key, resv] of reservations) if (now > resv.expiresAt) reservations.delete(key);
+    for (const [ip, rl] of createsByIp) if (now - rl.windowStart >= createWindowMs) createsByIp.delete(ip);
+    for (let i = queue.length - 1; i >= 0; i--) if (queue[i].readyState !== 1) queue.splice(i, 1);
+    const roomTtlMs = Math.max(graceMs * 3, 60000);   // generous but bounded
+    for (const [code, room] of rooms) {
+      const age = now - room.createdAt;
+      if (room.match) continue;                       // active match: owned by match.js
+      const abandoned = room.seats.filter(s => s && s.readyState === 1).length < 2;
+      if (abandoned && age > roomTtlMs) {
+        for (const s of room.seats) if (s) { net.roomOf.delete(s); try { s.close(1001, 'room expired'); } catch {} }
+        rooms.delete(code);
+      }
+    }
   };
   const sweepTimer = setInterval(sweep, 5000);
   if (sweepTimer.unref) sweepTimer.unref();
