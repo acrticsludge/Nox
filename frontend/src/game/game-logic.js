@@ -785,7 +785,11 @@ function hardResetInternalState() {
 
 // Input handling
 function setupInput() {
+  // T6: never capture keys while the user is typing in a text field
+  const isTypingTarget = (t) => t instanceof HTMLElement &&
+    (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   window.addEventListener('keydown', e => {
+    if (isTypingTarget(e.target)) return;
     keys[e.code] = true;
     keys[e.key] = true;
     keys[e.key.toLowerCase()] = true;
@@ -801,6 +805,10 @@ function setupInput() {
     if(e.code === 'Space') keys['Space'] = false, keys[' '] = false;
     if(e.code === 'Enter' || e.code === 'NumpadEnter') keys['Enter'] = false, keys['enter'] = false;
   });
+
+  // T6: stuck-key protection - reset all controls on blur / hidden tab
+  window.addEventListener('blur', clearInputState);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) clearInputState(); });
 
   window.addEventListener('keydown', e => {
     if(e.key.toLowerCase() === 'r' && gameState === 'gameOver') document.getElementById('rematchBtn')?.click();

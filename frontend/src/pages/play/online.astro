@@ -254,7 +254,7 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('countdown', async (m: { t: number }) => {
     if (!roomCode) return;
-    if (m.t > 0) { setHud(true); bigCount(String(m.t)); return; }
+    if (m.t > 0) { setHud(true); setMatchLive(true); bigCount(String(m.t)); return; }
     hideLobby();
     bigCount('GO');
     setTimeout(() => { const el = document.getElementById('noxCd'); if (el && (el.firstChild as HTMLElement)?.textContent === 'GO') el.style.display = 'none'; }, 700);
@@ -271,11 +271,12 @@ import SEO from '../../components/SEO.astro';
     }
   });
 
-  bridge.on('roundEnd', () => { /* roundOverlay shown by game-logic endRound via snapshot state */ });
+  bridge.on('roundEnd', () => { resetInput(); /* roundOverlay shown by game-logic endRound via snapshot state */ });
 
   // match over (win, forfeit or disconnect): one result message, then a full
   // reset back to the lobby — the server has already destroyed the room
   bridge.on('matchEnd', (m: { winner: number | null; reason?: string }) => {
+    setMatchLive(false);
     const win = m.winner === mySeat;
     const abandoned = /FORFEIT|DISCONNECT|LEFT/i.test(m.reason ?? '');
     const text = m.winner === null ? 'MATCH OVER'
@@ -295,6 +296,7 @@ import SEO from '../../components/SEO.astro';
   bridge.on('peerBack', () => stageMsg(''));
 
   bridge.on('disconnected', () => {
+    setMatchLive(false);
     if (roomCode) {
       let tries = 0;
       const retry = async () => {
@@ -307,22 +309,42 @@ import SEO from '../../components/SEO.astro';
   });
 
   window.addEventListener('nox:forfeit', () => {
+    setMatchLive(false);
     if (roomCode) bridge.send('forfeit');
     bridge.send('leave');
     showLobby();
   });
 
   // ---------- input: P0 keys -> 6-bit mask @30Hz ----------
+  // T6 input ownership: capture only while a match is live, never in text
+  // fields, reset on blur/hidden/terminal transitions so keys never stick.
   const INPUT = { up: false, down: false, left: false, right: false, dash: false, shoot: false };
   const KEYMAP: Record<string, keyof typeof INPUT> = {
     KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', ShiftLeft: 'dash', Space: 'shoot',
   };
-  addEventListener('keydown', (e) => { const k = KEYMAP[e.code]; if (k) { INPUT[k] = true; if (e.code === 'Space') e.preventDefault(); } });
-  addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) INPUT[k] = false; });
+  let matchLive = false;
+  const setMatchLive = (v: boolean) => { matchLive = v; resetInput(); };
+  const resetInput = () => { for (const k of Object.keys(INPUT) as Array<keyof typeof INPUT>) INPUT[k] = false; };
+  const isTypingTarget = (t: EventTarget | null) =>
+    t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+  addEventListener('keydown', (e) => {
+    const k = KEYMAP[e.code];
+    if (!k || !matchLive || isTypingTarget(e.target)) return;
+    INPUT[k] = true;
+    if (e.code === 'Space') e.preventDefault();
+  });
+  addEventListener('keyup', (e) => {
+    const k = KEYMAP[e.code];
+    if (!k || isTypingTarget(e.target)) return;   // always honour releases
+    INPUT[k] = false;
+  });
+  addEventListener('blur', resetInput);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) resetInput(); });
 
   let inputSeq = 0;
   setInterval(() => {
-    if (!bridge.authed || !roomCode) return;
+    // input packets only in 'playing' (spec: never during lobby/queue/round breaks)
+    if (!bridge.authed || !roomCode || !matchLive || document.hidden) return;
     const m = (INPUT.up ? 1 : 0) | (INPUT.down ? 2 : 0) | (INPUT.left ? 4 : 0)
       | (INPUT.right ? 8 : 0) | (INPUT.dash ? 16 : 0) | (INPUT.shoot ? 32 : 0);
     bridge.send('input', { seq: ++inputSeq, m });
