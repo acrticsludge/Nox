@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { attachNet } from './net.js';
 import { attachRooms } from './rooms.js';
+import { startMatch, attachMatchRouting } from './match.js';
 
 // Serves the Astro build output (frontend/dist). Run `npm run build` at the
 // repo root (or `npm --prefix frontend run build`) before starting.
@@ -154,7 +155,11 @@ export function createServer() {
   // T4/T5: WebSocket layer (guest sessions + rooms).
   const net = attachNet(server);
   server.noxNet = net;
-  attachRooms(server, net);
+  const roomsApi = attachRooms(server, net, {
+    onRoomFull: room => startMatch(room, net),
+  });
+  net.noxRooms = roomsApi.rooms;
+  attachMatchRouting(net);
   return server;
 }
 

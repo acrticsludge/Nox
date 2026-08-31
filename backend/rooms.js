@@ -37,6 +37,10 @@ export function attachRooms(server, net, opts = {}) {
 
   function broadcastRoom(room) {
     for (const s of room.seats) if (s) sendRoom(s, room);
+    if (room.seats.every(s => s) && !room.fullNotified) {
+      room.fullNotified = true;
+      opts.onRoomFull?.(room);
+    }
   }
 
   function makeRoom(wsA, wsB) {
