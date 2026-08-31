@@ -55,6 +55,20 @@ export function attachNet(server, opts = {}) {
   }
   const secret = opts.secret || process.env.WS_SECRET || 'nox-dev-secret';
   const extraOrigins = opts.extraOrigins || (process.env.WS_EXTRA_ORIGINS ? process.env.WS_EXTRA_ORIGINS.split(',') : []);
+  // P2-03: trusted-proxy IP policy. Behind a known reverse proxy (Render),
+  // req.socket.remoteAddress is the proxy, so per-IP limits would lump every
+  // guest into one bucket. Forwarded IPs are honored ONLY when
+  // TRUST_PROXY=1 is explicitly set in the environment — otherwise the
+  // socket address is used and the header is ignored (spoof-safe default).
+  const trustProxy = process.env.TRUST_PROXY === '1' || opts.trustProxy === true;
+  const clientIp = (req) => {
+    if (trustProxy) {
+      const fwd = String(req.headers['x-forwarded-for'] || '');
+      const first = fwd.split(',')[0].trim();
+      if (first) return first;
+    }
+    return req.socket.remoteAddress || 'unknown';
+  };
   const wss = new WebSocketServer({ noServer: true });
   const sessions = new Map();       // ws -> {guestId, nick, token, authed}
   const roomOf = new Map();         // ws -> roomCode (T5 registers itself here)
@@ -77,7 +91,7 @@ export function attachNet(server, opts = {}) {
   });
 
   wss.on('connection', (ws, req) => {
-    ws._noxIp = req.socket.remoteAddress || 'unknown';
+    ws._noxIp = clientIp(req);
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     const rate = { count: 0, windowStart: Date.now() };

@@ -77,3 +77,34 @@ test('production without WS_SECRET fails fast at attachNet', () => {
     process.env.NODE_ENV = prev.NODE_ENV;
   }
 });
+
+test('P2-03: x-forwarded-for honored only when TRUST_PROXY=1', async () => {
+  const { WebSocket } = await import('ws');
+  const seen = [];
+  // TRUST_PROXY=1 -> forwarded IP is used
+  process.env.NODE_ENV = 'development';
+  process.env.TRUST_PROXY = '1';
+  const s1 = http.createServer();
+  const a1 = attachNet(s1, { secret: 'tp' });
+  a1.wss.on('connection', ws => seen.push(ws._noxIp));
+  await new Promise(r => s1.listen(3116, '127.0.0.1', r));
+  const w1 = new WebSocket('ws://127.0.0.1:3116/ws', { origin: 'http://127.0.0.1:3116', headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' } });
+  await new Promise((r, j) => { w1.on('open', r); w1.on('error', j); });
+  await new Promise(r => setTimeout(r, 150));
+  w1.close();
+  await new Promise(r => s1.close(r));
+  assert.equal(seen[0], '203.0.113.9', 'first hop of x-forwarded-for must be used when TRUST_PROXY=1');
+
+  // default: header ignored, socket address used (spoof-safe)
+  delete process.env.TRUST_PROXY;
+  const s2 = http.createServer();
+  const a2 = attachNet(s2, { secret: 'tp' });
+  a2.wss.on('connection', ws => seen.push(ws._noxIp));
+  await new Promise(r => s2.listen(3116, '127.0.0.1', r));
+  const w2 = new WebSocket('ws://127.0.0.1:3116/ws', { origin: 'http://127.0.0.1:3116', headers: { 'x-forwarded-for': '203.0.113.9' } });
+  await new Promise((r, j) => { w2.on('open', r); w2.on('error', j); });
+  await new Promise(r => setTimeout(r, 150));
+  w2.close();
+  await new Promise(r => s2.close(r));
+  assert.notEqual(seen[1], '203.0.113.9', 'forwarded header must be IGNORED without TRUST_PROXY');
+});
