@@ -645,8 +645,12 @@ function executeEngagePlayer(bot, state) {
   }
   bot.lastPlayerDash = isDashing ? 1 : 0;
 
-  const predX = player.x + playerVx * (travelTime + bot.reactionDelay / 1000);
-  const predY = player.y + playerVy * (travelTime + bot.reactionDelay / 1000);
+  // Cap prediction time to prevent wild aim at long range
+  const maxPredictionTime = 0.5; // Max 0.5 seconds prediction
+  const cappedTravelTime = Math.min(travelTime, maxPredictionTime);
+
+  const predX = player.x + playerVx * (cappedTravelTime + bot.reactionDelay / 1000);
+  const predY = player.y + playerVy * (cappedTravelTime + bot.reactionDelay / 1000);
 
   const dx = predX - bot.x;
   const dy = predY - bot.y;
@@ -680,6 +684,9 @@ function executeEngagePlayer(bot, state) {
   // Use targetAngle (where we're aiming) for strafe, not current angle
   const strafeAngle = bot.targetAngle + Math.PI / 2 * strafeDir;
 
+  // Direct angle to player's current position (for movement at far range)
+  const directAngle = Math.atan2(player.y - bot.y, player.x - bot.x);
+
   if (dist < 150) {
     // CLOSE: Circle strafe - orbit player while shooting
     // Return normalized vector (magnitude 1.0), game logic applies speed
@@ -690,9 +697,9 @@ function executeEngagePlayer(bot, state) {
     mx = Math.cos(strafeAngle);
     my = Math.sin(strafeAngle);
   } else {
-    // FAR: Close distance aggressively
-    mx = Math.cos(bot.targetAngle);
-    my = Math.sin(bot.targetAngle);
+    // FAR: Close distance aggressively - move toward actual player position, not predicted
+    mx = Math.cos(directAngle);
+    my = Math.sin(directAngle);
   }
 
   // Dash to close distance when far
@@ -711,6 +718,9 @@ function executeEngagePlayer(bot, state) {
       bot.shootCd = 11; // Standard cooldown
     }
   }
+
+  // Also shoot if player is close and in view, even during other behaviors (handled in updateBotAI)
+  // This function returns shoot decision for engagePlayer only
 
   // Powerup activation: overcharge when engaging at close range
   let activateOvercharge = false;
@@ -876,6 +886,24 @@ function updateBotAI(bot, state, dt = 1) {
     if (bulletDodge.dist < 80 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
       output.dash = true;
     }
+  }
+
+  // Global shooting: if player is alive and roughly in aim cone, shoot (regardless of behavior)
+  // This ensures bot shoots even during seekPickup/evadeHazard when player is in view
+  if (bot.shootCd === 0 && state.player && state.player.alive) {
+    const angleToPlayer = Math.atan2(state.player.y - bot.y, state.player.x - bot.x);
+    const angleDiff = Math.abs(((bot.angle - angleToPlayer + Math.PI) % (2 * Math.PI)) - Math.PI);
+    if (angleDiff < Math.PI / 4) { // Within 45 degrees
+      output.shoot = true;
+      bot.shootCd = 11;
+    }
+  }
+
+  // Normalize blended movement vectors before wall check
+  const moveMag = Math.hypot(output.mx, output.my);
+  if (moveMag > 0) {
+    output.mx /= moveMag;
+    output.my /= moveMag;
   }
 
   // Apply wall-aware movement
