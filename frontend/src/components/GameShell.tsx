@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import CyberStatus from './game/atoms/CyberStatus'
 import PlayerHUD from './game/molecules/PlayerHUD'
+import OnlineHUD from './game/molecules/OnlineHUD'
 import CenterHUD from './game/molecules/CenterHUD'
 import TrialsHUD from './game/molecules/TrialsHUD'
 import ControlsStrip from './game/molecules/ControlsStrip'
@@ -168,16 +169,21 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 
         </header>
 
         <div className="nox-content game-layout">
-          {/* online: removed from layout until matchmaking assigns seats (no dead gap) */}
-          <div className="game-top-bar" id="noxHudBar" style={isOnline ? { display: 'none' } : undefined}>
-            <PlayerHUD player={1} onExit={() => handleExit(1)} mode={mode} />
-            <CenterHUD mode={mode} onPause={() => { setShowPause(true); window.dispatchEvent(new CustomEvent('nox:pause')) }} />
-            {isTrials ? <TrialsHUD /> : <PlayerHUD player={2} onExit={() => handleExit(2)} mode={mode} />}
-          </div>
-
-          <div id="noxKeysBar" style={isOnline ? { display: 'none' } : undefined} >
-            <ControlsStrip mode={mode} />
-          </div>
+          {isOnline ? (
+            /* P1-05: declarative online HUD — store-driven, seat-correct EXIT */
+            <OnlineHUD />
+          ) : (
+            <>
+              <div className="game-top-bar" id="noxHudBar">
+                <PlayerHUD player={1} onExit={() => handleExit(1)} mode={mode} />
+                <CenterHUD mode={mode} onPause={() => { setShowPause(true); window.dispatchEvent(new CustomEvent('nox:pause')) }} />
+                {isTrials ? <TrialsHUD /> : <PlayerHUD player={2} onExit={() => handleExit(2)} mode={mode} />}
+              </div>
+              <div id="noxKeysBar">
+                <ControlsStrip mode={mode} />
+              </div>
+            </>
+          )}
 
           <GameStage mode={mode} onPlay={handlePlay} onHow={handleHow} onRematch={handleRematch} onMenu={handleMenu} />
         </div>

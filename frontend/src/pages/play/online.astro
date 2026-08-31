@@ -54,6 +54,7 @@ import SEO from '../../components/SEO.astro';
 
 <script>
   import { NetBridge, getNick, setNick } from '../../game/net/net-bridge.js';
+  import { setOnlineHud, resetOnlineHud } from '../../game/net/online-hud';
 
   // O1: the game engine is loaded ONLY when a match actually starts. Importing it
   // eagerly booted its rAF loop during the lobby -> mutated HUD DOM before React
@@ -75,7 +76,6 @@ import SEO from '../../components/SEO.astro';
 
   let roomCode: string | null = null;
   let mySeat = 0;
-  let applyNickRef: () => void = () => {};
 
   // ---------- lobby DOM (site-styled overlay inside the stage) ----------
   function buildLobby(): HTMLElement {
@@ -118,16 +118,11 @@ import SEO from '../../components/SEO.astro';
 
     const input = el.querySelector('#noxNick') as HTMLInputElement;
     input.value = getNick();
-    // HUD self card mirrors the nick live as it is typed; opponent stays empty
-    // until a room pairs someone (empty state: —). Card follows your seat:
-    // seat 0 renders in the cyan card, seat 1 in the pink card.
-    const applyNick = () => {
-      const self = document.querySelector(mySeat === 1 ? '#cardP2 .hud-name' : '#cardP1 .hud-name');
-      if (self) self.textContent = input.value.trim().toUpperCase() || 'YOU';
-    };
-    applyNickRef = applyNick;
-    input.addEventListener('input', applyNick);
-    applyNick();
+    // P1-05: the HUD self card renders from the online-hud store; typing a
+    // nick pushes state — no React-owned DOM is touched from here.
+    const pushNick = () => setOnlineHud({ selfNick: input.value.trim().toUpperCase() || 'YOU' });
+    input.addEventListener('input', pushNick);
+    pushNick();
 
     el.querySelector('#noxQuick')!.addEventListener('click', () => run('quick'));
     el.querySelector('#noxCreate')!.addEventListener('click', () => run('create'));
@@ -178,16 +173,11 @@ import SEO from '../../components/SEO.astro';
   function showLobby() {
     gl?.stopOnlineMatch();
     roomCode = null;
-    setHud(false);
+    // P1-05: HUD visibility/identity come from the store, not DOM writes
+    resetOnlineHud();
+    setOnlineHud({ selfNick: ($('noxNick') as HTMLInputElement | undefined)?.value.trim().toUpperCase() || 'YOU' });
     const cd = document.getElementById('noxCd'); if (cd) cd.style.display = 'none';
     const msg = document.getElementById('noxMsg'); if (msg) msg.style.display = 'none';
-    for (const sel of ['#cardP1 .hud-name', '#cardP2 .hud-name']) {
-      const el = document.querySelector(sel);
-      if (el) el.textContent = '—';
-    }
-    applyNickRef();
-    const label = document.querySelector('#noxKeysBar .controls-label') as HTMLElement | null;
-    if (label) { label.textContent = 'YOU // CYAN'; label.style.color = '#58d8ff'; }
     const lob = buildLobby();
     lob.classList.remove('hidden');
     $('noxRoomInfo').hidden = true;
@@ -210,13 +200,14 @@ import SEO from '../../components/SEO.astro';
     $('noxSeats').textContent = msg.seats.every(Boolean)
       ? 'VS ' + (msg.seats[1 - msg.youSeat]?.nick ?? '?').toUpperCase() + ' — starting…'
       : 'WAITING FOR OPPONENT…';
-    // opponent card shows the remote player's nick (audit R1); keys label follows your color
+    // P1-05: seat identity/opponent live in the store — no React DOM writes
     const opp = msg.seats[1 - msg.youSeat];
-    const myCardSel = msg.youSeat === 1 ? '#cardP1 .hud-name' : '#cardP2 .hud-name';
-    const oppName = document.querySelector(myCardSel);
-    if (oppName) oppName.textContent = opp ? opp.nick.toUpperCase() : 'WAITING…';
-    const label = document.querySelector('#noxKeysBar .controls-label') as HTMLElement | null;
-    if (label) { label.textContent = 'YOU // ' + mine; label.style.color = mine === 'CYAN' ? '#58d8ff' : '#ff2d78'; }
+    setOnlineHud({
+      selfSeat: msg.youSeat === 0 ? 0 : 1,
+      selfNick: (getNick() || 'YOU').toUpperCase(),
+      oppNick: opp ? opp.nick.toUpperCase() : null,
+      connection: 'live',
+    });
     const link = new URL(location.href); link.search = '?room=' + msg.code;
     $('noxShare').textContent = link.href;
   }
@@ -230,12 +221,9 @@ import SEO from '../../components/SEO.astro';
     if (ms) setTimeout(() => { if (el.style.display !== 'none' && (el.firstChild as HTMLElement)?.textContent === m) el.style.display = 'none'; }, ms);
   };
 
-  // HUD identity stays hidden until the server assigns seats (countdown start)
+  // HUD visibility stays hidden until the server assigns seats (countdown start)
   const setHud = (v: boolean) => {
-    for (const id of ['noxHudBar', 'noxKeysBar']) {
-      const el = document.getElementById(id);
-      if (el) el.style.display = v ? '' : 'none';
-    }
+    setOnlineHud({ hudVisible: v });
   };
 
   const bigCount = (txt: string) => {
@@ -274,9 +262,12 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('rejoined', (m: { code: string; seat: number }) => {
     // Task 10: seat reclaimed after reconnect — wait for the fresh room broadcast
+    setOnlineHud({ connection: 'live' });
     stageMsg('RECONNECTED — SEAT ' + (m.seat === 0 ? 'CYAN' : 'PINK'));
     setTimeout(() => stageMsg(''), 2500);
   });
+
+  bridge.on('pingChanged', (ms: number) => setOnlineHud({ pingMs: ms }));
 
   bridge.on('roomError', (m: { reason?: string }) => {
     lockLobby(false);
@@ -331,11 +322,12 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('disconnected', () => {
     setMatchLive(false);
+    setOnlineHud({ connection: roomCode ? 'reconnecting' : 'idle' });
     if (roomCode) {
       let tries = 0;
       const retry = async () => {
         if (tries++ >= 3 || bridge.authed) {
-          if (!bridge.authed) { bridge.reconnectCred = null; showLobby(); lobbyError('Connection lost — could not rejoin the room.'); }
+          if (!bridge.authed) { bridge.reconnectCred = null; setOnlineHud({ connection: 'lost', hudVisible: false }); showLobby(); lobbyError('Connection lost — could not rejoin the room.'); }
           return;
         }
         try { await bridge.connect(WS_BASE + '/ws'); } catch { setTimeout(retry, 1500); return; }
