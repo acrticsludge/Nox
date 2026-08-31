@@ -836,14 +836,49 @@ function executeEvadeHazard(bot, state) {
 /**
  * Execute patrol behavior
  */
-function executePatrol(bot, _state) {
+function executePatrol(bot, state) {
   let mx = 0, my = 0;
 
   // Random waypoint using arena bounds from config
+  // Try to pick a waypoint that's not behind a wall
   if (bot.behaviorTimer <= 0 || distance(bot.x, bot.y, bot.targetX, bot.targetY) < BOT_CONFIG.PATROL_WAYPOINT_REACH) {
     const margin = 100;
-    bot.targetX = margin + Math.random() * (BOT_CONFIG.TRIALS_W - 2 * margin);
-    bot.targetY = margin + Math.random() * (BOT_CONFIG.TRIALS_H - 2 * margin);
+    const { wallsCollide } = state;
+    
+    // Try up to 5 random waypoints, pick first that's reachable (no wall between bot and waypoint)
+    let foundReachable = false;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const testX = margin + Math.random() * (BOT_CONFIG.TRIALS_W - 2 * margin);
+      const testY = margin + Math.random() * (BOT_CONFIG.TRIALS_H - 2 * margin);
+      
+      // Check if path is clear
+      const dx = testX - bot.x;
+      const dy = testY - bot.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist === 0) continue;
+      
+      const steps = Math.ceil(dist / 24);
+      let blocked = false;
+      for (let i = 1; i < steps; i++) {
+        const checkX = bot.x + (dx / steps) * i;
+        const checkY = bot.y + (dy / steps) * i;
+        if (wallsCollide(checkX, checkY, 16)) { blocked = true; break; }
+      }
+      
+      if (!blocked) {
+        bot.targetX = testX;
+        bot.targetY = testY;
+        foundReachable = true;
+        break;
+      }
+    }
+    
+    // Fallback: just pick any waypoint (wall avoidance will handle it)
+    if (!foundReachable) {
+      bot.targetX = margin + Math.random() * (BOT_CONFIG.TRIALS_W - 2 * margin);
+      bot.targetY = margin + Math.random() * (BOT_CONFIG.TRIALS_H - 2 * margin);
+    }
+    
     bot.behaviorTimer = BOT_CONFIG.PATROL_TIMER_MIN + Math.floor(Math.random() * (BOT_CONFIG.PATROL_TIMER_MAX - BOT_CONFIG.PATROL_TIMER_MIN));
   }
   bot.behaviorTimer--;
@@ -974,10 +1009,14 @@ function updateBotAI(bot, state, dt = 1) {
 
   // Global shooting: if player is alive and roughly in aim cone, shoot (regardless of behavior)
   // This ensures bot shoots even during seekPickup/evadeHazard when player is in view
+  // Use aim direction (toward player), not bot.angle (movement direction)
   if (bot.shootCd === 0 && state.player && state.player.alive) {
     const angleToPlayer = Math.atan2(state.player.y - bot.y, state.player.x - bot.x);
-    const angleDiff = Math.abs(((bot.angle - angleToPlayer + Math.PI) % (2 * Math.PI)) - Math.PI);
-    if (angleDiff < Math.PI / 4) { // Within 45 degrees
+    // For engagePlayer, AI tracks predictive aim in bot.targetAngle
+    // For other behaviors, aim directly at player
+    const currentAimAngle = (bot.behavior === 'engagePlayer') ? bot.targetAngle : angleToPlayer;
+    const diff = Math.abs(((currentAimAngle - angleToPlayer + Math.PI) % (2 * Math.PI)) - Math.PI);
+    if (diff < Math.PI / 4) { // Within 45 degrees
       output.shoot = true;
       bot.shootCd = 11;
     }
