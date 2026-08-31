@@ -654,10 +654,14 @@ function executeSeekPickup(bot, state) {
     const dx = pickup.target.x - bot.x;
     const dy = pickup.target.y - bot.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 0) { mx = dx / dist; my = dy / dist; }
+    if (dist > 0) {
+      const q = quantizeTo8Dir(Math.atan2(dy, dx));
+      mx = q.mx; my = q.my;
+    }
   } else {
     // Fallback to patrol direction
-    mx = Math.cos(bot.angle); my = Math.sin(bot.angle);
+    const q = quantizeTo8Dir(bot.angle);
+    mx = q.mx; my = q.my;
   }
 
   return { mx, my, shoot: false, dash: false, targetAngle: bot.angle };

@@ -45,9 +45,11 @@ import SEO from '../../components/SEO.astro';
   #noxLobby .id-cyan { color: #58d8ff; }
   #noxLobby .id-pink { color: #ff2d78; }
 
-  /* in-arena: big countdown + transient status banner */
-  #noxCd { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 55; font: 700 clamp(64px, 12vw, 120px) var(--nox-mono, monospace); color: var(--nox-lime, #c9ff2f); text-shadow: 0 0 24px rgba(201,255,47,0.45); }
-  #noxMsg { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 55; pointer-events: none; font: 12px var(--nox-mono, monospace); letter-spacing: 0.15em; color: var(--nox-amber, #ffb23e); background: rgba(10,12,16,0.8); border: 1px solid rgba(255,178,62,0.35); padding: 8px 14px; border-radius: 4px; }
+  /* in-arena: big countdown modal + centered result modal */
+  #noxCd { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 55; }
+  #noxCd span { display: inline-block; min-width: 190px; text-align: center; padding: 18px 34px; background: rgba(13,16,22,0.92); border: 1px solid rgba(201,255,47,0.45); border-radius: 10px; font: 700 clamp(44px, 8vw, 76px) var(--nox-mono, monospace); color: var(--nox-lime, #c9ff2f); text-shadow: 0 0 18px rgba(201,255,47,0.4); box-shadow: 0 0 40px rgba(0,0,0,0.6); }
+  #noxMsg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 56; }
+  #noxMsg span { display: inline-block; max-width: 80%; text-align: center; padding: 20px 30px; background: rgba(13,16,22,0.94); border: 1px solid rgba(255,178,62,0.5); border-radius: 10px; font: 700 clamp(16px, 2.6vw, 26px) var(--nox-mono, monospace); letter-spacing: 0.08em; color: var(--nox-amber, #ffb23e); box-shadow: 0 0 40px rgba(0,0,0,0.65); }
 </style>
 
 <script>
@@ -67,6 +69,7 @@ import SEO from '../../components/SEO.astro';
 
   let roomCode: string | null = null;
   let mySeat = 0;
+  let applyNickRef: () => void = () => {};
 
   // ---------- lobby DOM (site-styled overlay inside the stage) ----------
   function buildLobby(): HTMLElement {
@@ -107,11 +110,13 @@ import SEO from '../../components/SEO.astro';
     const input = el.querySelector('#noxNick') as HTMLInputElement;
     input.value = getNick();
     // HUD self card mirrors the nick live as it is typed; opponent stays empty
-    // until a room pairs someone (empty state: —)
+    // until a room pairs someone (empty state: —). Card follows your seat:
+    // seat 0 renders in the cyan card, seat 1 in the pink card.
     const applyNick = () => {
-      const p1 = document.querySelector('#cardP1 .hud-name');
-      if (p1) p1.textContent = input.value.trim().toUpperCase() || 'YOU';
+      const self = document.querySelector(mySeat === 1 ? '#cardP2 .hud-name' : '#cardP1 .hud-name');
+      if (self) self.textContent = input.value.trim().toUpperCase() || 'YOU';
     };
+    applyNickRef = applyNick;
     input.addEventListener('input', applyNick);
     applyNick();
 
@@ -156,8 +161,13 @@ import SEO from '../../components/SEO.astro';
     setHud(false);
     const cd = document.getElementById('noxCd'); if (cd) cd.style.display = 'none';
     const msg = document.getElementById('noxMsg'); if (msg) msg.style.display = 'none';
-    const p2name = document.querySelector('#cardP2 .hud-name');
-    if (p2name) p2name.textContent = '—';
+    for (const sel of ['#cardP1 .hud-name', '#cardP2 .hud-name']) {
+      const el = document.querySelector(sel);
+      if (el) el.textContent = '—';
+    }
+    applyNickRef();
+    const label = document.querySelector('#noxKeysBar .controls-label') as HTMLElement | null;
+    if (label) { label.textContent = 'YOU // CYAN'; label.style.color = '#58d8ff'; }
     const lob = buildLobby();
     lob.classList.remove('hidden');
     $('noxRoomInfo').hidden = true;
@@ -171,16 +181,22 @@ import SEO from '../../components/SEO.astro';
   function showRoom(msg: { code: string; seats: Array<{ nick: string } | null>; youSeat: number }) {
     $('noxRoomInfo').hidden = false;
     $('noxRoomCode').textContent = msg.code;
-    // identity is explicit BEFORE the match: your color, their color, their nick
+    // identity is explicit BEFORE the match: seat 0 = cyan, seat 1 = pink
+    const mine = msg.youSeat === 0 ? 'CYAN' : 'PINK';
+    const theirs = msg.youSeat === 0 ? 'PINK' : 'CYAN';
     $('noxIdentity').innerHTML =
-      'YOU ARE <strong class="id-cyan">CYAN</strong> // OPPONENT IS <strong class="id-pink">PINK</strong>';
+      'YOU ARE <strong class="' + (mine === 'CYAN' ? 'id-cyan' : 'id-pink') + '">' + mine + '</strong>' +
+      ' // OPPONENT IS <strong class="' + (theirs === 'CYAN' ? 'id-cyan' : 'id-pink') + '">' + theirs + '</strong>';
     $('noxSeats').textContent = msg.seats.every(Boolean)
       ? 'VS ' + (msg.seats[1 - msg.youSeat]?.nick ?? '?').toUpperCase() + ' — starting…'
       : 'WAITING FOR OPPONENT…';
-    // opponent card shows the remote player's nick (audit R1)
+    // opponent card shows the remote player's nick (audit R1); keys label follows your color
     const opp = msg.seats[1 - msg.youSeat];
-    const p2name = document.querySelector('#cardP2 .hud-name');
-    if (p2name) p2name.textContent = opp ? opp.nick.toUpperCase() : 'WAITING…';
+    const myCardSel = msg.youSeat === 1 ? '#cardP1 .hud-name' : '#cardP2 .hud-name';
+    const oppName = document.querySelector(myCardSel);
+    if (oppName) oppName.textContent = opp ? opp.nick.toUpperCase() : 'WAITING…';
+    const label = document.querySelector('#noxKeysBar .controls-label') as HTMLElement | null;
+    if (label) { label.textContent = 'YOU // ' + mine; label.style.color = mine === 'CYAN' ? '#58d8ff' : '#ff2d78'; }
     const link = new URL(location.href); link.search = '?room=' + msg.code;
     $('noxShare').textContent = link.href;
   }
@@ -188,9 +204,10 @@ import SEO from '../../components/SEO.astro';
   const stageMsg = (m: string, ms = 0) => {
     const el = document.getElementById('noxMsg');
     if (!el) return;
-    el.textContent = m;
-    el.style.display = m ? 'block' : 'none';
-    if (ms) setTimeout(() => { if (el.textContent === m) el.style.display = 'none'; }, ms);
+    el.innerHTML = '<span></span>';
+    (el.firstChild as HTMLElement).textContent = m;
+    el.style.display = m ? 'flex' : 'none';
+    if (ms) setTimeout(() => { if (el.style.display !== 'none' && (el.firstChild as HTMLElement)?.textContent === m) el.style.display = 'none'; }, ms);
   };
 
   // HUD identity stays hidden until the server assigns seats (countdown start)
@@ -204,7 +221,8 @@ import SEO from '../../components/SEO.astro';
   const bigCount = (txt: string) => {
     const el = document.getElementById('noxCd');
     if (!el) return;
-    el.textContent = txt;
+    el.innerHTML = '<span></span>';
+    (el.firstChild as HTMLElement).textContent = txt;
     el.style.display = 'flex';
   };
 
@@ -233,7 +251,7 @@ import SEO from '../../components/SEO.astro';
     if (m.t > 0) { setHud(true); bigCount(String(m.t)); return; }
     hideLobby();
     bigCount('GO');
-    setTimeout(() => { const el = document.getElementById('noxCd'); if (el && el.textContent === 'GO') el.style.display = 'none'; }, 700);
+    setTimeout(() => { const el = document.getElementById('noxCd'); if (el && (el.firstChild as HTMLElement)?.textContent === 'GO') el.style.display = 'none'; }, 700);
     const g = await engine();
     g.onlineResume();
   });

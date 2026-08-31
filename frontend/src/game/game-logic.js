@@ -646,6 +646,7 @@ let onlineActive = false;
 export function startOnlineMatch(seed) {
   onlineActive = true;
   simMatch = createMatch(seed >>> 0, { baseSpeed: globalSpeed });
+  applyNetSnapshot._prev = {};
   mirrorSimToLegacy();
   drawWalls();
   drawHazards();
@@ -665,9 +666,40 @@ export function applyNetSnapshot(s) {
     if (!p) return;
     p.x = d[0]; p.y = d[1]; p.angle = d[2]; p.hp = d[3]; p.ammoType = d[4];
     p.shield = d[5] > 0; p.shieldHp = d[5];
+    p.ammo = d[6] === -1 || d[6] == null ? Infinity : d[6];   // -1 = standard/infinite
   });
+  // cosmetic parity: synthesise the fx the server sim would have emitted,
+  // from snapshot diffs (new bullets, hp drops, deaths, pickups)
+  const prev = applyNetSnapshot._prev || (applyNetSnapshot._prev = {});
+  const colors = ['#58d8ff', '#ff5ca8'];
+  for (let bi = (prev.bLen || 0); bi < (s.b || []).length; bi++) {
+    const b = s.b[bi];
+    const owner = b[5] ?? 0;
+    const ang = Math.atan2(b[3], b[2]);
+    for (let k = 0; k < 6; k++) simMatch.fx.push({ x: b[0], y: b[1], vx: Math.cos(ang + (Math.random() - 0.5) * 0.9) * (2 + Math.random() * 3), vy: Math.sin(ang + (Math.random() - 0.5) * 0.9) * (2 + Math.random() * 3), life: 12, max: 12, r: 2, color: colors[owner] || '#fff', type: 'spark' });
+  }
+  (s.p || []).forEach((d, i) => {
+    const php = prev.hp?.[i], palive = prev.alive?.[i];
+    if (php != null && d[3] < php) {
+      for (let k = 0; k < 10; k++) simMatch.fx.push({ x: d[0], y: d[1], vx: Math.cos(Math.random() * Math.PI * 2) * (1 + Math.random() * 3.8), vy: Math.sin(Math.random() * Math.PI * 2) * (1 + Math.random() * 3.8), life: 16, max: 16, r: 1.6 + Math.random() * 1.8, color: colors[i], type: 'hit' });
+    }
+    if (palive && d[3] <= 0) {
+      for (let k = 0; k < 22; k++) simMatch.fx.push({ x: d[0], y: d[1], vx: Math.cos(Math.random() * Math.PI * 2) * (2 + Math.random() * 5), vy: Math.sin(Math.random() * Math.PI * 2) * (2 + Math.random() * 5), life: 26, max: 26, r: 2 + Math.random() * 2.5, color: colors[i], type: 'hit' });
+    }
+  });
+  const nowPk = (s.pk || []).map(pk => pk[0] + ',' + pk[1]);
+  for (const key of (prev.pk || [])) {
+    if (!nowPk.includes(key)) {
+      const [px, py] = key.split(',').map(Number);
+      for (let k = 0; k < 16; k++) simMatch.fx.push({ x: px, y: py, vx: Math.cos(Math.random() * Math.PI * 2) * (2 + Math.random() * 3), vy: Math.sin(Math.random() * Math.PI * 2) * (2 + Math.random() * 3), life: 22, max: 22, r: 2.2, color: '#ffb23e', type: 'star' });
+    }
+  }
+  prev.bLen = (s.b || []).length;
+  prev.hp = (s.p || []).map(d => d[3]);
+  prev.alive = (s.p || []).map(d => d[3] > 0);
+  prev.pk = nowPk;
   simMatch.bullets.length = 0;
-  for (const b of (s.b || [])) simMatch.bullets.push({ x: b[0], y: b[1], vx: b[2], vy: b[3], type: b[4], owner: 0, life: 90, r: 4, dmg: 2, bounces: 0, trail: [] });
+  for (const b of (s.b || [])) simMatch.bullets.push({ x: b[0], y: b[1], vx: b[2], vy: b[3], type: b[4], owner: b[5] ?? 0, life: 90, r: 4, dmg: 2, bounces: 0, trail: Array.from({ length: 5 }, (_, k) => ({ x: b[0] - b[2] * k * 1.2, y: b[1] - b[3] * k * 1.2 })) });
   simMatch.pickups.length = 0;
   for (const pk of (s.pk || [])) simMatch.pickups.push({ x: pk[0], y: pk[1], kind: pk[2], t: 0, life: 9999 });
   mirrorSimToLegacy();
