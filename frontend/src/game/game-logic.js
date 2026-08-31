@@ -2,6 +2,7 @@
 // Extracted from play.astro to separate concerns
 
 import { updateBotAI } from './bot-ai.js';
+import { createMatch, simTick, simNextRound } from './sim/game-sim.js';
 
 const W = 960, H = 560;
 const PLAYER_R = 16;
@@ -619,6 +620,7 @@ function setGlobalSpeed(v) {
   globalSpeed = clamped;
   players[0].baseSpeed = clamped;
   players[1].baseSpeed = clamped;
+  if (simMatch) { simMatch.baseSpeed = clamped; simMatch.players[0].baseSpeed = clamped; simMatch.players[1].baseSpeed = clamped; }
   try { localStorage.setItem('nv_speedGlobal', String(clamped)); } catch {}
   // legacy keys cleanup
   try { localStorage.removeItem('nv_speedP1'); localStorage.removeItem('nv_speedP2'); } catch {}
@@ -638,6 +640,9 @@ let timeLeft = ROUND_TIME;
 let prevHp = [MAX_HP, MAX_HP, BOT_MAX_HP];
 let pendingTimeouts = [];
 let forfeitLock = false;
+
+// T2 sim adapter: when set, 1v1 runs through the pure sim core (offline parity path)
+let simMatch = null;
 
 // Void Trials state
 let trialPoints = 0;
@@ -944,11 +949,145 @@ function prepareTrialsMenu() {
   updateHUD();
 }
 
+// --- T2 sim adapter (offline 1v1 routed through game-sim.js) ---
+function simLocalSeed() { return (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0; }
+
+function mirrorSimToLegacy() {
+  const m = simMatch;
+  if (!m) return;
+  for (let i = 0; i < 2; i++) {
+    const sp = m.players[i], lp = players[i];
+    lp.x = sp.x; lp.y = sp.y; lp.angle = sp.angle; lp.hp = sp.hp;
+    lp.dash = sp.dash; lp.dashCd = sp.dashCd; lp.inv = sp.inv; lp.shootCd = sp.shootCd;
+    lp.overcharge = sp.overcharge; lp.shield = sp.shield; lp.shieldHp = sp.shieldHp;
+    lp.speedBoost = sp.speedBoost; lp.extraDash = sp.extraDash; lp.squish = sp.squish;
+    lp.inSlime = sp.inSlime; lp.lavaCd = sp.lavaCd; lp.voidCd = sp.voidCd; lp.slimeCd = sp.slimeCd;
+    lp.alive = sp.alive; lp.ammoType = sp.ammoType; lp.ammo = sp.ammo; lp.baseSpeed = sp.baseSpeed;
+  }
+  scores[0] = m.scores[0]; scores[1] = m.scores[1];
+  timeLeft = m.timeLeft;
+  safeRadius = m.safeRadius;
+  bullets.length = 0; for (const b of m.bullets) bullets.push(b);
+  pickups.length = 0; for (const pu of m.pickups) pickups.push(pu);
+  hazards.length = 0; for (const h of m.hazards) hazards.push(h);
+  wallData = m.walls;
+  particles.length = 0; for (const f of m.fx) particles.push(f);
+}
+
+function simInputs() {
+  const i0 = {
+    up: isDownCode('KeyW') || isDown('w'),
+    down: isDownCode('KeyS') || isDown('s'),
+    left: isDownCode('KeyA') || isDown('a'),
+    right: isDownCode('KeyD') || isDown('d'),
+    dash: isDownCode('ShiftLeft') || isDown('Shift') || isDown('shift'),
+    shoot: isDownCode('Space') || isDown(' ') || isDown('space'),
+  };
+  const i1 = {
+    up: isDownCode('ArrowUp') || isDown('arrowup'),
+    down: isDownCode('ArrowDown') || isDown('arrowdown'),
+    left: isDownCode('ArrowLeft') || isDown('arrowleft'),
+    right: isDownCode('ArrowRight') || isDown('arrowright'),
+    dash: isDownCode('Slash') || isDownCode('ShiftRight') || isDown('/') || isDownCode('NumpadDivide'),
+    shoot: isDownCode('Enter') || isDownCode('NumpadEnter') || isDown('Enter') || isDown('enter'),
+  };
+  return [i0, i1];
+}
+
+function simVoidVisuals() {
+  // DOM void ring visuals — identical to legacy block, safeRadius sourced from sim
+  const elapsed = ROUND_TIME - timeLeft;
+  if(elapsed < 45) {
+    safeRadius = 999;
+    const voidG = document.getElementById('void');
+    if(voidG) voidG.setAttribute('opacity', '0');
+    const vh = document.getElementById('voidHole');
+    if(vh) vh.setAttribute('r', 420);
+    const vr = document.getElementById('voidRing');
+    if(vr) vr.setAttribute('r', 420);
+    const vi = document.getElementById('voidInner');
+    if(vi) vi.setAttribute('r', 420);
+    const vr2 = document.getElementById('voidRing2');
+    if(vr2) vr2.setAttribute('r', 420);
+    const vc = document.getElementById('voidCore');
+    if(vc) vc.setAttribute('r', 420);
+  } else {
+    const voidHole = document.getElementById('voidHole');
+    const voidRing = document.getElementById('voidRing');
+    const voidInner = document.getElementById('voidInner');
+    const voidRing2 = document.getElementById('voidRing2');
+    const voidCore = document.getElementById('voidCore');
+    const voidStars = document.getElementById('voidStars');
+    const voidG = document.getElementById('void');
+    if(voidHole) voidHole.setAttribute('r', safeRadius);
+    if(voidRing) voidRing.setAttribute('r', safeRadius);
+    if(voidInner) voidInner.setAttribute('r', safeRadius);
+    if(voidRing2) voidRing2.setAttribute('r', safeRadius);
+    if(voidCore) voidCore.setAttribute('r', safeRadius);
+    if(voidG) voidG.setAttribute('opacity', '1');
+    voidTick[0] = (voidTick[0] + 0.7) % 48;
+    voidTick[1] = (voidTick[1] + 0.4) % 48;
+    if(voidStars) voidStars.setAttribute('patternTransform', `translate(${voidTick[0]} ${voidTick[1]})`);
+    const voidBlocks = document.getElementById('voidBlocks');
+    if(voidBlocks) voidBlocks.setAttribute('patternTransform', `translate(${voidTick[0]*0.6} ${voidTick[1]*0.6})`);
+    if(voidRing) {
+      voidRing.setAttribute('stroke-dashoffset', String((Date.now()/14)% 17));
+      voidRing.setAttribute('transform', `rotate(${(Date.now()/28)%360} 480 280)`);
+    }
+    if(voidRing2) {
+      voidRing2.setAttribute('stroke-dashoffset', String((Date.now()/10)% 13));
+      voidRing2.setAttribute('transform', `rotate(${-(Date.now()/38)%360} 480 280)`);
+    }
+    if(voidCore) {
+      const pulse = 0.5 + Math.sin(Date.now()/380)*0.35;
+      voidCore.setAttribute('opacity', String(pulse*0.4));
+      voidCore.setAttribute('stroke-width', String(1 + pulse*0.8));
+    }
+  }
+}
+
+function simUpdate(dt) {
+  const m = simMatch;
+  const [i0, i1] = simInputs();
+  simTick(m, [i0, i1], dt);
+  mirrorSimToLegacy();
+  simVoidVisuals();
+  drawHazards();
+  if (m.state !== 'playing' && gameState === 'playing') {
+    if (m.state === 'roundEnd' || m.state === 'matchEnd') {
+      endRound(m.roundResult.winner, m.roundResult.reason);
+    }
+  }
+  updateHUD();
+}
+
+function simStartFresh() {
+  simMatch = createMatch(simLocalSeed(), { baseSpeed: globalSpeed });
+  mirrorSimToLegacy();
+  drawWalls();
+  drawHazards();
+  updateHUD();
+}
+
+function simAdvanceRound() {
+  if (!simMatch) return;
+  simNextRound(simMatch);
+  mirrorSimToLegacy();
+  drawWalls();
+  drawHazards();
+  updateHUD();
+}
+
 function update(dt) {
   if(gameState !== 'playing') return;
 
   if(gameMode === 'trials') {
     updateTrials(dt);
+    return;
+  }
+
+  if (simMatch) {
+    simUpdate(dt);
     return;
   }
 
@@ -2545,7 +2684,7 @@ function endRound(winner, reason, forfeitPid) {
       if (gameState !== 'roundEnd') return;
       round++;
       ro.classList.add('hidden');
-      resetRound(true);
+      if (simMatch) simAdvanceRound(); else resetRound(true);
       startCountdown();
     }, 1600));
   }
@@ -3118,7 +3257,7 @@ function init() {
     document.getElementById('startOverlay')?.classList.add('hidden');
     scores[0]=0; scores[1]=0;
     if (window.NOX_GAME) { window.NOX_GAME.scores[0]=0; window.NOX_GAME.scores[1]=0; }
-    round = 1; resetRound(true); startCountdown();
+    round = 1; simStartFresh(); startCountdown();
   }
   function rematchGame() {
     clearPendingTimeouts();
@@ -3129,7 +3268,7 @@ function init() {
     document.getElementById('startOverlay')?.classList.add('hidden');
     scores[0]=0; scores[1]=0;
     if (window.NOX_GAME) { window.NOX_GAME.scores[0]=0; window.NOX_GAME.scores[1]=0; }
-    round = 1; resetRound(true); startCountdown();
+    round = 1; simStartFresh(); startCountdown();
   }
   function backToMenu() {
     clearPendingTimeouts();
