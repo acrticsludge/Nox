@@ -1,6 +1,6 @@
 import CyberBadge from '../atoms/CyberBadge'
 
-export default function RoundOverlay({ mode = '1v1' }: { mode?: '1v1' | 'trials' }) {
+export default function RoundOverlay({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 'online' }) {
   return (
     <div className="overlay hidden" id="roundOverlay">
       <div className="menu-card" style={{ padding: 22 }}>

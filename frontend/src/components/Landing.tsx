@@ -307,7 +307,7 @@ export default function Landing() {
                   ●
                 </span>
                 <span className="card-rule" />
-                <Badge label="∞" variant="secondary" />
+                <Badge label="∞" variant="neutral" />
               </HStack>
               <Heading level={3}>Standard</Heading>
               <Text type="body" color="secondary">
@@ -326,7 +326,7 @@ export default function Landing() {
                   ◈
                 </span>
                 <span className="card-rule" />
-                <Badge label="FLANK" variant="secondary" />
+                <Badge label="FLANK" variant="neutral" />
               </HStack>
               <Heading level={3}>Needle</Heading>
               <Text type="body" color="secondary">
@@ -345,7 +345,7 @@ export default function Landing() {
                   ■
                 </span>
                 <span className="card-rule" />
-                <Badge label="HEAVY" variant="secondary" />
+                <Badge label="HEAVY" variant="neutral" />
               </HStack>
               <Heading level={3}>Cannon</Heading>
               <Text type="body" color="secondary">
@@ -364,7 +364,7 @@ export default function Landing() {
                   ◇
                 </span>
                 <span className="card-rule" />
-                <Badge label="BOUNCE" variant="secondary" />
+                <Badge label="BOUNCE" variant="neutral" />
               </HStack>
               <Heading level={3}>Trick</Heading>
               <Text type="body" color="secondary">

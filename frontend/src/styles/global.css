@@ -2112,3 +2112,9 @@ input[type='range']::-webkit-slider-thumb {
 .mobile-game-controls { display: none !important; }
 @media (pointer: coarse) { .mobile-game-controls { display: flex !important; } }
 
+
+.cyber-badge--secondary {
+  color: #cfd6dd;
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.22);
+}

@@ -10,7 +10,7 @@ export default function GameStage({
   onRematch,
   onMenu,
 }: {
-  mode?: '1v1' | 'trials'
+  mode?: '1v1' | 'trials' | 'online'
   onPlay: () => void
   onHow: () => void
   onRematch: () => void
@@ -75,7 +75,7 @@ export default function GameStage({
         <StartOverlay mode={mode} onPlay={onPlay} onHow={onHow} />
       )}
       <RoundOverlay mode={mode} />
-      <GameOverOverlay mode={mode} onRematch={onRematch} onMenu={onMenu} total={0} high={0} time="00:00" breakdown={{ survival: 0, hits: 0, pickups: 0, lava: 0, slime: 0, void: 0, botKill: 0 }} />
+      <GameOverOverlay mode={mode} onRematch={onRematch} onMenu={onMenu} />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import CyberBadge from '../atoms/CyberBadge'
 
-export default function HowToPlayModal({ mode = '1v1', onClose }: { mode?: '1v1' | 'trials'; onClose: () => void }) {
+export default function HowToPlayModal({ mode = '1v1', onClose }: { mode?: '1v1' | 'trials' | 'online'; onClose: () => void }) {
   const isTrials = mode === 'trials'
   return (
     <div className="how-modal" role="dialog" aria-modal="true" aria-labelledby="how-modal-title">

@@ -6,7 +6,7 @@ export default function CyberBadge({
   id,
 }: {
   children: ReactNode
-  variant?: 'lime' | 'cyan' | 'amber' | 'pink'
+  variant?: 'lime' | 'cyan' | 'amber' | 'pink' | 'secondary'
   id?: string
 }) {
   return (

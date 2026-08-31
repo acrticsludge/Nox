@@ -1,6 +1,6 @@
 import CyberTimer from '../atoms/CyberTimer'
 
-export default function CenterHUD({ mode = '1v1', onPause }: { mode?: '1v1' | 'trials'; onPause?: () => void }) {
+export default function CenterHUD({ mode = '1v1', onPause }: { mode?: '1v1' | 'trials' | 'online'; onPause?: () => void }) {
   const isTrials = mode === 'trials'
   return (
     <div className="center-hud">

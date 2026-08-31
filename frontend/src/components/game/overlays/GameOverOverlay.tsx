@@ -5,7 +5,7 @@ export default function GameOverOverlay({
   onRematch,
   onMenu,
 }: {
-  mode?: '1v1' | 'trials'
+  mode?: '1v1' | 'trials' | 'online'
   onRematch: () => void
   onMenu: () => void
 }) {
