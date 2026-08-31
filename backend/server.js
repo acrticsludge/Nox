@@ -30,7 +30,13 @@ export function createServer() {
   const net = attachNet(server);
   server.noxNet = net;
   const roomsApi = attachRooms(server, net, {
-    onRoomFull: room => startMatch(room, net),
+    onRoomFull: room => startMatch(room, net, {
+      // a finished match destroys its room — no stale seats/codes linger
+      onEnd: () => {
+        for (const s of room.seats) if (s) roomsApi.leave(s);
+        roomsApi.rooms.delete(room.code);
+      },
+    }),
   });
   net.noxRooms = roomsApi.rooms;
   attachMatchRouting(net);

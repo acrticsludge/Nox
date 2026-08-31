@@ -57,6 +57,8 @@ export function startMatch(room, net, opts = {}) {
   function endMatch(winner, reason) {
     broadcast({ type: 'matchEnd', winner, reason, scores: match.scores.slice() });
     stop();
+    // match is over either way — the room has no purpose left; server.js tears it down
+    opts.onEnd?.(room);
   }
 
   function tick() {
@@ -107,12 +109,15 @@ export function startMatch(room, net, opts = {}) {
     if (seat === -1) return;
     switch (msg.type) {
       case 'ready': {
+        // 3-2-1-GO, one beat per second, then the server starts ticking
         broadcast({ type: 'countdown', t: 3 });
-        setTimeout(() => {
-          if (stopped) return;
-          broadcast({ type: 'countdown', t: 0 });
-          if (!tickTimer) tickTimer = setInterval(tick, TICK_MS);
-        }, 3000);
+        for (const t of [2, 1, 0]) {
+          setTimeout(() => {
+            if (stopped) return;
+            broadcast({ type: 'countdown', t });
+            if (t === 0 && !tickTimer) tickTimer = setInterval(tick, TICK_MS);
+          }, (3 - t) * 1000);
+        }
         return;
       }
       case 'input': {
