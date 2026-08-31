@@ -1,12 +1,16 @@
 // NOX view layer (T3 extraction) — renders sim state to SVG/DOM.
 // Pure module: function declarations only, zero top-level side effects.
-// Circular import with game-logic.js is safe: view functions are invoked
-// post-init; state is read via ESM live bindings and never written here.
+// P2-06 slice 1: constants now come from core/constants.js (canonical
+// owner); only live game state and isLavaActive are still read from
+// game-logic.js (state→view direction; the reverse edge is view functions
+// called by game-logic — full inversion is the next migration slice).
+import {
+  MAX_HP, SHIELD_MAX_HP, DASH_COOLDOWN, BULLET_R, WIN_SCORE, POWER_TYPES, AMMO_PICKUP_CFG,
+  TRIALS_W, TRIALS_H, TRIAL_DURATION, VOID_START_TIME,
+} from './core/constants.js';
 import {
   players, bot, bullets, pickups, particles, hazards, wallData, scores, round, timeLeft, safeRadius,
   gameState, gameMode, prevHp, trialPoints,
-  MAX_HP, SHIELD_MAX_HP, DASH_COOLDOWN, BULLET_R, WIN_SCORE, POWER_TYPES, AMMO_PICKUP_CFG,
-  TRIALS_W, TRIALS_H, TRIAL_DURATION, VOID_START_TIME,
   isLavaActive,
 } from './game-logic.js';
 

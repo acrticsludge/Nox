@@ -1,4 +1,4 @@
-﻿// NEON VOID // 2P Duel Game Logic + Void Trials Solo
+// NEON VOID // 2P Duel Game Logic + Void Trials Solo
 // Extracted from play.astro to separate concerns
 
 import { updateBotAI } from './bot-ai.js';
@@ -6,56 +6,18 @@ import { drawWalls, drawHazards, render, setCyberBadgeText, setCyberBadgeVariant
 import { createMatch, simTick, simNextRound } from './sim/game-sim.js';
 import { applyLedger, createLedger, ledgerTotal, sumLedger } from './trials-ledger.js';
 import { TRIALS_SAVE_KEY, buildTrialsSaveSnapshot, loadTrialsSave } from './trials-save.js';
+// P2-06 migration slice 1: gameplay constants are owned by core/constants.js
+// (pre-existing canonical module). game-logic re-exports them so NOX_GAME and
+// existing importers keep working; tuning happens in exactly one file.
+import {
+  W, H, PLAYER_R, BULLET_R, BULLET_SPEED, BASE_SPEED, DASH_COOLDOWN, DASH_TIME,
+  MAX_HP, ROUND_TIME, WIN_SCORE, SHIELD_MAX_HP, HEAL_AMOUNT, GRID, COLS, ROWS,
+  TRIALS_W, TRIALS_H, TRIALS_COLS, TRIALS_ROWS, TRIAL_DURATION, VOID_START_TIME,
+  VOID_SHRINK_DURATION, BOT_MAX_HP, TRIALS_HAZARD_COUNT, TRIALS_WALL_TARGET,
+  REQUIRED_WALL_GAP, POWER_TYPES, BULLET_TYPES, AMMO_PICKUP_CFG,
+} from './core/constants.js';
 
-const W = 960, H = 560;
-const PLAYER_R = 16;
-const BULLET_R = 5;
-const BULLET_SPEED = 7.2;
-const BASE_SPEED = 3.6;
-const DASH_COOLDOWN = 60;
-const DASH_TIME = 16;
-const MAX_HP = 12;
-const ROUND_TIME = 60;
-const WIN_SCORE = 5;
-const SHIELD_MAX_HP = 5;
-const HEAL_AMOUNT = 2;
-const GRID = 40;
-const COLS = 24;
-const ROWS = 14;
-
-// Void Trials constants
-const TRIALS_W = 1920;
-const TRIALS_H = 1120;
-const TRIALS_COLS = 48;
-const TRIALS_ROWS = 28;
-const TRIAL_DURATION = 600;
-const VOID_START_TIME = 450;
-const VOID_SHRINK_DURATION = 30; // SECONDS â€” second-scale timer (dt/60 loop, display m:s); 30s from 7:30 to 8:00
-const BOT_MAX_HP = 12;
-const TRIALS_HAZARD_COUNT = 10;
-const TRIALS_WALL_TARGET = 16;
-
-const POWER_TYPES = {
-  overcharge: { color:'#ffb23e', bg:'#ff9d2e', icon:'âš¡', duration:240, life:480 },
-  shield:     { color:'#58d8ff', bg:'#3ec5f2', icon:'â„', life:480, hp:5 },
-  blink:      { color:'#c9ff2f', bg:'#c9ff2f', icon:'âœ¦', duration:180, life:480 },
-  heal:       { color:'#22c55e', bg:'#16a34a', icon:'âœš', life:480, heal:2 }
-};
-
-// Bullet archetypes - balanced for MAX_HP 12, guest only, no ELO
-// dmg integer (except trick decay uses 0.5 steps via table), speed / r / cd / life / ammo tuned
-const BULLET_TYPES = {
-  standard: { id:'standard', label:'STD', color:'#f1f4f3', bg:'#f1f4f3', icon:'o', speed:7.2, r:5,   dmg:2, cd:11, life:90,  ammo: Infinity, bouncesMax:0, lifeDecay:false },
-  needle:   { id:'needle',   label:'NEEDLE', color:'#a78bfa', bg:'#7c3aed', icon:'N', speed:8.5, r:3.5, dmgFront:0, dmgRear:6, cd:14, life:90,  ammo:5, bouncesMax:0 },
-  cannon:   { id:'cannon',   label:'CANNON', color:'#ffb23e', bg:'#ff9d2e', icon:'C', speed:3.8, r:7,   dmg:4, cd:32, life:120, ammo:3, bouncesMax:0 },
-  trick:    { id:'trick',    label:'TRICK',  color:'#58d8ff', bg:'#3ec5f2', icon:'T', speed:6.2, r:4,   dmg:2.5, cd:16, life:180, ammo:6, bouncesMax:5, decay:0.82 }
-};
 const AMMO_KINDS = ['ammo_needle','ammo_cannon','ammo_trick'];
-const AMMO_PICKUP_CFG = {
-  ammo_needle: { color:'#a78bfa', bg:'#7c3aed', icon:'N', life:480, ammo:5, bullet:'needle' },
-  ammo_cannon: { color:'#ffb23e', bg:'#ff9d2e', icon:'C', life:480, ammo:3, bullet:'cannon' },
-  ammo_trick:  { color:'#58d8ff', bg:'#3ec5f2', icon:'T', life:480, ammo:6, bullet:'trick' }
-};
 
 let wallData = [];
 let hazards = [];
@@ -64,7 +26,6 @@ let voidTick = [0, 0];
 const HAZARD_RELOCATE_MIN = 480; // 8s @60fps
 const HAZARD_RELOCATE_MAX = 720; // 12s
 let hazardRelocateTimer = HAZARD_RELOCATE_MIN + Math.random() * (HAZARD_RELOCATE_MAX - HAZARD_RELOCATE_MIN);
-const REQUIRED_WALL_GAP = PLAYER_R * 2 + 2; // pointer diameter (32) + 2px breathing = 34px exact fit
 function wallGap(a, b) {
   const dx = Math.max(0, Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w)));
   const dy = Math.max(0, Math.max(a.y - (b.y + b.h), b.y - (a.y + a.h)));
@@ -2711,6 +2672,7 @@ export function shutdownEngine() {
 // T3: view layer lives in game-view.js. State below is exported as ESM live
 // bindings for the view (view reads only, never writes).
 export { players, bot, bullets, pickups, particles, hazards, wallData, scores, round, timeLeft, safeRadius, gameState, gameMode, prevHp, trialPoints };
+export { W, H, PLAYER_R, BULLET_SPEED, BASE_SPEED, DASH_TIME, ROUND_TIME, HEAL_AMOUNT, GRID, COLS, ROWS, TRIALS_COLS, TRIALS_ROWS, VOID_SHRINK_DURATION, BOT_MAX_HP, TRIALS_HAZARD_COUNT, TRIALS_WALL_TARGET, REQUIRED_WALL_GAP, BULLET_TYPES, AMMO_KINDS };
 export { MAX_HP, SHIELD_MAX_HP, DASH_COOLDOWN, BULLET_R, WIN_SCORE, POWER_TYPES, AMMO_PICKUP_CFG, TRIALS_W, TRIALS_H, TRIAL_DURATION, VOID_START_TIME };
 export { isLavaActive };
 export { drawWalls, drawHazards, render, setCyberBadgeText, setCyberBadgeVariant, updateHUD };
