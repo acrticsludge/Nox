@@ -1,12 +1,20 @@
+import { useEffect } from 'react'
 import CyberBadge from '../atoms/CyberBadge'
+import GameDialog from '../atoms/GameDialog'
 
+// P2-08: dialog lifecycle (initial focus, trap, Escape, focus restore) is
+// delegated to GameDialog; this component stays presentation-only.
 export default function HowToPlayModal({ mode = '1v1', onClose }: { mode?: '1v1' | 'trials' | 'online'; onClose: () => void }) {
   const isTrials = mode === 'trials'
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   return (
-    <div className="how-modal" role="dialog" aria-modal="true" aria-labelledby="how-modal-title">
-      <div className="how-modal__backdrop" onClick={onClose} aria-hidden="true" />
-      <div className="how-modal__card" role="document">
-        <button className="how-modal__close" onClick={onClose} aria-label="Close">✕</button>
+    <div className="how-modal">
+      <GameDialog label={isTrials ? 'Void Trials field manual' : 'How to play'} onClose={onClose} escapeCloses={false} className="how-modal__card">
+        <button className="how-modal__close" onClick={onClose} aria-label="Close how-to-play manual">✕</button>
         <div className="how-modal__header">
           <CyberBadge variant={isTrials ? 'amber' : 'cyan'}>{isTrials ? 'VOID TRIALS // SOLO' : 'HOW TO PLAY'}</CyberBadge>
           <h2 id="how-modal-title" className="how-modal__title">
@@ -93,7 +101,7 @@ export default function HowToPlayModal({ mode = '1v1', onClose }: { mode?: '1v1'
         <div className="how-modal__footer">
           <button className="btn btn-primary" onClick={onClose}>{isTrials ? 'ENTER THE VOID // READY' : 'GOT IT // FIGHT!'}</button>
         </div>
-      </div>
+      </GameDialog>
     </div>
   )
 }

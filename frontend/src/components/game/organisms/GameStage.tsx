@@ -24,7 +24,7 @@ export default function GameStage({
   const voidR = isTrials ? 900 : 420
   return (
     <div className="stage" id="stage" style={isTrials ? { width: '100%', maxWidth: '100vw', height: 'auto', aspectRatio: '1920 / 1120', maxHeight: 'min(640px, calc(100vh - 210px))', touchAction: 'manipulation' } as React.CSSProperties : undefined}>
-        <svg id="gameSvg" viewBox={`0 0 ${arenaW} ${arenaH}`} xmlns="http://www.w3.org/2000/svg" role="application" aria-label="NOX arena game" aria-describedby="game-desc">
+        <svg id="gameSvg" viewBox={`0 0 ${arenaW} ${arenaH}`} xmlns="http://www.w3.org/2000/svg" role="application" aria-label={`NOX arena — keyboard game. ${isTrials ? 'WASD to move, Shift to dash, Space to shoot, P pauses.' : 'WASD or arrows to move, Shift or / to dash, Space or Enter to shoot.'}`} aria-describedby="game-desc">
         <SvgDefs isTrials={isTrials} arenaW={arenaW} arenaH={arenaH} cx={cx} cy={cy} voidR={voidR} />
 
         <rect x="0" y="0" width={arenaW} height={arenaH} rx="18" fill="url(#arenaGrad)" />

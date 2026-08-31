@@ -26,7 +26,7 @@ import SEO from '../../components/SEO.astro';
     />
   </head>
   <body>
-    <div id="game-desc" aria-label="Solo survival arena. Use WASD/arrows to move, mouse to aim, click to shoot. Score breakdown shows survival, hits, pickups, penalties." style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;"></div>
+    <div id="game-desc" aria-label="Solo survival arena. Keyboard only: WASD to move, Shift to dash, Space to shoot, P pauses. Score breakdown shows survival, hit bonus, pickup bonus, and penalties." style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;"></div>
     <GameShell mode="trials" client:load />
     <script>
       // Prepare menu HUD to show 10:00 immediately (before first start)

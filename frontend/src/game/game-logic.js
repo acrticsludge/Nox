@@ -290,7 +290,7 @@ function findValidHazardPos(ignoreIdx = -1) {
     const r = 1 + Math.floor(Math.random() * (rows - 2));
     const x = c * GRID + 2, y = r * GRID + 2;
     const cx = x + 18, cy = y + 18;
-    // avoid spawn protects â€” mirror generators' protectedCells per mode
+    // avoid spawn protects — mirror generators' protectedCells per mode
     if (gameMode === 'trials') {
       const inTrialSpawn = (c>=5&&c<=8&&r>=12&&r<=16) || (c>=39&&c<=42&&r>=12&&r<=16) || (c>=21&&c<=26&&r>=12&&r<=16);
       if (inTrialSpawn) continue;
@@ -319,7 +319,7 @@ function findValidHazardPos(ignoreIdx = -1) {
       if (Math.abs(h.x - x) < 42 && Math.abs(h.y - y) < 42) { overlap = true; break; }
     }
     if (overlap) continue;
-    // avoid players/bot (80px) â€” include bot in trials
+    // avoid players/bot (80px) — include bot in trials
     const avoid = gameMode === 'trials' ? [players[0], bot] : [players[0], players[1]];
     let nearEnt=false;
     for(const ent of avoid){ if(ent && ent.alive && len2(cx,cy,ent.x,ent.y)<88){ nearEnt=true; break; } }
@@ -702,6 +702,12 @@ function clearInputState() { keys = {}; }
 // as signed (negative) amounts; bonuses as positive amounts.
 function awardTrials(key, amount) { trialPoints = applyLedger(trialsLedger, key, amount); }
 function trialsFinal() { return ledgerTotal(trialsLedger); }
+// P2-08: milestone-only live announcements — significant events (round end,
+// match end, trials result), never per-frame updates.
+function announce(text) {
+  const el = document.getElementById('nox-score-announcer');
+  if (el) el.textContent = text;
+}
 function hardResetInternalState() {
   clearPendingTimeouts();
   clearInputState();
@@ -1060,7 +1066,7 @@ function simInputs() {
 }
 
 function simVoidVisuals() {
-  // DOM void ring visuals â€” identical to legacy block, safeRadius sourced from sim
+  // DOM void ring visuals — identical to legacy block, safeRadius sourced from sim
   const elapsed = ROUND_TIME - timeLeft;
   if(elapsed < 45) {
     safeRadius = 999;
@@ -1764,7 +1770,7 @@ function updateTrials(dt) {
     }
   }
 
-  // Bot shooting â€” handled by AI (predictive aim, reaction delay already applied)
+  // Bot shooting — handled by AI (predictive aim, reaction delay already applied)
   if(botResult.shoot && bot.shootCd <= 0) {
     shoot(bot);
   }
@@ -1925,7 +1931,7 @@ function updateTrials(dt) {
     }
   });
 
-  // Bullets â€” identical physics to 1v1 update(), just bounds scaled to 1920x1120
+  // Bullets — identical physics to 1v1 update(), just bounds scaled to 1920x1120
   for(let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     const br = b.r ?? BULLET_R;
@@ -2057,7 +2063,7 @@ function forfeitTrials() {
   forfeitLock = false;
   clearTrialsState();
   try { localStorage.removeItem('nv_trials_paused'); } catch {}
-  // Hard reset trial state so menu is clean â€” HUD-only, don't touch arena walls (keep preview), just clear dynamic objects
+  // Hard reset trial state so menu is clean — HUD-only, don't touch arena walls (keep preview), just clear dynamic objects
   bullets.length = 0; pickups.length = 0; particles.length = 0;
   if(window.NOX_GAME){ window.NOX_GAME.bullets.length=0; window.NOX_GAME.pickups.length=0; window.NOX_GAME.particles.length=0; }
   trialPoints = 0; trialsLedger = createLedger(); timeLeft = TRIAL_DURATION; voidRect = null; safeRadius = 999; lastSaveTime = 0;
@@ -2073,14 +2079,14 @@ function forfeitTrials() {
 }
 
 function shootBotBullet(bot, target) {
-  // kept for backwards compat â€” now delegates to shared shoot()
+  // kept for backwards compat — now delegates to shared shoot()
   const ang = Math.atan2(target.y - bot.y, target.x - bot.x);
   bot.angle = ang;
   shoot(bot);
 }
 
 function pickupBotPowerup(bot, pu) {
-  // Ammo pickups are separate from POWER_TYPES â€” handle first
+  // Ammo pickups are separate from POWER_TYPES — handle first
   if(pu.kind && pu.kind.indexOf('ammo_') === 0) {
     const cfg = AMMO_PICKUP_CFG[pu.kind];
     if(cfg) { bot.ammoType = cfg.bullet; bot.ammo = cfg.ammo; }
@@ -2214,6 +2220,7 @@ function endRound(winner, reason, forfeitPid) {
   const sub = document.getElementById('roundSub');
   if(!ro) return;
   ro.classList.remove('hidden');
+  announce(winner === null ? 'Round drawn.' : `Player ${winner + 1} wins the round. Score ${scores[0]} to ${scores[1]}.`);
   const isForfeit = !!(reason && reason.includes('FORFEIT'));
 
   if(winner === null) {
@@ -2221,20 +2228,20 @@ function endRound(winner, reason, forfeitPid) {
     if (badge) setCyberBadgeVariant(badge, 'lime');
     title.textContent = 'DRAW!';
     title.className = 'result-score winner-draw';
-    if(sub) sub.textContent = reason + ' â€¢ No points';
+    if(sub) sub.textContent = reason + ' • No points';
   } else if (isForfeit) {
     const loser = forfeitPid != null ? forfeitPid + 1 : (winner === 0 ? 2 : 1);
     setCyberBadgeText(badge, `FORFEIT // P${loser} EXIT -> P${winner+1} WINS`);
     if (badge) setCyberBadgeVariant(badge, winner === 0 ? 'cyan' : 'pink');
     title.textContent = `PLAYER ${winner + 1} WINS BY FORFEIT!`;
     title.className = 'result-score ' + (winner === 0 ? 'winner-p1' : 'winner-p2');
-    if(sub) sub.textContent = `P${loser} LEFT THE VOID â€¢ ${scores[0]} // ${scores[1]} â€¢ First to ${WIN_SCORE}`;
+    if(sub) sub.textContent = `P${loser} LEFT THE VOID • ${scores[0]} // ${scores[1]} • First to ${WIN_SCORE}`;
   } else {
     setCyberBadgeText(badge, `ROUND ${round} // ${reason}`);
     if (badge) setCyberBadgeVariant(badge, winner === 0 ? 'cyan' : 'pink');
     title.textContent = `PLAYER ${winner + 1} WINS ROUND!`;
     title.className = 'result-score ' + (winner === 0 ? 'winner-p1' : 'winner-p2');
-    if(sub) sub.textContent = `${scores[0]} // ${scores[1]} â€¢ First to ${WIN_SCORE}`;
+    if(sub) sub.textContent = `${scores[0]} // ${scores[1]} • First to ${WIN_SCORE}`;
   }
 
   if(Math.max(...scores) >= WIN_SCORE) {
@@ -2258,6 +2265,7 @@ function endRound(winner, reason, forfeitPid) {
 function showTrialsGameOver(points, reason, won) {
   clearPendingTimeouts();
   clearInputState();
+  announce(`Trial ${won ? 'survived' : 'failed'}. ${reason || ''} Final score ${points.toLocaleString()}.`);
   const roundOverlay = document.getElementById('roundOverlay');
   const ov = document.getElementById('gameOverOverlay');
   if(roundOverlay) roundOverlay.classList.add('hidden');
@@ -2273,7 +2281,7 @@ function showTrialsGameOver(points, reason, won) {
     wt.textContent = won ? 'TRIAL SURVIVED' : 'TRIAL FAILED';
     wt.className = 'result-score ' + (won ? 'winner-p1' : 'winner-p2');
   }
-  if(ws) ws.textContent = `${points.toLocaleString()} PTS â€¢ ${reason || (won ? 'VOID CONQUERED' : 'VOID CLAIMED YOU')} â€¢ ${m}:${s} LEFT`;
+  if(ws) ws.textContent = `${points.toLocaleString()} PTS • ${reason || (won ? 'VOID CONQUERED' : 'VOID CLAIMED YOU')} • ${m}:${s} LEFT`;
   // save high score
   if(points > trialHighScore) {
     trialHighScore = points;
@@ -2308,6 +2316,7 @@ function showTrialsGameOver(points, reason, won) {
 }
 
 function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();
+  announce('Match over.');
   clearInputState();
   const roundOverlay = document.getElementById('roundOverlay');
   const ov = document.getElementById('gameOverOverlay');
@@ -2325,15 +2334,15 @@ function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();
   const isForfeit = !!(forfeitReason && forfeitReason.includes('FORFEIT'));
   if(scores[0] === scores[1]) {
     if(wt) { wt.textContent = 'DRAW // VOID CLAIMS ALL'; wt.className = 'result-score winner-draw'; }
-    if(ws) ws.textContent = forfeitReason ? `${scores[0]} // ${scores[1]} â€¢ ${forfeitReason}` : `${scores[0]} // ${scores[1]} â€¢ Perfectly balanced`;
+    if(ws) ws.textContent = forfeitReason ? `${scores[0]} // ${scores[1]} • ${forfeitReason}` : `${scores[0]} // ${scores[1]} • Perfectly balanced`;
   } else {
     if (isForfeit) {
       if(wt) { wt.textContent = `PLAYER ${w + 1} WINS BY FORFEIT!`; wt.className = 'result-score ' + (w === 0 ? 'winner-p1' : 'winner-p2'); }
       const loser = forfeitPid != null ? forfeitPid + 1 : (w === 0 ? 2 : 1);
-      if(ws) ws.textContent = `P${loser} EXITED â€¢ ${scores[0]} // ${scores[1]} â€¢ PLAYER ${w + 1} CHAMPION â€¢ ${round} rounds`;
+      if(ws) ws.textContent = `P${loser} EXITED • ${scores[0]} // ${scores[1]} • PLAYER ${w + 1} CHAMPION • ${round} rounds`;
     } else {
       if(wt) { wt.textContent = `PLAYER ${w + 1} WINS THE VOID!`; wt.className = 'result-score ' + (w === 0 ? 'winner-p1' : 'winner-p2'); }
-      if(ws) ws.textContent = `${scores[0]} // ${scores[1]} â€¢ ${round} rounds â€¢ GG`;
+      if(ws) ws.textContent = `${scores[0]} // ${scores[1]} • ${round} rounds • GG`;
     }
   }
   // badge in gameOver should reflect forfeit variant if provided
@@ -2346,16 +2355,16 @@ function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();
   } else if (govBadge && isForfeit === false) {
     // restore default badge on normal win
     setCyberBadgeVariant(govBadge, 'amber');
-    setCyberBadgeText(govBadge, `ðŸ† CHAMPION OF THE VOID`);
+    setCyberBadgeText(govBadge, `🏆 CHAMPION OF THE VOID`);
   }
   // buttons: forfeit shows CONTINUE / RETURN TO MENU clearly, normal shows REMATCH / Menu
   const rematchBtn = document.getElementById('rematchBtn');
   const menuBtn = document.getElementById('menuBtn');
   if (isForfeit) {
-    if (rematchBtn) rematchBtn.textContent = 'â†» CONTINUE // PLAY AGAIN';
+    if (rematchBtn) rematchBtn.textContent = '↻ CONTINUE // PLAY AGAIN';
     if (menuBtn) menuBtn.textContent = 'RETURN TO MENU';
   } else {
-    if (rematchBtn) rematchBtn.textContent = 'â†» REMATCH';
+    if (rematchBtn) rematchBtn.textContent = '↻ REMATCH';
     if (menuBtn) menuBtn.textContent = 'Menu';
   }
   gameState = 'gameOver';
@@ -2391,12 +2400,12 @@ function startCountdown() {
     if (gameState !== 'countdown') return;
     if(c > 0) {
       if(title) { title.textContent = String(c); title.className = 'result-score winner-draw'; }
-      if(sub) sub.textContent = isTrialsCountdown ? 'Survive 10:00 or kill the bot â€¢ Stay centered' : 'Get ready...';
+      if(sub) sub.textContent = isTrialsCountdown ? 'Survive 10:00 or kill the bot • Stay centered' : 'Get ready...';
       c--;
       trackTimeout(setTimeout(tick, 650));
     } else {
       if(title) { title.textContent = 'FIGHT!'; title.className = 'result-score winner-draw'; }
-      if(sub) sub.textContent = isTrialsCountdown ? 'Void crush at 7:30 â€¢ Bot fears the void' : 'Dash = invincible â€¢ Grab the orb!';
+      if(sub) sub.textContent = isTrialsCountdown ? 'Void crush at 7:30 • Bot fears the void' : 'Dash = invincible • Grab the orb!';
       trackTimeout(setTimeout(() => {
         if (gameState !== 'countdown') return;
         ro.classList.add('hidden');
