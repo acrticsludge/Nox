@@ -49,7 +49,9 @@ export class NetBridge {
   }
 
   connect(url) {
-    return new Promise((resolve, reject) => {
+    // T13: single-flight — a connect() while one is pending returns the same promise
+    if (this.ws && this.ws.readyState === 0 && this._connecting) return this._connecting;
+    this._connecting = new Promise((resolve, reject) => {
       const ws = new WebSocket(url);
       this.ws = ws;
       const to = setTimeout(() => reject(new Error('connection timeout')), 8000);
@@ -87,6 +89,8 @@ export class NetBridge {
       });
       ws.addEventListener('error', () => { /* close event follows */ });
     });
+    this._connecting.finally(() => { this._connecting = null; });
+    return this._connecting;
   }
 
   _startPing() {

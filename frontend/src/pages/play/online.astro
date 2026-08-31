@@ -334,7 +334,10 @@ import SEO from '../../components/SEO.astro';
     if (roomCode) {
       let tries = 0;
       const retry = async () => {
-        if (tries++ >= 3 || bridge.authed) return;
+        if (tries++ >= 3 || bridge.authed) {
+          if (!bridge.authed) { bridge.reconnectCred = null; showLobby(); lobbyError('Connection lost — could not rejoin the room.'); }
+          return;
+        }
         try { await bridge.connect(WS_BASE + '/ws'); } catch { setTimeout(retry, 1500); return; }
         // Task 10: present the signed seat credential when we hold one
         const cred = bridge.reconnectCred;
