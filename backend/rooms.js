@@ -80,7 +80,7 @@ export function attachRooms(server, net, opts = {}) {
     return room;
   }
 
-  function leave(ws, notifyPeer = true) {
+  function leave(ws, notifyPeer = true, reserve = true) {
     const code = net.roomOf.get(ws);
     if (!code) return false;
     net.roomOf.delete(ws);
@@ -89,10 +89,10 @@ export function attachRooms(server, net, opts = {}) {
     const i = room.seats.indexOf(ws);
     if (i !== -1) {
       room.seats[i] = null;
-      // Task 10: reserve the seat for the departing guest (deliberate leave
-      // passes a short reservation; disconnects keep the full grace window)
+      // Task 10: a DISCONNECT reserves the seat for the departing guest
+      // (grace window); a deliberate leave frees it immediately
       const sess = net.sessions.get(ws);
-      if (sess && room.credentials?.[i]) {
+      if (reserve && sess && room.credentials?.[i]) {
         room.credentials[i].token = net.sign({ guestId: sess.guestId, roomCode: code, seat: i, exp: Date.now() + reconnectTtlMs });
         reservations.set(code + ':' + i, { guestId: sess.guestId, expiresAt: Date.now() + graceMs });
       }
@@ -177,7 +177,7 @@ export function attachRooms(server, net, opts = {}) {
         return;
       }
       case 'leave': {
-        leave(ws);
+        leave(ws, true, false);   // deliberate leave: no seat reservation
         return;
       }
       case 'rematchReq': {
