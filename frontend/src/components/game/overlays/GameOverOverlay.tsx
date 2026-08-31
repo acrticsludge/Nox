@@ -23,8 +23,8 @@ export default function GameOverOverlay({
               <span>Survival Time</span>
               <strong id="scoreTime">10:00</strong>
             </div>
-            <div className="score-row" role="listitem" aria-label="Survival Points bonus" style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', font: '12px var(--nox-mono)' }}>
-              <span className="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg> Survival Points</span>
+            <div className="score-row" role="listitem" aria-label="Time / Base Score bonus" style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', font: '12px var(--nox-mono)' }}>
+              <span className="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg> Time / Base Score</span>
               <strong id="scoreSurvival" className="text-[var(--nox-lime)]">+0</strong>
             </div>
             <div className="score-row" role="listitem" aria-label="Hit Bonus" style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', font: '12px var(--nox-mono)' }}>

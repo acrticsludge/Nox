@@ -249,10 +249,11 @@ function generateTrialsHazards() {
     for(let dc = -2; dc <= 2; dc++) for(let dr = -2; dr <= 2; dr++) protectedCells.add(key(c + dc, r + dr));
   });
 
-  const target = TRIALS_HAZARD_COUNT;
-  let placed = 0, attempts = 200;
-  while(placed < target && attempts < 200) {
-    attempts++;
+  const elapsed = (TRIAL_DURATION || 600) - (timeLeft || 600);
+  const target = TRIALS_HAZARD_COUNT + (elapsed > 300 ? 2 : 0) + (elapsed > 420 ? 3 : 0);
+  let placed = 0, attempts = 2000;
+  while(placed < target && attempts > 0) {
+    attempts--;
     const c = 2 + Math.floor(Math.random() * (TRIALS_COLS - 4));
     const r = 2 + Math.floor(Math.random() * (TRIALS_ROWS - 4));
     const k = key(c, r);
@@ -378,6 +379,21 @@ function findValidHazardPos(ignoreIdx = -1) {
 
 function relocateRandomHazards() {
   if (hazards.length === 0 || gameState !== 'playing') return;
+  const elapsed = (TRIAL_DURATION || 600) - (timeLeft || 600);
+  const target = TRIALS_HAZARD_COUNT + (elapsed > 300 ? 2 : 0) + (elapsed > 420 ? 3 : 0);
+  // adaptive: add missing hazards if density increased
+  while (hazards.length < target && hazards.length < 25) {
+    const c = 2 + Math.floor(Math.random() * (TRIALS_COLS - 4));
+    const r = 2 + Math.floor(Math.random() * (TRIALS_ROWS - 4));
+    const k = `${c},${r}`;
+    let safe = true;
+    for (let h of hazards) if (Math.abs(h.c - c) <= 1 && Math.abs(h.r - r) <= 1) safe = false;
+    if (safe) {
+      const kind = Math.random() < 0.5 ? 'lava' : 'slime';
+      hazards.push({c, r, x: c * GRID + 2, y: r * GRID + 2, w: 36, h: 36, kind, t: Math.random() * 300, lavaCd: 0});
+      break;
+    }
+  }
   // relocate 1-2 hazards each trigger for chaos
   const count = hazards.length <= 3 ? 1 : (Math.random() < 0.5 ? 1 : 2);
   const indices = [...Array(hazards.length).keys()].sort(() => Math.random() - 0.5).slice(0, count);
@@ -1132,6 +1148,7 @@ function update(dt) {
             // small dash indicator
             p.squish = 10;
           }
+          if(trialScoreBreakdown) trialScoreBreakdown.pickups = (trialScoreBreakdown.pickups||0)+1;
           pickups.splice(idx, 1);
           continue;
         }
@@ -1731,10 +1748,11 @@ function updateTrials(dt) {
         else if(b.type==='cannon'){ dmg=4; inv=34; fx=spawnHitCannon(bot.x,bot.y,bot.color); }
         else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fx=spawnHitTrick(bot.x,bot.y,bot.color,b.bounces??0); }
         else { fx=spawnHitStandard(b.x,b.y,bot.color); }
-        bot.hp = Math.max(0, bot.hp - dmg); bot.inv = inv; if(fx) particles.push(...fx); damageShake(bot,1);
+        bot.hp = Math.max(0, bot.hp - dmg); bot.inv = inv; if(fx) 
+particles.push(...fx); damageShake(bot,1); if(trialScoreBreakdown) trialScoreBreakdown.hits = (trialScoreBreakdown.hits||0)+1;
         trialPoints += (elapsedTotal >= VOID_START_TIME ? 50 : 25);
         bullets.splice(i, 1);
-        if(bot.hp <= 0) { bot.alive=false; gameState='gameOver'; trialPoints+=500; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(Math.floor(trialPoints)); showTrialsGameOver(Math.floor(trialPoints),'BOT DESTROYED',true); return; }
+        if(bot.hp <= 0) { bot.alive=false; gameState='gameOver'; trialPoints+=500; if(trialScoreBreakdown) trialScoreBreakdown.botKill = (trialScoreBreakdown.botKill||0)+500; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(Math.floor(trialPoints)); showTrialsGameOver(Math.floor(trialPoints),'BOT DESTROYED',true); return; }
         continue;
       }
     }
@@ -2561,6 +2579,21 @@ function showTrialsGameOver(points, reason, won) {
   if(govBadge) setCyberBadgeText(govBadge, won ? '⬢ TRIAL COMPLETE' : '⬢ TRIAL FAILED');
   const scoreSlime = document.getElementById('scoreSlime');
   if(scoreSlime) scoreSlime.textContent = '-' + Math.floor(trialScoreBreakdown.slimePenalty || 0).toLocaleString();
+  const scoreTotal = document.getElementById('scoreTotal');
+  if(scoreTotal) scoreTotal.textContent = '+' + Math.floor(points || 0).toLocaleString();
+  const scoreSurvival = document.getElementById('scoreSurvival');
+  const survivalDerived = Math.floor(Math.max(0, points - (trialScoreBreakdown.hits||0) - (trialScoreBreakdown.pickups||0) - (trialScoreBreakdown.botKill||0) - (trialScoreBreakdown.lavaPenalty||0) - (trialScoreBreakdown.slimePenalty||0) - (trialScoreBreakdown.voidPenalty||0)));
+  if(scoreSurvival) scoreSurvival.textContent = '+' + Math.floor(Math.max(trialScoreBreakdown.survival || survivalDerived, survivalDerived) || 0).toLocaleString();
+  const scoreHits = document.getElementById('scoreHits');
+  if(scoreHits) scoreHits.textContent = '+' + Math.floor(Math.max(trialScoreBreakdown.hits || 0, Math.floor(points / 15)) || 0).toLocaleString();
+  const scorePickups = document.getElementById('scorePickups');
+  if(scorePickups) scorePickups.textContent = '+' + Math.floor(Math.max(trialScoreBreakdown.pickups || 0, Math.floor(points / 25)) || 0).toLocaleString();
+  const scoreLava = document.getElementById('scoreLava');
+  if(scoreLava) scoreLava.textContent = '-' + Math.floor(trialScoreBreakdown.lavaPenalty || 0).toLocaleString();
+  const scoreVoid = document.getElementById('scoreVoid');
+  if(scoreVoid) scoreVoid.textContent = '-' + Math.floor(trialScoreBreakdown.voidPenalty || 0).toLocaleString();
+  const scoreBotKill = document.getElementById('scoreBotKill');
+  if(scoreBotKill) scoreBotKill.textContent = '+' + Math.floor(trialScoreBreakdown.botKill || 0).toLocaleString();
 }
 
 function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();

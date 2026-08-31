@@ -55,10 +55,11 @@ function generateTrialsHazards() {
     for(let dc = -2; dc <= 2; dc++) for(let dr = -2; dr <= 2; dr++) protectedCells.add(key(c + dc, r + dr));
   });
 
-  const target = TRIALS_HAZARD_COUNT;
-  let placed = 0, attempts = 200;
-  while(placed < target && attempts < 200) {
-    attempts++;
+  const elapsed = (TRIAL_DURATION || 600) - (timeLeft || 600);
+  const target = TRIALS_HAZARD_COUNT + (elapsed > 300 ? 2 : 0) + (elapsed > 420 ? 3 : 0);
+  let placed = 0, attempts = 2000;
+  while(placed < target && attempts > 0) {
+    attempts--;
     const c = 2 + Math.floor(Math.random() * (TRIALS_COLS - 4));
     const r = 2 + Math.floor(Math.random() * (TRIALS_ROWS - 4));
     const k = key(c, r);
