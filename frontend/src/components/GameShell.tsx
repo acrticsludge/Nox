@@ -11,8 +11,9 @@ import CyberBadge from './game/atoms/CyberBadge'
 // Reusable GameShell — thin composer. All HUD/SVG/overlay pieces are in ./game/*
 // Edit those files to change look/feel; 1v1 and trials both import the same components so they stay in sync.
 
-export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' }) {
+export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 'online' }) {
   const isTrials = mode === 'trials'
+  const isOnline = mode === 'online'
   const gameReady = useRef<Promise<void> | null>(null)
   const [showHow, setShowHow] = useState(false)
   const [showPause, setShowPause] = useState(false)
@@ -119,6 +120,7 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
   const handleCloseHow = () => setShowHow(false)
   const handleRematch = () => {
     document.getElementById('gameOverOverlay')?.classList.add('hidden')
+    if (isOnline) { window.dispatchEvent(new CustomEvent('nox:onlineRematch')); return }
     if (isTrials) {
       const g = (window as unknown as { NOX_GAME?: { startTrials?: () => void } }).NOX_GAME
       if (g?.startTrials) g.startTrials()
@@ -163,9 +165,9 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' })
             <span style={{ color: 'var(--nox-muted)', opacity: 0.5, font: '10px var(--nox-mono)', letterSpacing: '0.1em' }}>//</span>
             <a href="/play" className="brand-lockup" style={{ textDecoration: 'none' }}>PLAY</a>
             <span style={{ color: 'var(--nox-muted)', opacity: 0.5, font: '10px var(--nox-mono)', letterSpacing: '0.1em' }}>//</span>
-            <span className="brand-lockup" style={{ color: isTrials ? 'var(--nox-amber)' : 'var(--nox-lime)' }}>{isTrials ? 'TRIALS' : '1V1'}</span>
+            <span className="brand-lockup" style={{ color: isTrials ? 'var(--nox-amber)' : isOnline ? '#58d8ff' : 'var(--nox-lime)' }}>{isTrials ? 'TRIALS' : isOnline ? 'ONLINE' : '1V1'}</span>
           </div>
-          <CyberStatus label={isTrials ? 'NEON VOID // TRIALS' : 'NEON VOID // 1V1'} />
+          <CyberStatus label={isTrials ? 'NEON VOID // TRIALS' : isOnline ? 'NEON VOID // ONLINE' : 'NEON VOID // 1V1'} />
         </header>
 
         <div className="nox-content game-layout">

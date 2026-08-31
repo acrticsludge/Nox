@@ -28,10 +28,6 @@ import SEO from '../../components/SEO.astro';
   <body>
     <div id="game-desc" aria-label="Solo survival arena. Use WASD/arrows to move, mouse to aim, click to shoot. Score breakdown shows survival, hits, pickups, penalties." style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;"></div>
     <GameShell mode="trials" client:load />
-    <div style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#0a0a0c;flex-direction:column;color:#58d8ff;font-family:var(--nox-mono);font-size:2.5rem;letter-spacing:0.15em;pointer-events:auto;">
-      <div>VOID TRIALS</div>
-      <div style="color:#fb923c;font-size:1.5rem;margin-top:1rem;letter-spacing:0.3em;">COMING SOON</div>
-    </div>
     <script>
       // Prepare menu HUD to show 10:00 immediately (before first start)
       const tryPrepare = () => {

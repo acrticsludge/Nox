@@ -640,6 +640,53 @@ let forfeitLock = false;
 
 // T2 sim adapter: when set, 1v1 runs through the pure sim core (offline parity path)
 let simMatch = null;
+let onlineActive = false;
+
+// --- Online 1v1 (T8): server snapshots drive the same render pipeline ---
+export function startOnlineMatch(seed) {
+  onlineActive = true;
+  simMatch = createMatch(seed >>> 0, { baseSpeed: globalSpeed });
+  mirrorSimToLegacy();
+  drawWalls();
+  drawHazards();
+  updateHUD();
+}
+
+export function applyNetSnapshot(s) {
+  if (!simMatch || !onlineActive) return;
+  simMatch.tick = s.tick;
+  simMatch.state = s.state;
+  if (s.score) { simMatch.scores[0] = s.score[0]; simMatch.scores[1] = s.score[1]; }
+  simMatch.timeLeft = s.time;
+  simMatch.roundResult = s.rr ?? null;
+  simMatch.matchWinner = s.mw ?? null;
+  (s.p || []).forEach((d, i) => {
+    const p = simMatch.players[i];
+    if (!p) return;
+    p.x = d[0]; p.y = d[1]; p.angle = d[2]; p.hp = d[3]; p.ammoType = d[4];
+    p.shield = d[5] > 0; p.shieldHp = d[5];
+  });
+  simMatch.bullets.length = 0;
+  for (const b of (s.b || [])) simMatch.bullets.push({ x: b[0], y: b[1], vx: b[2], vy: b[3], type: b[4], owner: 0, life: 90, r: 4, dmg: 2, bounces: 0, trail: [] });
+  simMatch.pickups.length = 0;
+  for (const pk of (s.pk || [])) simMatch.pickups.push({ x: pk[0], y: pk[1], kind: pk[2], t: 0, life: 9999 });
+  mirrorSimToLegacy();
+}
+
+export function onlineResume() {
+  if (!simMatch || !onlineActive) return;
+  simMatch.state = 'playing';
+  simMatch.roundResult = null;
+  simMatch.matchWinner = null;
+  gameState = 'playing';
+  const ro = document.getElementById('roundOverlay');
+  if (ro) ro.classList.add('hidden');
+}
+
+export function stopOnlineMatch() {
+  onlineActive = false;
+  simMatch = null;
+}
 
 // Void Trials state
 let trialPoints = 0;
@@ -1047,6 +1094,19 @@ function simVoidVisuals() {
 
 function simUpdate(dt) {
   const m = simMatch;
+  if (onlineActive) {
+    // server-authoritative: no local ticking, snapshots arrive via applyNetSnapshot
+    mirrorSimToLegacy();
+    simVoidVisuals();
+    drawHazards();
+    if (m.state !== 'playing' && gameState === 'playing') {
+      if (m.state === 'roundEnd' || m.state === 'matchEnd') {
+        endRound(m.roundResult?.winner ?? null, m.roundResult?.reason ?? '');
+      }
+    }
+    updateHUD();
+    return;
+  }
   const [i0, i1] = simInputs();
   simTick(m, [i0, i1], dt);
   mirrorSimToLegacy();
