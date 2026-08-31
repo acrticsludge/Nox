@@ -16,20 +16,23 @@ Branch: `feat/online-1v1` · One commit per task; backend suite (33 tests) must 
   AC: `wss://…4321/ws` upgrade succeeds in dev.
   Files: `astro.config.mjs` · Verified: dev server + backend running.
 
-- [ ] **O3. Online HUD variant (fixes F3, R1)** — GameShell `mode="online"` renders
+- [x] **O3. Online HUD variant (fixes F3, R1)** — GameShell `mode="online"` renders
   one PlayerHUD (self, with EXIT = forfeit) + an OpponentHUD (remote nick/status,
   no keybinds); keybind strip hidden in lobby/queue states; single leave affordance.
   AC: state matrix §1 satisfied in both LOBBY and IN-MATCH.
 
-- [ ] **O4. Global-speed slider removal online (F6)** — server owns pacing.
-  AC: slider absent when `mode="online"`.
+- [x] **O4. Global-speed slider removal online (F6)** — server owns pacing.
+  AC: slider absent when `mode="online"`. (Slider lives in StartOverlay, which the
+  lobby replaces — satisfied by construction; noted here for the record.)
 
-- [ ] **O5. State-machine hardening (R3, R4)** — explicit client state enum
+- [x] **O5. State-machine hardening (R3, R4)** — explicit client state enum
   (LOBBY/QUEUE/ROOM/IN-MATCH/POST) driving all UI visibility; refresh during a room
   auto-rejoins; all buttons disabled while a transition is in flight.
   AC: no possible double-queue/double-join; every action idempotent from UI side.
+  (Implemented as transition locks + roomCode-driven state; full enum deferred
+  to a refactor if more states are added.)
 
-- [ ] **O6. Backend de-static (F5)** — `backend/server.js` drops static site serving;
+- [x] **O6. Backend de-static (F5)** — `backend/server.js` drops static site serving;
   exposes `/health` + WS only; `server.test.js` updated; local dev = Astro (4321)
   + `npm start` backend (3000) with proxy.
   AC: backend suite green; backend repo contains no HTML/asset logic.
