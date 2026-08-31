@@ -1679,7 +1679,16 @@ function updateTrials(dt) {
 
   // Apply bot movement with wall-aware physics
   bot.vx = botResult.mx; bot.vy = botResult.my;
-  if (botResult.mx || botResult.my) bot.angle = Math.atan2(botResult.my, botResult.mx);
+  // Use movement direction for movement angle, but preserve aim angle from AI for shooting
+  // botResult.targetAngle is the predictive aim direction; bot.angle is updated there
+  // Only update angle for movement if not engaging (engagePlayer keeps aim angle for shooting)
+  if (botResult.mx || botResult.my) {
+    const moveAngle = Math.atan2(botResult.my, botResult.mx);
+    // Don't overwrite aim angle when engaging - AI sets bot.angle = targetAngle + aimError
+    if (bot.behavior !== 'engagePlayer' && bot.behavior !== 'seekPickup') {
+      bot.angle = moveAngle;
+    }
+  }
 
   let botSpd = bot.baseSpeed * (bot.speedBoost > 0 ? 1.22 : 1);
   if(bot.inSlime) botSpd *= 0.55;
