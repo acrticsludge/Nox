@@ -166,7 +166,8 @@ test('grace: opponent drop holds seat, rejoin resumes, rematch reseeds', async (
   // rematch: both request -> new seed broadcast -> countdown again
   const room = rooms.rooms.get(roomA.code);
   const oldSeed = room.seed;
-  room.match.stop(); // end the match to allow rematch flow
+  room.match.stop();
+  room.state = 'rematchWait'; // task 12: rematch is legal only from post-match state
   send(a.ws, { type: 'rematchReq' });
   await b.next('rematchReq');
   send(b.ws, { type: 'rematchReq' });
