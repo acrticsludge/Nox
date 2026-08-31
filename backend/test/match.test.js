@@ -181,3 +181,32 @@ test('grace: opponent drop holds seat, rejoin resumes, rematch reseeds', async (
   roomAfter.match.stop();
   a.ws.close(); b.ws.close();
 });
+
+test('duplicate ready packets arm exactly one countdown (P1-03)', async () => {
+  const a = makeClient('RA');
+  await new Promise(r => a.ws.on('open', r));
+  send(a.ws, hello('RA'));
+  await a.next('session');
+  send(a.ws, { type: 'create' });
+  const roomA = await a.next('room');
+  const b = makeClient('RB');
+  await new Promise(r => b.ws.on('open', r));
+  send(b.ws, hello('RB'));
+  await b.next('session');
+  send(b.ws, { type: 'join', code: roomA.code });
+  await b.next('room');
+
+  // flood: duplicate ready from both seats + extra from a third socket
+  for (let i = 0; i < 5; i++) { send(a.ws, { type: 'ready' }); send(b.ws, { type: 'ready' }); }
+  const c1 = await a.next('countdown');
+  assert.equal(c1.t, 3);
+  // drain any queued beats — there must be exactly 3,2,1,0 and no restart
+  const beats = [];
+  for (let i = 0; i < 8; i++) {
+    try { beats.push((await a.next('countdown', 4500)).t); } catch { break; }
+  }
+  assert.deepEqual(beats, [2, 1, 0], 'exactly one 3-2-1-GO sequence, got: ' + beats.join(','));
+  const room = rooms.rooms.get(roomA.code);
+  room.match.stop();
+  a.ws.close(); b.ws.close();
+});

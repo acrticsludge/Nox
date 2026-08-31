@@ -44,6 +44,11 @@ export function startMatch(room, net, opts = {}) {
   let graceTimer = null;
   let stopped = false;
   let snapCounter = 0;
+  // Task 11 (P1-03): ready is a per-seat set and the waiting -> countdown
+  // transition is one-shot — duplicate ready packets can never stack timers
+  const readySeats = new Set();
+  let countdownArmed = false;
+  const startTimers = [];
 
   function stop() {
     if (stopped) return;
@@ -51,6 +56,8 @@ export function startMatch(room, net, opts = {}) {
     if (tickTimer) clearInterval(tickTimer);
     if (breakTimer) clearTimeout(breakTimer);
     if (graceTimer) clearTimeout(graceTimer);
+    for (const t of startTimers) clearTimeout(t);
+    startTimers.length = 0;
     room.match = null;
   }
 
@@ -109,14 +116,18 @@ export function startMatch(room, net, opts = {}) {
     if (seat === -1) return;
     switch (msg.type) {
       case 'ready': {
+        if (readySeats.has(seat) || countdownArmed) return;   // idempotent (P1-03)
+        readySeats.add(seat);
+        if (readySeats.size < room.seats.filter(Boolean).length) return;
+        countdownArmed = true;
         // 3-2-1-GO, one beat per second, then the server starts ticking
         broadcast({ type: 'countdown', t: 3 });
         for (const t of [2, 1, 0]) {
-          setTimeout(() => {
+          startTimers.push(setTimeout(() => {
             if (stopped) return;
             broadcast({ type: 'countdown', t });
             if (t === 0 && !tickTimer) tickTimer = setInterval(tick, TICK_MS);
-          }, (3 - t) * 1000);
+          }, (3 - t) * 1000));
         }
         return;
       }
