@@ -8,6 +8,8 @@ import ControlsStrip from './game/molecules/ControlsStrip'
 import GameStage from './game/organisms/GameStage'
 import HowToPlayModal from './game/overlays/HowToPlayModal'
 import CyberBadge from './game/atoms/CyberBadge'
+import PauseOverlay from './game/overlays/PauseOverlay'
+import GameDialog from './game/atoms/GameDialog'
 
 // Reusable GameShell — thin composer. All HUD/SVG/overlay pieces are in ./game/*
 // Edit those files to change look/feel; 1v1 and trials both import the same components so they stay in sync.
@@ -195,39 +197,36 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 
       </main>
 
       {isTrials && showPause && (
-        <div className="overlay" style={{ zIndex: 100 }}>
-          <div className="menu-card" style={{ padding: 30 }}>
-            <CyberBadge variant="amber">⏸ PAUSED</CyberBadge>
-            <h2 className="menu-title" style={{ marginTop: 18 }}>VOID TRIALS // PAUSED</h2>
-            <p style={{ color: 'var(--nox-muted)', font: '12px var(--nox-mono)', lineHeight: 1.6 }}>
-              Press <strong style={{ color: 'var(--nox-fg)' }}>P</strong> or <strong style={{ color: 'var(--nox-fg)' }}>Esc</strong> to resume. Your state is saved locally.
-            </p>
-            <div className="btn-row" style={{ marginTop: 20 }}>
-              <button className="btn btn-primary" onClick={() => { setShowPause(false); const g = (window as unknown as { NOX_GAME?: { resumeTrials?: () => void } }).NOX_GAME; if ((g as unknown as { gameState?: () => string })?.gameState?.() === 'paused') window.dispatchEvent(new CustomEvent('nox:resume')) }}>
-                ▶ RESUME
-              </button>
-              <button className="btn btn-ghost" onClick={() => setShowExitConfirm(true)}>EXIT TRIAL</button>
-            </div>
-          </div>
-        </div>
+        <PauseOverlay
+          onResume={() => {
+            setShowPause(false)
+            const g = (window as unknown as { NOX_GAME?: { resumeTrials?: () => void } }).NOX_GAME
+            if ((g as unknown as { gameState?: () => string })?.gameState?.() === 'paused') window.dispatchEvent(new CustomEvent('nox:resume'))
+          }}
+          onExit={() => setShowExitConfirm(true)}
+        />
       )}
 
       {isTrials && showExitConfirm && (
-        <div className="overlay" style={{ zIndex: 101 }}>
-          <div className="menu-card" style={{ padding: 30, borderColor: 'var(--nox-amber)' }}>
-            <CyberBadge variant="amber">⚠ FORFEIT</CyberBadge>
-            <h2 className="menu-title" style={{ marginTop: 18, color: 'var(--nox-amber)' }}>EXIT VOID TRIAL?</h2>
-            <p style={{ color: 'var(--nox-muted)', font: '12px var(--nox-mono)', lineHeight: 1.6 }}>
-              Your progress and high score will be saved. Are you sure you want to leave the trial?
-            </p>
-            <div className="btn-row" style={{ marginTop: 20 }}>
-              <button className="btn btn-primary" style={{ background: 'var(--nox-amber)', color: 'var(--nox-bg)' }} onClick={() => { setShowExitConfirm(false); setShowPause(false); window.dispatchEvent(new CustomEvent('nox:forfeitTrials')) }}>
-                YES // EXIT
-              </button>
-              <button className="btn btn-ghost" onClick={() => setShowExitConfirm(false)}>CANCEL</button>
-            </div>
+        <GameDialog
+          label="Exit void trial?"
+          zIndex={101}
+          escapeCloses={false}
+          style={{ padding: 30, borderColor: 'var(--nox-amber)' }}
+          onClose={() => setShowExitConfirm(false)}
+        >
+          <CyberBadge variant="amber">⚠ FORFEIT</CyberBadge>
+          <h2 className="menu-title" style={{ marginTop: 18, color: 'var(--nox-amber)' }}>EXIT VOID TRIAL?</h2>
+          <p style={{ color: 'var(--nox-muted)', font: '12px var(--nox-mono)', lineHeight: 1.6 }}>
+            Your progress and high score will be saved. Are you sure you want to leave the trial?
+          </p>
+          <div className="btn-row" style={{ marginTop: 20 }}>
+            <button className="btn btn-primary" style={{ background: 'var(--nox-amber)', color: 'var(--nox-bg)' }} onClick={() => { setShowExitConfirm(false); setShowPause(false); window.dispatchEvent(new CustomEvent('nox:forfeitTrials')) }}>
+              YES // EXIT
+            </button>
+            <button className="btn btn-ghost" onClick={() => setShowExitConfirm(false)}>CANCEL</button>
           </div>
-        </div>
+        </GameDialog>
       )}
 
       {showHow && <HowToPlayModal mode={mode} onClose={handleCloseHow} />}

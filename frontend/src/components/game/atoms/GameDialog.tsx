@@ -10,12 +10,16 @@ export default function GameDialog({
   onClose,
   escapeCloses = true,
   className = 'menu-card',
+  style,
+  zIndex = 100,
 }: {
   label: string
   children: ReactNode
   onClose?: () => void
   escapeCloses?: boolean
   className?: string
+  style?: React.CSSProperties
+  zIndex?: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -57,8 +61,8 @@ export default function GameDialog({
   }, [escapeCloses, onClose])
 
   return (
-    <div className="overlay" style={{ zIndex: 100 }} onKeyDown={e => e.stopPropagation()}>
-      <div ref={ref} className={className} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
+    <div className="overlay" style={{ zIndex }} onKeyDown={e => e.stopPropagation()}>
+      <div ref={ref} className={className} style={style} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
         {children}
       </div>
     </div>
