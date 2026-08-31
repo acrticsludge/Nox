@@ -227,11 +227,19 @@ import SEO from '../../components/SEO.astro';
     bridge.send('input', { seq: ++inputSeq, m });
   }, 1000 / 30);
 
-  // boot: lobby replaces the local start overlay; deep-link ?room= joins directly
-  function boot() {
+  // boot: wait for React hydration to finish (it rebuilds #stage), then hide the
+  // local start overlay and mount the lobby. Observer on body re-asserts if React
+  // ever re-renders the stage.
+  function inject() {
+    const stage = document.getElementById('stage');
+    if (!stage) return false;
     const so = document.getElementById('startOverlay');
-    if (so) so.classList.add('hidden');
-    buildLobby();
+    if (so && roomCode === null) so.classList.add('hidden');
+    if (!document.getElementById('noxLobby')) stage.appendChild(buildLobby());
+    return true;
+  }
+  function boot() {
+    if (!inject()) { setTimeout(boot, 150); return; }
     const roomParam = new URLSearchParams(location.search).get('room');
     if (roomParam && /^[A-Z0-9]{5}$/i.test(roomParam)) {
       const input = $('noxNick') as HTMLInputElement;
@@ -239,6 +247,9 @@ import SEO from '../../components/SEO.astro';
       ($('noxJoinCode') as HTMLInputElement).value = roomParam.toUpperCase();
       run('join', roomParam.toUpperCase());
     }
+    new MutationObserver(() => { if (roomCode === null) inject(); })
+      .observe(document.body, { childList: true, subtree: true });
   }
-  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', boot); else boot();
+  // hydration replaces island DOM shortly after load — inject only after it settles
+  addEventListener('load', () => setTimeout(boot, 900));
 </script>
