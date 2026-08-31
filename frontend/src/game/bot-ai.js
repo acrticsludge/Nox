@@ -88,7 +88,7 @@ const BOT_CONFIG = {
   VOID_AVOID_RANGE: 100,
 
   // Engagement ranges
-  ENGAGE_RANGE: 1200,
+  ENGAGE_RANGE: 2000,  // Increased from 1200 - always engage if player alive
   ENGAGE_STRAFE_MIN: 150,
   ENGAGE_STRAFE_MAX: 300,
   ENGAGE_BACKOFF_RANGE: 150,

@@ -249,12 +249,12 @@ import SEO from '../../components/SEO.astro';
   // boot: wait for React hydration to finish (it rebuilds #stage), then hide the
   // local start overlay and mount the lobby. Observer on body re-asserts if React
   // ever re-renders the stage.
+  // boot: after hydration settles, mount the lobby into the React-rendered
+  // #noxLobbyMount (the 1v1 start overlay is never rendered in online mode)
   function inject() {
-    const stage = document.getElementById('stage');
-    if (!stage) return false;
-    const so = document.getElementById('startOverlay');
-    if (so && roomCode === null) so.classList.add('hidden');
-    if (!document.getElementById('noxLobby')) stage.appendChild(buildLobby());
+    const mount = document.getElementById('noxLobbyMount');
+    if (!mount) return false;
+    if (!document.getElementById('noxLobby')) mount.appendChild(buildLobby());
     return true;
   }
   function boot() {
@@ -266,7 +266,7 @@ import SEO from '../../components/SEO.astro';
       ($('noxJoinCode') as HTMLInputElement).value = roomParam.toUpperCase();
       run('join', roomParam.toUpperCase());
     }
-    new MutationObserver(() => { if (roomCode === null) inject(); })
+    new MutationObserver(() => { inject(); })
       .observe(document.body, { childList: true, subtree: true });
   }
   // hydration replaces island DOM shortly after load — inject only after it settles

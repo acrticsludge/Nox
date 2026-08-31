@@ -68,7 +68,12 @@ export default function GameStage({
         </g>
       </svg>
 
-      <StartOverlay mode={mode} onPlay={onPlay} onHow={onHow} />
+      {/* online: the start overlay is never server-rendered — the lobby mounts here (no 1v1 flash on refresh) */}
+      {mode === 'online' ? (
+        <div id="noxLobbyMount" />
+      ) : (
+        <StartOverlay mode={mode} onPlay={onPlay} onHow={onHow} />
+      )}
       <RoundOverlay mode={mode} />
       <GameOverOverlay mode={mode} onRematch={onRematch} onMenu={onMenu} total={0} high={0} time="00:00" breakdown={{ survival: 0, hits: 0, pickups: 0, lava: 0, slime: 0, void: 0, botKill: 0 }} />
     </div>
