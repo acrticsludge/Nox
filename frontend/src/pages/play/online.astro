@@ -153,6 +153,7 @@ import SEO from '../../components/SEO.astro';
   function showLobby() {
     gl?.stopOnlineMatch();
     roomCode = null;
+    setHud(false);
     const cd = document.getElementById('noxCd'); if (cd) cd.style.display = 'none';
     const msg = document.getElementById('noxMsg'); if (msg) msg.style.display = 'none';
     const p2name = document.querySelector('#cardP2 .hud-name');
@@ -192,6 +193,14 @@ import SEO from '../../components/SEO.astro';
     if (ms) setTimeout(() => { if (el.textContent === m) el.style.display = 'none'; }, ms);
   };
 
+  // HUD identity stays hidden until the server assigns seats (countdown start)
+  const setHud = (v: boolean) => {
+    for (const id of ['noxHudBar', 'noxKeysBar']) {
+      const el = document.getElementById(id);
+      if (el) el.style.visibility = v ? 'visible' : 'hidden';
+    }
+  };
+
   const bigCount = (txt: string) => {
     const el = document.getElementById('noxCd');
     if (!el) return;
@@ -221,7 +230,7 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('countdown', async (m: { t: number }) => {
     if (!roomCode) return;
-    if (m.t > 0) { bigCount(String(m.t)); return; }
+    if (m.t > 0) { setHud(true); bigCount(String(m.t)); return; }
     hideLobby();
     bigCount('GO');
     setTimeout(() => { const el = document.getElementById('noxCd'); if (el && el.textContent === 'GO') el.style.display = 'none'; }, 700);
