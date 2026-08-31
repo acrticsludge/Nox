@@ -1,5 +1,9 @@
 // NEON VOID // Bot AI for Void Trials
-// Priority-based behavior selector with hysteresis, wall-aware movement, void awareness
+// Priority-based behavior selector with hysteresis, wall-aware movement,
+// VOID AWARENESS: the bot avoids the shrinking void (highest-priority
+// avoidVoid behavior, 1000+ score outside the safe zone). This is the
+// intended design decision (audit P1-08) — player copy, tests, and docs
+// must all say the bot avoids the void.
 
 /**
  * @typedef {Object} BotState
@@ -617,18 +621,20 @@ function executeAvoidVoid(bot, state) {
     const hw = voidRect.w / 2;
     const hh = voidRect.h / 2;
 
-    // Find nearest safe zone edge
+    // Find the axis of overshoot and steer BACK toward the safe zone.
+    // (Fixed for P1-08: the previous vector pointed from center to bot,
+    // which moved the bot further OUT of the safe zone.)
     const dx = bot.x - cx;
     const dy = bot.y - cy;
     const absDx = Math.abs(dx), absDy = Math.abs(dy);
 
     let moveAngle;
     if (absDx - hw > absDy - hh) {
-      // Closer to left/right edge
-      moveAngle = dx > 0 ? 0 : Math.PI;
+      // Overshooting past the left/right edge — walk back horizontally
+      moveAngle = dx > 0 ? Math.PI : 0;
     } else {
-      // Closer to top/bottom edge
-      moveAngle = dy > 0 ? Math.PI / 2 : -Math.PI / 2;
+      // Overshooting past the top/bottom edge — walk back vertically
+      moveAngle = dy > 0 ? -Math.PI / 2 : Math.PI / 2;
     }
     const q = quantizeTo8Dir(moveAngle);
     mx = q.mx; my = q.my;
@@ -705,27 +711,24 @@ function executeEngagePlayer(bot, state) {
     return { mx, my, shoot: false, dash: false, targetAngle: bot.angle };
   }
 
-  // Use LIVE player velocity (updated every frame in game-logic)
+  // P1-07: use the player's REAL applied per-frame delta (lastVx/lastVy,
+  // maintained by game-logic). It already includes dash speed and slime slow,
+  // so no further multipliers are applied here.
   const bulletSpeed = BOT_CONFIG.BULLET_SPEED;
   const travelTime = distance(bot.x, bot.y, player.x, player.y) / bulletSpeed;
-
-  // Account for dash speed boost and slime slow
-  let playerVx = player.vx || 0;
-  let playerVy = player.vy || 0;
+  let playerVx = player.lastVx != null ? player.lastVx : (player.vx || 0);
+  let playerVy = player.lastVy != null ? player.lastVy : (player.vy || 0);
   const wasDashing = bot.lastPlayerDash > 0;
   const isDashing = player.dash > 0;
-  if (isDashing) {
-    playerVx *= 2.35;
-    playerVy *= 2.35;
-  }
   bot.lastPlayerDash = isDashing ? 1 : 0;
 
-  // Cap prediction time to prevent wild aim at long range
-  const maxPredictionTime = 0.5; // Max 0.5 seconds prediction
-  const cappedTravelTime = Math.min(travelTime, maxPredictionTime);
+  // Cap prediction to 30 frames (0.5s) to prevent wild aim at long range.
+  // lastVx/lastVy are px PER FRAME, so convert travel/reaction time to frames.
+  const maxPredictionFrames = 30;
+  const predictionFrames = Math.min(travelTime * 60 + bot.reactionDelay / (1000 / 60), maxPredictionFrames);
 
-  const predX = player.x + playerVx * (cappedTravelTime + bot.reactionDelay / 1000);
-  const predY = player.y + playerVy * (cappedTravelTime + bot.reactionDelay / 1000);
+  const predX = player.x + playerVx * predictionFrames;
+  const predY = player.y + playerVy * predictionFrames;
 
   const dx = predX - bot.x;
   const dy = predY - bot.y;

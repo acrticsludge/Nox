@@ -1,4 +1,4 @@
-# Spec: Void Trials // Solo Mode
+﻿# Spec: Void Trials // Solo Mode
 
 ## Objective
 
@@ -25,27 +25,27 @@ Lint: npm --prefix frontend run lint
 
 ```
 frontend/
-├── src/
-│   ├── pages/
-│   │   ├── play/
-│   │   │   ├── 1v1.astro          # existing
-│   │   │   └── trials.astro        # NEW - Void Trials entry point
-│   │   └── play.astro              # mode selection (update Trials card)
-│   ├── components/
-│   │   ├── GameShell.tsx           # existing - extend for Trials mode
-│   │   └── trials/
-│   │       ├── TrialsGameShell.tsx # NEW - solo-specific shell
-│   │       ├── TrialsHUD.tsx       # NEW - points, timer, void status
-│   │       ├── TrialsBot.tsx       # NEW - bot AI logic (or in game-logic)
-│   │       ├── PauseOverlay.tsx    # NEW
-│   │       └── ExitOverlay.tsx     # NEW
-│   ├── game/
-│   │   ├── game-logic.js           # EXTEND - add Trials mode, bot AI, 2x arena
-│   │   └── bot-ai.js               # NEW - separated bot behavior tree
-│   └── styles/
-│       └── global.css              # EXTEND - Trials-specific tokens
-├── public/
-│   └── og.png                      # update if needed
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ pages/
+â”‚   â”‚   â”œâ”€â”€ play/
+â”‚   â”‚   â”‚   â”œâ”€â”€ 1v1.astro          # existing
+â”‚   â”‚   â”‚   â””â”€â”€ trials.astro        # NEW - Void Trials entry point
+â”‚   â”‚   â””â”€â”€ play.astro              # mode selection (update Trials card)
+â”‚   â”œâ”€â”€ components/
+â”‚   â”‚   â”œâ”€â”€ GameShell.tsx           # existing - extend for Trials mode
+â”‚   â”‚   â””â”€â”€ trials/
+â”‚   â”‚       â”œâ”€â”€ TrialsGameShell.tsx # NEW - solo-specific shell
+â”‚   â”‚       â”œâ”€â”€ TrialsHUD.tsx       # NEW - points, timer, void status
+â”‚   â”‚       â”œâ”€â”€ TrialsBot.tsx       # NEW - bot AI logic (or in game-logic)
+â”‚   â”‚       â”œâ”€â”€ PauseOverlay.tsx    # NEW
+â”‚   â”‚       â””â”€â”€ ExitOverlay.tsx     # NEW
+â”‚   â”œâ”€â”€ game/
+â”‚   â”‚   â”œâ”€â”€ game-logic.js           # EXTEND - add Trials mode, bot AI, 2x arena
+â”‚   â”‚   â””â”€â”€ bot-ai.js               # NEW - separated bot behavior tree
+â”‚   â””â”€â”€ styles/
+â”‚       â””â”€â”€ global.css              # EXTEND - Trials-specific tokens
+â”œâ”€â”€ public/
+â”‚   â””â”€â”€ og.png                      # update if needed
 ```
 
 ## Code Style
@@ -53,7 +53,7 @@ frontend/
 - TypeScript for React components, vanilla JS for game logic
 - Monospace typography (`Courier New` / `--nox-mono`)
 - Square radius (`0`), hairline borders (`var(--nox-border)`)
-- Semantic color tokens only — no ad-hoc hex
+- Semantic color tokens only â€” no ad-hoc hex
 - Async module loading via dynamic `import()`
 - Event-driven communication via `window.dispatchEvent` / `window.NOX_GAME`
 
@@ -88,7 +88,7 @@ function selectBehavior(bot, state) {
   - Follow `docs/design/DESIGN.md` tokens exactly
   - Serialize full state to localStorage every 2 seconds
   - 60Hz fixed-step simulation (`SIM_STEP = 1000/60`)
-  - No em dashes — use hyphens
+  - No em dashes â€” use hyphens
 - **Ask First:**
   - New npm dependencies
   - Changes to `global.css` design tokens
@@ -101,11 +101,11 @@ function selectBehavior(bot, state) {
 
 ## Success Criteria
 
-1. **Mode Selection:** `/play` shows "VOID TRIALS // SOLO" card with amber accent, "LIVE // 1P • 10:00 • VOID CRUSH" badge, scary cyber styling, WASD hint, difficulty warning
+1. **Mode Selection:** `/play` shows "VOID TRIALS // SOLO" card with amber accent, "LIVE // 1P â€¢ 10:00 â€¢ VOID CRUSH" badge, scary cyber styling, WASD hint, difficulty warning
 2. **Arena:** 2x scale (1920x1120 viewBox), walls/pickups/hazards scale proportionally, same rendering quality
-3. **Bot:** Moves, aims predictively (80-120ms delay), shoots all bullet types, picks up powerups, dodges lava/slime, uses dash, retreats when low HP — NO void awareness
-4. **Void Shrink:** At 7:30 (450s), rectangular border begins shrinking from 2x edges to 1x center over 30s. Exponential damage outside: low at edge → lethal at 1x boundary
-5. **Scoring:** +1/sec survival, +25/hit, +75/powerup, -30/lava tick, -15/slime tick. After 7:30: gains ×2, losses ×3. High score persisted in localStorage
+3. **Bot:** Moves, aims predictively (80-120ms delay), shoots all bullet types, picks up powerups, dodges lava/slime, uses dash, retreats when low HP â€” NO void awareness
+4. **Void Shrink:** At 7:30 (450s), rectangular border begins shrinking from 2x edges to 1x center over 30s. Exponential damage outside: low at edge â†’ lethal at 1x boundary
+5. **Scoring:** +1/sec survival, +25/hit, +75/powerup, -30/lava tick, -15/slime tick. After 7:30: gains Ã—2, losses Ã—3. High score persisted in localStorage
 6. **Controls:** P1 = WASD + SHIFT (dash) + SPACE (shoot). Pause = P or ESC. Exit = forfeit with confirmation
 7. **Persistence:** Full state (timer, HPs, positions, velocities, powerups, bot state, points, pause) saved every 2s. On reload, "Resume Trial" button appears on Trials start screen
 8. **HUD:** Points large, timer with void warning at 7:30, bot HP, player HP, active powerups, current bullet type
@@ -115,7 +115,7 @@ function selectBehavior(bot, state) {
 
 - [RESOLVED] Void shrink: rectangular border, 30s duration (7:30-8:00), exponential damage
 - [RESOLVED] Points: local high score only, values as specified above
-- [RESOLVED] Bot: predictive aim + reaction delay, no void knowledge, all powerup types
+- [RESOLVED 2026-08-31] Bot: predictive aim (real applied player velocity) + reaction delay, AVOIDS the shrinking void (intended design, audit P1-08), all powerup types
 - [RESOLVED] Persistence: full run state snapshot every 2s, resume on reload
 - [RESOLVED] Arena: 2x scale (1920x1120), proportional wall/hazard/pickup scaling
 - [RESOLVED] Win: survive 10:00 OR kill bot (bot has 12 HP like player)
@@ -127,11 +127,11 @@ function selectBehavior(bot, state) {
 
 See `docs/features/void-trials-future.md` for:
 
-1. **Difficulty Tiers** — Trial I/II/III with increasing bot aggression, faster void, less pickup spawn
-2. **Daily Seeded Runs** — Deterministic RNG seed per day, shared leaderboard via localStorage sync
-3. **Meta Progression** — Unlock cosmetic ship variants, trail colors, void ring styles via total points
-4. **Bot Personality Profiles** — "Stalker" (aggro), "Sniper" (long range), "Scavenger" (pickup priority), "Ghost" (evasive)
-5. **Mutators** — "No Dashes", "One HP", "Bullet Hell", "Void Accelerated"
-6. **Replay System** — Record inputs, playback with ghost bot
-7. **Co-op Trials** — 2 players (WASD + Arrows) vs 2 bots on 2x arena
-8. **Global Leaderboard** — Vercel KV or Supabase for cross-device scores
+1. **Difficulty Tiers** â€” Trial I/II/III with increasing bot aggression, faster void, less pickup spawn
+2. **Daily Seeded Runs** â€” Deterministic RNG seed per day, shared leaderboard via localStorage sync
+3. **Meta Progression** â€” Unlock cosmetic ship variants, trail colors, void ring styles via total points
+4. **Bot Personality Profiles** â€” "Stalker" (aggro), "Sniper" (long range), "Scavenger" (pickup priority), "Ghost" (evasive)
+5. **Mutators** â€” "No Dashes", "One HP", "Bullet Hell", "Void Accelerated"
+6. **Replay System** â€” Record inputs, playback with ghost bot
+7. **Co-op Trials** â€” 2 players (WASD + Arrows) vs 2 bots on 2x arena
+8. **Global Leaderboard** â€” Vercel KV or Supabase for cross-device scores

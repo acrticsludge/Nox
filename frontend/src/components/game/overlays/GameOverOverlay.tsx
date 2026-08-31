@@ -47,6 +47,10 @@ export default function GameOverOverlay({
               <span className="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg> Bot Kill Bonus</span>
               <strong id="scoreBotKill" className="text-[var(--nox-amber)]">+0</strong>
             </div>
+            <div className="score-row" role="listitem" aria-label="Bot Hit Penalty" style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', font: '12px var(--nox-mono)' }}>
+              <span className="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> Bot Hit Penalty</span>
+              <strong id="scoreBotHit" className="text-[var(--nox-pink)]">0</strong>
+            </div>
             <div className="score-row" role="listitem" aria-label="Void Penalty" style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', font: '12px var(--nox-mono)' }}>
               <span className="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> Void Penalty</span>
               <strong id="scoreVoid" className="text-[var(--nox-pink)]">0</strong>

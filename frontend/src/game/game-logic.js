@@ -1,9 +1,10 @@
-// NEON VOID // 2P Duel Game Logic + Void Trials Solo
+﻿// NEON VOID // 2P Duel Game Logic + Void Trials Solo
 // Extracted from play.astro to separate concerns
 
 import { updateBotAI } from './bot-ai.js';
 import { drawWalls, drawHazards, render, setCyberBadgeText, setCyberBadgeVariant, updateHUD } from './game-view.js';
 import { createMatch, simTick, simNextRound } from './sim/game-sim.js';
+import { applyLedger, createLedger, ledgerTotal, sumLedger } from './trials-ledger.js';
 
 const W = 960, H = 560;
 const PLAYER_R = 16;
@@ -28,16 +29,16 @@ const TRIALS_COLS = 48;
 const TRIALS_ROWS = 28;
 const TRIAL_DURATION = 600;
 const VOID_START_TIME = 450;
-const VOID_SHRINK_DURATION = 30; // SECONDS — second-scale timer (dt/60 loop, display m:s); 30s from 7:30 to 8:00
+const VOID_SHRINK_DURATION = 30; // SECONDS â€” second-scale timer (dt/60 loop, display m:s); 30s from 7:30 to 8:00
 const BOT_MAX_HP = 12;
 const TRIALS_HAZARD_COUNT = 10;
 const TRIALS_WALL_TARGET = 16;
 
 const POWER_TYPES = {
-  overcharge: { color:'#ffb23e', bg:'#ff9d2e', icon:'⚡', duration:240, life:480 },
-  shield:     { color:'#58d8ff', bg:'#3ec5f2', icon:'❄', life:480, hp:5 },
-  blink:      { color:'#c9ff2f', bg:'#c9ff2f', icon:'✦', duration:180, life:480 },
-  heal:       { color:'#22c55e', bg:'#16a34a', icon:'✚', life:480, heal:2 }
+  overcharge: { color:'#ffb23e', bg:'#ff9d2e', icon:'âš¡', duration:240, life:480 },
+  shield:     { color:'#58d8ff', bg:'#3ec5f2', icon:'â„', life:480, hp:5 },
+  blink:      { color:'#c9ff2f', bg:'#c9ff2f', icon:'âœ¦', duration:180, life:480 },
+  heal:       { color:'#22c55e', bg:'#16a34a', icon:'âœš', life:480, heal:2 }
 };
 
 // Bullet archetypes - balanced for MAX_HP 12, guest only, no ELO
@@ -327,7 +328,7 @@ function findValidHazardPos(ignoreIdx = -1) {
     const r = 1 + Math.floor(Math.random() * (rows - 2));
     const x = c * GRID + 2, y = r * GRID + 2;
     const cx = x + 18, cy = y + 18;
-    // avoid spawn protects — mirror generators' protectedCells per mode
+    // avoid spawn protects â€” mirror generators' protectedCells per mode
     if (gameMode === 'trials') {
       const inTrialSpawn = (c>=5&&c<=8&&r>=12&&r<=16) || (c>=39&&c<=42&&r>=12&&r<=16) || (c>=21&&c<=26&&r>=12&&r<=16);
       if (inTrialSpawn) continue;
@@ -356,7 +357,7 @@ function findValidHazardPos(ignoreIdx = -1) {
       if (Math.abs(h.x - x) < 42 && Math.abs(h.y - y) < 42) { overlap = true; break; }
     }
     if (overlap) continue;
-    // avoid players/bot (80px) — include bot in trials
+    // avoid players/bot (80px) â€” include bot in trials
     const avoid = gameMode === 'trials' ? [players[0], bot] : [players[0], players[1]];
     let nearEnt=false;
     for(const ent of avoid){ if(ent && ent.alive && len2(cx,cy,ent.x,ent.y)<88){ nearEnt=true; break; } }
@@ -721,9 +722,11 @@ export function stopOnlineMatch() {
   simMatch = null;
 }
 
-// Void Trials state
+// Void Trials state. trialPoints is the EXACT running sum of the ledger
+// (audit P1-06); it is only ever mutated through awardTrials(), never clamped
+// or inferred. Display clamping/flooring happens at render time only.
 let trialPoints = 0;
-let trialScoreBreakdown = { survival: 0, hits: 0, pickups: 0, lavaPenalty: 0, slimePenalty: 0, voidPenalty: 0, botKill: 0 };
+let trialsLedger = createLedger();
 let trialHighScore = 0;
 let voidRect = null;
 let voidShrinkStart = 0;
@@ -733,6 +736,10 @@ const SAVE_INTERVAL = 120;
 function trackTimeout(id) { pendingTimeouts.push(id); return id; }
 function clearPendingTimeouts() { pendingTimeouts.forEach(clearTimeout); pendingTimeouts.length = 0; }
 function clearInputState() { keys = {}; }
+// The ONLY mutation path for Trials score (audit P1-06). Penalties are stored
+// as signed (negative) amounts; bonuses as positive amounts.
+function awardTrials(key, amount) { trialPoints = applyLedger(trialsLedger, key, amount); }
+function trialsFinal() { return ledgerTotal(trialsLedger); }
 function hardResetInternalState() {
   clearPendingTimeouts();
   clearInputState();
@@ -760,6 +767,7 @@ function hardResetInternalState() {
   });
   // Trials reset
   trialPoints = 0;
+  trialsLedger = createLedger();
   voidRect = null;
   voidShrinkStart = 0;
   lastSaveTime = 0;
@@ -970,7 +978,7 @@ function startTrials() {
   gameMode = 'trials';
   timeLeft = TRIAL_DURATION;
   trialPoints = 0;
-  trialScoreBreakdown = { survival: 0, hits: 0, pickups: 0, lavaPenalty: 0, slimePenalty: 0, voidPenalty: 0, botKill: 0 };
+  trialsLedger = createLedger();
   voidRect = null;
   voidShrinkStart = 0;
   lastSaveTime = 0;
@@ -1036,7 +1044,7 @@ function prepareTrialsMenu() {
   gameMode = 'trials';
   timeLeft = TRIAL_DURATION;
   trialPoints = 0;
-  trialScoreBreakdown = { survival: 0, hits: 0, pickups: 0, lavaPenalty: 0, slimePenalty: 0, voidPenalty: 0, botKill: 0 };
+  trialsLedger = createLedger();
   voidRect = null;
   safeRadius = 999;
   // Ensure P2 hidden in menu preview as well
@@ -1090,7 +1098,7 @@ function simInputs() {
 }
 
 function simVoidVisuals() {
-  // DOM void ring visuals — identical to legacy block, safeRadius sourced from sim
+  // DOM void ring visuals â€” identical to legacy block, safeRadius sourced from sim
   const elapsed = ROUND_TIME - timeLeft;
   if(elapsed < 45) {
     safeRadius = 999;
@@ -1333,12 +1341,15 @@ function update(dt) {
     if(p.dash > 0 && mag === 0) { mx = Math.cos(p.angle); my = Math.sin(p.angle); }
     let nx = p.x + mx * spd;
     let ny = p.y + my * spd;
+    // P1-07: capture pre-move position, then record the APPLIED delta so bot
+    // prediction uses real velocity (wall slides included, free moves nonzero)
+    const px0 = p.x, py0 = p.y;
     if(mx || my || p.dash > 0) tryMove(p, nx, ny);
     else { pushOutOfWalls(p); }
 
     // Track player velocity for bot predictive aim (updated every frame)
-    p.lastVx = nx - p.x;
-    p.lastVy = ny - p.y;
+    p.lastVx = p.x - px0;
+    p.lastVy = p.y - py0;
 
     const hz = hazardAt(p.x, p.y);
     if(hz && hz.kind === 'lava' && isLavaActive(hz) && p.lavaCd === 0) {
@@ -1399,7 +1410,6 @@ function update(dt) {
             // small dash indicator
             p.squish = 10;
           }
-          if(trialScoreBreakdown) trialScoreBreakdown.pickups = (trialScoreBreakdown.pickups||0)+1;
           pickups.splice(idx, 1);
           continue;
         }
@@ -1599,9 +1609,8 @@ function updateTrials(dt) {
   timeLeft -= dt / 60;
   if(timeLeft <= 0) {
     // Survived 10 minutes - WIN
-    trialPoints += Math.floor(timeLeft * 0); // remaining time bonus
     gameState = 'gameOver';
-    const finalPoints = Math.floor(trialPoints);
+    const finalPoints = trialsFinal();
     if(finalPoints > trialHighScore) {
       trialHighScore = finalPoints;
       try { localStorage.setItem('nv_trials_highscore', String(trialHighScore)); } catch {}
@@ -1669,11 +1678,11 @@ function updateTrials(dt) {
     if(vPurple) vPurple.setAttribute('mask', 'url(#voidMask)');
   }
 
-  // Point accrual: +1 per second (survival)
+  // Point accrual: +1 per second (survival), exact fractional ledger entry
   const elapsedTotal = TRIAL_DURATION - timeLeft;
   if(elapsedTotal >= 1) {
     const multiplier = elapsedTotal >= VOID_START_TIME ? 2 : 1;
-    trialPoints += 1 * multiplier / 60; // per frame at 60fps
+    awardTrials('survival', 1 * multiplier / 60); // per frame at 60fps
   }
 
   // Hazard movement
@@ -1774,7 +1783,7 @@ function updateTrials(dt) {
     if(bot.hp <= 0) {
       bot.alive = false;
       gameState = 'gameOver';
-      clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT LAVA'); showTrialsGameOver(Math.floor(trialPoints), 'BOT BURNED IN LAVA', false);
+      clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(), 'BOT LAVA'); showTrialsGameOver(trialsFinal(), 'BOT BURNED IN LAVA', false);
       return;
     }
   }
@@ -1788,12 +1797,12 @@ function updateTrials(dt) {
     if(bot.hp <= 0) {
       bot.alive = false;
       gameState = 'gameOver';
-      clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'BOT VOID'); showTrialsGameOver(Math.floor(trialPoints), 'BOT LOST TO THE VOID', false);
+      clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(), 'BOT VOID'); showTrialsGameOver(trialsFinal(), 'BOT LOST TO THE VOID', false);
       return;
     }
   }
 
-  // Bot shooting — handled by AI (predictive aim, reaction delay already applied)
+  // Bot shooting â€” handled by AI (predictive aim, reaction delay already applied)
   if(botResult.shoot && bot.shootCd <= 0) {
     shoot(bot);
   }
@@ -1846,8 +1855,7 @@ function updateTrials(dt) {
     if(p.inSlime) {
       if(p.slimeCd <= 0) {
         const slimePenalty = elapsedTotal >= VOID_START_TIME ? 45 : 15;
-        trialScoreBreakdown.slimePenalty += slimePenalty;
-        trialPoints = Math.max(0, trialPoints - slimePenalty);
+        awardTrials('slimePenalty', -slimePenalty);
         p.slimeCd = 60;
       }
       curSpeed *= 0.55;
@@ -1858,12 +1866,14 @@ function updateTrials(dt) {
     if(p.dash > 0 && mag === 0) { mx = Math.cos(p.angle); my = Math.sin(p.angle); }
     let nx = p.x + mx * spd;
     let ny = p.y + my * spd;
+    // P1-07: record the APPLIED movement delta (see 1v1 twin site)
+    const px0 = p.x, py0 = p.y;
     if(mx || my || p.dash > 0) tryMove(p, nx, ny);
     else { pushOutOfWalls(p); }
 
     // Track player velocity for bot predictive aim (updated every frame)
-    p.lastVx = nx - p.x;
-    p.lastVy = ny - p.y;
+    p.lastVx = p.x - px0;
+    p.lastVy = p.y - py0;
 
     // Lava damage
     const hz = hazardAt(p.x, p.y);
@@ -1876,13 +1886,13 @@ function updateTrials(dt) {
       } else if(p.inv === 0) {
         const penalty = elapsedTotal >= VOID_START_TIME ? 60 : 30; // 3x after 7:30
         p.hp = Math.max(0, p.hp - 2); p.lavaCd = 60; p.inv = 26;
-        trialPoints = Math.max(0, trialPoints - penalty);
+        awardTrials('lavaPenalty', -penalty);
         particles.push(...spawnHitLava(p.x, p.y));
         damageShake(p, 1);
         if(p.hp <= 0) {
           p.alive = false;
           gameState = 'gameOver';
-          clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'LAVA BURNED'); showTrialsGameOver(Math.floor(trialPoints), 'LAVA BURNED', false);
+          clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(), 'LAVA BURNED'); showTrialsGameOver(trialsFinal(), 'LAVA BURNED', false);
           return;
         }
       }
@@ -1908,13 +1918,13 @@ function updateTrials(dt) {
           } else if(p.inv === 0) {
             p.hp = Math.max(0, p.hp - dmg); p.inv = 22;
             const penalty = dmg * (elapsedTotal >= VOID_START_TIME ? 3 : 1);
-            trialPoints = Math.max(0, trialPoints - penalty);
+            awardTrials('voidPenalty', -penalty);
             particles.push(...spawnHitVoid(p.x, p.y));
             damageShake(p, 0.8);
             if(p.hp <= 0) {
               p.alive = false;
               gameState = 'gameOver';
-              clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints), 'VOID CRUSHED'); showTrialsGameOver(Math.floor(trialPoints), 'VOID CRUSHED', false);
+              clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(), 'VOID CRUSHED'); showTrialsGameOver(trialsFinal(), 'VOID CRUSHED', false);
               return;
             }
           }
@@ -1929,7 +1939,7 @@ function updateTrials(dt) {
         // Award points for pickup
         const pt = POWER_TYPES[pu.kind];
         const pointValue = elapsedTotal >= VOID_START_TIME ? 150 : 75;
-        trialPoints += pointValue;
+        awardTrials('pickupBonus', pointValue);
 
         if(pu.kind && pu.kind.indexOf('ammo_') === 0) {
           const cfg = AMMO_PICKUP_CFG[pu.kind];
@@ -1953,7 +1963,7 @@ function updateTrials(dt) {
     }
   });
 
-  // Bullets — identical physics to 1v1 update(), just bounds scaled to 1920x1120
+  // Bullets â€” identical physics to 1v1 update(), just bounds scaled to 1920x1120
   for(let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     const br = b.r ?? BULLET_R;
@@ -2008,9 +2018,9 @@ function updateTrials(dt) {
         else if(b.type==='cannon'){ dmg=4; inv=34; fx=spawnHitCannon(p.x,p.y,p.color); shake=1.5; }
         else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fx=spawnHitTrick(p.x,p.y,p.color,b.bounces??0); }
         p.hp = Math.max(0, p.hp - dmg); p.inv = inv; if(fx) particles.push(...fx); damageShake(p,shake);
-        trialPoints = Math.max(0, trialPoints - (elapsedTotal >= VOID_START_TIME ? 6 : 3));
+        awardTrials('botHitPenalty', -(elapsedTotal >= VOID_START_TIME ? 6 : 3));
         bullets.splice(i, 1);
-        if(p.hp <= 0) { p.alive=false; gameState='gameOver'; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(Math.floor(trialPoints),'BOT HIT'); showTrialsGameOver(Math.floor(trialPoints),'KILLED BY THE BOT',false); return; }
+        if(p.hp <= 0) { p.alive=false; gameState='gameOver'; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsLose) window.NOX_GAME.onTrialsLose(trialsFinal(),'BOT HIT'); showTrialsGameOver(trialsFinal(),'KILLED BY THE BOT',false); return; }
         continue;
       }
     } else if(b.owner === 0) {
@@ -2028,11 +2038,10 @@ function updateTrials(dt) {
         else if(b.type==='cannon'){ dmg=4; inv=34; fx=spawnHitCannon(bot.x,bot.y,bot.color); }
         else if(b.type==='trick'){ dmg=b.dmg??trickDmgAt(b.bounces??0); inv=26; fx=spawnHitTrick(bot.x,bot.y,bot.color,b.bounces??0); }
         else { fx=spawnHitStandard(b.x,b.y,bot.color); }
-        bot.hp = Math.max(0, bot.hp - dmg); bot.inv = inv; if(fx) 
-particles.push(...fx); damageShake(bot,1); if(trialScoreBreakdown) trialScoreBreakdown.hits = (trialScoreBreakdown.hits||0)+1;
-        trialPoints += (elapsedTotal >= VOID_START_TIME ? 50 : 25);
+        bot.hp = Math.max(0, bot.hp - dmg); bot.inv = inv; if(fx) particles.push(...fx); damageShake(bot,1);
+        awardTrials('hitBonus', (elapsedTotal >= VOID_START_TIME ? 50 : 25));
         bullets.splice(i, 1);
-        if(bot.hp <= 0) { bot.alive=false; gameState='gameOver'; trialPoints+=500; if(trialScoreBreakdown) trialScoreBreakdown.botKill = (trialScoreBreakdown.botKill||0)+500; clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(Math.floor(trialPoints)); showTrialsGameOver(Math.floor(trialPoints),'BOT DESTROYED',true); return; }
+        if(bot.hp <= 0) { bot.alive=false; gameState='gameOver'; awardTrials('botKill', 500); clearTrialsState(); if(window.NOX_GAME && window.NOX_GAME.onTrialsWin) window.NOX_GAME.onTrialsWin(trialsFinal()); showTrialsGameOver(trialsFinal(),'BOT DESTROYED',true); return; }
         continue;
       }
     }
@@ -2077,8 +2086,8 @@ window.addEventListener('keydown', e => {
 function forfeitTrials() {
   // Save high score before clearing
   const hs = parseInt(localStorage.getItem('nv_trials_highscore') || '0', 10);
-  if(Math.floor(trialPoints) > hs) {
-    try { localStorage.setItem('nv_trials_highscore', String(Math.floor(trialPoints))); } catch {}
+  if(trialsFinal() > hs) {
+    try { localStorage.setItem('nv_trials_highscore', String(trialsFinal())); } catch {}
   }
   gameState = 'menu';
   clearPendingTimeouts();
@@ -2086,10 +2095,10 @@ function forfeitTrials() {
   forfeitLock = false;
   clearTrialsState();
   try { localStorage.removeItem('nv_trials_paused'); } catch {}
-  // Hard reset trial state so menu is clean — HUD-only, don't touch arena walls (keep preview), just clear dynamic objects
+  // Hard reset trial state so menu is clean â€” HUD-only, don't touch arena walls (keep preview), just clear dynamic objects
   bullets.length = 0; pickups.length = 0; particles.length = 0;
   if(window.NOX_GAME){ window.NOX_GAME.bullets.length=0; window.NOX_GAME.pickups.length=0; window.NOX_GAME.particles.length=0; }
-  trialPoints = 0; timeLeft = TRIAL_DURATION; voidRect = null; safeRadius = 999; lastSaveTime = 0;
+  trialPoints = 0; trialsLedger = createLedger(); timeLeft = TRIAL_DURATION; voidRect = null; safeRadius = 999; lastSaveTime = 0;
   prevHp[0]=MAX_HP; prevHp[1]=MAX_HP; prevHp[2]=BOT_MAX_HP;
   bot.hp = BOT_MAX_HP; bot.alive = true;
   const voidG=document.getElementById('void'); if(voidG) voidG.setAttribute('opacity','0');
@@ -2102,14 +2111,14 @@ function forfeitTrials() {
 }
 
 function shootBotBullet(bot, target) {
-  // kept for backwards compat — now delegates to shared shoot()
+  // kept for backwards compat â€” now delegates to shared shoot()
   const ang = Math.atan2(target.y - bot.y, target.x - bot.x);
   bot.angle = ang;
   shoot(bot);
 }
 
 function pickupBotPowerup(bot, pu) {
-  // Ammo pickups are separate from POWER_TYPES — handle first
+  // Ammo pickups are separate from POWER_TYPES â€” handle first
   if(pu.kind && pu.kind.indexOf('ammo_') === 0) {
     const cfg = AMMO_PICKUP_CFG[pu.kind];
     if(cfg) { bot.ammoType = cfg.bullet; bot.ammo = cfg.ammo; }
@@ -2248,20 +2257,20 @@ function endRound(winner, reason, forfeitPid) {
     if (badge) setCyberBadgeVariant(badge, 'lime');
     title.textContent = 'DRAW!';
     title.className = 'result-score winner-draw';
-    if(sub) sub.textContent = reason + ' • No points';
+    if(sub) sub.textContent = reason + ' â€¢ No points';
   } else if (isForfeit) {
     const loser = forfeitPid != null ? forfeitPid + 1 : (winner === 0 ? 2 : 1);
     setCyberBadgeText(badge, `FORFEIT // P${loser} EXIT -> P${winner+1} WINS`);
     if (badge) setCyberBadgeVariant(badge, winner === 0 ? 'cyan' : 'pink');
     title.textContent = `PLAYER ${winner + 1} WINS BY FORFEIT!`;
     title.className = 'result-score ' + (winner === 0 ? 'winner-p1' : 'winner-p2');
-    if(sub) sub.textContent = `P${loser} LEFT THE VOID • ${scores[0]} // ${scores[1]} • First to ${WIN_SCORE}`;
+    if(sub) sub.textContent = `P${loser} LEFT THE VOID â€¢ ${scores[0]} // ${scores[1]} â€¢ First to ${WIN_SCORE}`;
   } else {
     setCyberBadgeText(badge, `ROUND ${round} // ${reason}`);
     if (badge) setCyberBadgeVariant(badge, winner === 0 ? 'cyan' : 'pink');
     title.textContent = `PLAYER ${winner + 1} WINS ROUND!`;
     title.className = 'result-score ' + (winner === 0 ? 'winner-p1' : 'winner-p2');
-    if(sub) sub.textContent = `${scores[0]} // ${scores[1]} • First to ${WIN_SCORE}`;
+    if(sub) sub.textContent = `${scores[0]} // ${scores[1]} â€¢ First to ${WIN_SCORE}`;
   }
 
   if(Math.max(...scores) >= WIN_SCORE) {
@@ -2300,7 +2309,7 @@ function showTrialsGameOver(points, reason, won) {
     wt.textContent = won ? 'TRIAL SURVIVED' : 'TRIAL FAILED';
     wt.className = 'result-score ' + (won ? 'winner-p1' : 'winner-p2');
   }
-  if(ws) ws.textContent = `${points.toLocaleString()} PTS • ${reason || (won ? 'VOID CONQUERED' : 'VOID CLAIMED YOU')} • ${m}:${s} LEFT`;
+  if(ws) ws.textContent = `${points.toLocaleString()} PTS â€¢ ${reason || (won ? 'VOID CONQUERED' : 'VOID CLAIMED YOU')} â€¢ ${m}:${s} LEFT`;
   // save high score
   if(points > trialHighScore) {
     trialHighScore = points;
@@ -2308,23 +2317,30 @@ function showTrialsGameOver(points, reason, won) {
   }
   const govBadge = document.querySelector('#gameOverOverlay .cyber-badge');
   if(govBadge) setCyberBadgeText(govBadge, won ? '⬢ TRIAL COMPLETE' : '⬢ TRIAL FAILED');
-  const scoreSlime = document.getElementById('scoreSlime');
-  if(scoreSlime) scoreSlime.textContent = '-' + Math.floor(trialScoreBreakdown.slimePenalty || 0).toLocaleString();
+  // Exact ledger rows (audit P1-06). Rows are floor(entry); TOTAL is
+  // clamp>=0(floor(exact sum)) — see trials-ledger.js rounding contract.
+  // No value here is derived from the total or from any other row.
+  const L = trialsLedger;
+  const fmtBonus = v => '+' + Math.floor(Math.max(0, v) || 0).toLocaleString();
+  const fmtPenalty = v => '-' + Math.floor(Math.abs(v) || 0).toLocaleString();
   const scoreTotal = document.getElementById('scoreTotal');
-  if(scoreTotal) scoreTotal.textContent = '+' + Math.floor(points || 0).toLocaleString();
+  if(scoreTotal) scoreTotal.textContent = '+' + ledgerTotal(L).toLocaleString();
   const scoreSurvival = document.getElementById('scoreSurvival');
-  const survivalDerived = Math.floor(Math.max(0, points - (trialScoreBreakdown.hits||0) - (trialScoreBreakdown.pickups||0) - (trialScoreBreakdown.botKill||0) - (trialScoreBreakdown.lavaPenalty||0) - (trialScoreBreakdown.slimePenalty||0) - (trialScoreBreakdown.voidPenalty||0)));
-  if(scoreSurvival) scoreSurvival.textContent = '+' + Math.floor(Math.max(trialScoreBreakdown.survival || survivalDerived, survivalDerived) || 0).toLocaleString();
+  if(scoreSurvival) scoreSurvival.textContent = fmtBonus(L.survival);
   const scoreHits = document.getElementById('scoreHits');
-  if(scoreHits) scoreHits.textContent = '+' + Math.floor(Math.max(trialScoreBreakdown.hits || 0, Math.floor(points / 15)) || 0).toLocaleString();
+  if(scoreHits) scoreHits.textContent = fmtBonus(L.hitBonus);
   const scorePickups = document.getElementById('scorePickups');
-  if(scorePickups) scorePickups.textContent = '+' + Math.floor(Math.max(trialScoreBreakdown.pickups || 0, Math.floor(points / 25)) || 0).toLocaleString();
+  if(scorePickups) scorePickups.textContent = fmtBonus(L.pickupBonus);
   const scoreLava = document.getElementById('scoreLava');
-  if(scoreLava) scoreLava.textContent = '-' + Math.floor(trialScoreBreakdown.lavaPenalty || 0).toLocaleString();
+  if(scoreLava) scoreLava.textContent = fmtPenalty(L.lavaPenalty);
+  const scoreSlime = document.getElementById('scoreSlime');
+  if(scoreSlime) scoreSlime.textContent = fmtPenalty(L.slimePenalty);
   const scoreVoid = document.getElementById('scoreVoid');
-  if(scoreVoid) scoreVoid.textContent = '-' + Math.floor(trialScoreBreakdown.voidPenalty || 0).toLocaleString();
+  if(scoreVoid) scoreVoid.textContent = fmtPenalty(L.voidPenalty);
   const scoreBotKill = document.getElementById('scoreBotKill');
-  if(scoreBotKill) scoreBotKill.textContent = '+' + Math.floor(trialScoreBreakdown.botKill || 0).toLocaleString();
+  if(scoreBotKill) scoreBotKill.textContent = fmtBonus(L.botKill);
+  const scoreBotHit = document.getElementById('scoreBotHit');
+  if(scoreBotHit) scoreBotHit.textContent = fmtPenalty(L.botHitPenalty);
 }
 
 function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();
@@ -2345,15 +2361,15 @@ function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();
   const isForfeit = !!(forfeitReason && forfeitReason.includes('FORFEIT'));
   if(scores[0] === scores[1]) {
     if(wt) { wt.textContent = 'DRAW // VOID CLAIMS ALL'; wt.className = 'result-score winner-draw'; }
-    if(ws) ws.textContent = forfeitReason ? `${scores[0]} // ${scores[1]} • ${forfeitReason}` : `${scores[0]} // ${scores[1]} • Perfectly balanced`;
+    if(ws) ws.textContent = forfeitReason ? `${scores[0]} // ${scores[1]} â€¢ ${forfeitReason}` : `${scores[0]} // ${scores[1]} â€¢ Perfectly balanced`;
   } else {
     if (isForfeit) {
       if(wt) { wt.textContent = `PLAYER ${w + 1} WINS BY FORFEIT!`; wt.className = 'result-score ' + (w === 0 ? 'winner-p1' : 'winner-p2'); }
       const loser = forfeitPid != null ? forfeitPid + 1 : (w === 0 ? 2 : 1);
-      if(ws) ws.textContent = `P${loser} EXITED • ${scores[0]} // ${scores[1]} • PLAYER ${w + 1} CHAMPION • ${round} rounds`;
+      if(ws) ws.textContent = `P${loser} EXITED â€¢ ${scores[0]} // ${scores[1]} â€¢ PLAYER ${w + 1} CHAMPION â€¢ ${round} rounds`;
     } else {
       if(wt) { wt.textContent = `PLAYER ${w + 1} WINS THE VOID!`; wt.className = 'result-score ' + (w === 0 ? 'winner-p1' : 'winner-p2'); }
-      if(ws) ws.textContent = `${scores[0]} // ${scores[1]} • ${round} rounds • GG`;
+      if(ws) ws.textContent = `${scores[0]} // ${scores[1]} â€¢ ${round} rounds â€¢ GG`;
     }
   }
   // badge in gameOver should reflect forfeit variant if provided
@@ -2366,16 +2382,16 @@ function showGameOver(forfeitReason, forfeitPid) {  clearPendingTimeouts();
   } else if (govBadge && isForfeit === false) {
     // restore default badge on normal win
     setCyberBadgeVariant(govBadge, 'amber');
-    setCyberBadgeText(govBadge, `🏆 CHAMPION OF THE VOID`);
+    setCyberBadgeText(govBadge, `ðŸ† CHAMPION OF THE VOID`);
   }
   // buttons: forfeit shows CONTINUE / RETURN TO MENU clearly, normal shows REMATCH / Menu
   const rematchBtn = document.getElementById('rematchBtn');
   const menuBtn = document.getElementById('menuBtn');
   if (isForfeit) {
-    if (rematchBtn) rematchBtn.textContent = '↻ CONTINUE // PLAY AGAIN';
+    if (rematchBtn) rematchBtn.textContent = 'â†» CONTINUE // PLAY AGAIN';
     if (menuBtn) menuBtn.textContent = 'RETURN TO MENU';
   } else {
-    if (rematchBtn) rematchBtn.textContent = '↻ REMATCH';
+    if (rematchBtn) rematchBtn.textContent = 'â†» REMATCH';
     if (menuBtn) menuBtn.textContent = 'Menu';
   }
   gameState = 'gameOver';
@@ -2411,12 +2427,12 @@ function startCountdown() {
     if (gameState !== 'countdown') return;
     if(c > 0) {
       if(title) { title.textContent = String(c); title.className = 'result-score winner-draw'; }
-      if(sub) sub.textContent = isTrialsCountdown ? 'Survive 10:00 or kill the bot • Stay centered' : 'Get ready...';
+      if(sub) sub.textContent = isTrialsCountdown ? 'Survive 10:00 or kill the bot â€¢ Stay centered' : 'Get ready...';
       c--;
       trackTimeout(setTimeout(tick, 650));
     } else {
       if(title) { title.textContent = 'FIGHT!'; title.className = 'result-score winner-draw'; }
-      if(sub) sub.textContent = isTrialsCountdown ? 'Void crush at 7:30 • Bot has no void sense' : 'Dash = invincible • Grab the orb!';
+      if(sub) sub.textContent = isTrialsCountdown ? 'Void crush at 7:30 â€¢ Bot fears the void' : 'Dash = invincible â€¢ Grab the orb!';
       trackTimeout(setTimeout(() => {
         if (gameState !== 'countdown') return;
         ro.classList.add('hidden');
@@ -2661,7 +2677,8 @@ function init() {
     startTrials, prepareTrialsMenu, onTrialsWin: null, onTrialsLose: null, onTrialsPause: null,
     forfeitTrials, resumeTrials, hasTrialsState, loadTrialsState, saveTrialsState, clearTrialsState,
     getGlobalSpeed: () => globalSpeed, setGlobalSpeed,
-    getTimeLeft: () => timeLeft, getTrialPoints: () => Math.floor(trialPoints), getGameMode: () => gameMode,
+    getTimeLeft: () => timeLeft, getTrialPoints: () => trialsFinal(), getGameMode: () => gameMode,
+    getTrialsLedger: () => trialsLedger, trialsTotal: trialsFinal,
     W, H, PLAYER_R, BULLET_R, BULLET_SPEED, MAX_HP, ROUND_TIME, WIN_SCORE,
     POWER_TYPES, BULLET_TYPES, AMMO_PICKUP_CFG, DASH_COOLDOWN, DASH_TIME, SHIELD_MAX_HP, HEAL_AMOUNT
   };

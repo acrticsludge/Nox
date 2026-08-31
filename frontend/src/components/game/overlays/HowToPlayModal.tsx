@@ -37,7 +37,7 @@ export default function HowToPlayModal({ mode = '1v1', onClose }: { mode?: '1v1'
                 </div>
               )}
               <p className="how-desc">
-                {isTrials ? <>Use <strong>WASD</strong> to run. Hold <strong>Shift</strong> to <strong>dash</strong> — you flash forward and cannot be hit. Hold <strong>Space</strong> to shoot. The bot uses the same arena and rules, but it has <strong>no void sense</strong> — use that.</> : <>Use the move keys to run around. Hold <strong>Shift</strong> or <strong>/</strong> to <strong>dash</strong> — you flash forward and cannot get hit for a moment. Hold <strong>Space</strong> or <strong>Enter</strong> to keep shooting.</>}
+                {isTrials ? <>Use <strong>WASD</strong> to run. Hold <strong>Shift</strong> to <strong>dash</strong> — you flash forward and cannot be hit. Hold <strong>Space</strong> to shoot. The bot uses the same arena and rules, but it <strong>fears the void</strong> — when the border closes in, it runs for safety.</> : <>Use the move keys to run around. Hold <strong>Shift</strong> or <strong>/</strong> to <strong>dash</strong> — you flash forward and cannot get hit for a moment. Hold <strong>Space</strong> or <strong>Enter</strong> to keep shooting.</>}
               </p>
               {isTrials && <p className="how-desc" style={{ marginTop: 6, opacity: 0.7 }}>Press <strong>P</strong> or <strong>Esc</strong> to pause — your run saves locally and you can resume.</p>}
             </div>
@@ -77,8 +77,8 @@ export default function HowToPlayModal({ mode = '1v1', onClose }: { mode?: '1v1'
             <div className="how-card how-card--lime">
               {isTrials ? (
                 <>
-                  <p className="how-desc">Survive <strong>10:00</strong> or <strong>kill the bot</strong> (12 HP). You earn <strong>+1/s</strong> for living, <strong>+25</strong> per hit, <strong>+75</strong> per pickup. Lava <strong>-30</strong>, slime <strong>-15</strong>. After <strong>7:30</strong> gains <strong>×2</strong> and losses <strong>×3</strong>.</p>
-                  <p className="how-desc" style={{ marginTop: 8 }}>The bot has <strong>no void sense</strong> — it will walk into the crush. Use the center. Pause with <strong>P</strong>, exit with confirmation saves your high score. Your run auto-saves every 2 seconds.</p>
+                  <p className="how-desc">Survive <strong>10:00</strong> or <strong>kill the bot</strong> (12 HP). You earn <strong>+1/s</strong> for living, <strong>+25</strong> per hit, <strong>+75</strong> per pickup. Lava <strong>-30</strong>, slime <strong>-15</strong>, getting shot <strong>-3</strong>, void damage <strong>-1</strong> per point lost. After <strong>7:30</strong> gains <strong>×2</strong> and losses <strong>×3</strong>.</p>
+                  <p className="how-desc" style={{ marginTop: 8 }}>The bot <strong>dreads the void</strong> — when the border closes in it will run for the amber line instead of chasing you. Use that window. Pause with <strong>P</strong>, exit with confirmation saves your high score. Your run auto-saves every 2 seconds.</p>
                 </>
               ) : (
                 <>
