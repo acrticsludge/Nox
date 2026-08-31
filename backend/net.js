@@ -60,7 +60,8 @@ export function attachNet(server, opts = {}) {
     wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
   });
 
-  wss.on('connection', ws => {
+  wss.on('connection', (ws, req) => {
+    ws._noxIp = req.socket.remoteAddress || 'unknown';
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     const rate = { count: 0, windowStart: Date.now() };
