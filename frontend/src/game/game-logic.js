@@ -2062,16 +2062,19 @@ particles.push(...fx); damageShake(bot,1); if(trialScoreBreakdown) trialScoreBre
   updateHUD();
 }
 
-// Pause/resume for trials
+// Pause/resume for trials - SINGLE key owner (P0-05). The shell mirrors the
+// overlay from the events dispatched here; it never toggles pause itself.
 window.addEventListener('keydown', e => {
   if(gameMode !== 'trials') return;
   if(gameState === 'playing' && (e.key === 'p' || e.key === 'P' || e.key === 'Escape')) {
     gameState = 'paused';
     try { localStorage.setItem('nv_trials_paused', '1'); } catch {}
     if(window.NOX_GAME && window.NOX_GAME.onTrialsPause) window.NOX_GAME.onTrialsPause();
+    window.dispatchEvent(new CustomEvent('nox:pause'));
   } else if(gameState === 'paused' && (e.key === 'p' || e.key === 'P' || e.key === 'Escape')) {
     gameState = 'playing';
     try { localStorage.removeItem('nv_trials_paused'); } catch {}
+    window.dispatchEvent(new CustomEvent('nox:resume'));
   }
 });
 

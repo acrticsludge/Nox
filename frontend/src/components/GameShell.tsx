@@ -45,25 +45,19 @@ export default function GameShell({ mode = '1v1' }: { mode?: '1v1' | 'trials' | 
     return () => window.removeEventListener('keydown', onKey);
   }, [])
 
-  // Pause/Resume key handler (trials only)
+  // P0-05: game-logic is the SINGLE owner of P/Escape pause toggling (it guards
+  // on its own gameState). This shell only mirrors overlay visibility from the
+  // nox:pause / nox:resume events the engine dispatches — no key handling here.
   useEffect(() => {
     if (!isTrials) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
-        const g = (window as unknown as { NOX_GAME?: { gameState?: () => string } }).NOX_GAME
-        if (!g || !g.gameState) return
-        const state = g.gameState()
-        if (state === 'playing') {
-          setShowPause(true)
-          window.dispatchEvent(new CustomEvent('nox:pause'))
-        } else if (state === 'paused') {
-          setShowPause(false)
-          window.dispatchEvent(new CustomEvent('nox:resume'))
-        }
-      }
+    const onPause = () => setShowPause(true)
+    const onResume = () => setShowPause(false)
+    window.addEventListener('nox:pause', onPause)
+    window.addEventListener('nox:resume', onResume)
+    return () => {
+      window.removeEventListener('nox:pause', onPause)
+      window.removeEventListener('nox:resume', onResume)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
   }, [isTrials])
 
   useEffect(() => {
