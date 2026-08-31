@@ -257,8 +257,7 @@ export default function Landing() {
           {instructions.map((item) => (
             <Card
               key={item.number}
-              // @ts-ignore
-              variant={item.accent}
+              variant={item.accent as any}
               padding={5}
               minHeight={280}
               className={`instruction-card card-accent-${item.accent}`}
@@ -308,7 +307,6 @@ export default function Landing() {
                   ●
                 </span>
                 <span className="card-rule" />
-                // @ts-ignore
                 <Badge label="∞" variant="secondary" />
               </HStack>
               <Heading level={3}>Standard</Heading>
@@ -328,7 +326,6 @@ export default function Landing() {
                   ◈
                 </span>
                 <span className="card-rule" />
-                // @ts-ignore
                 <Badge label="FLANK" variant="secondary" />
               </HStack>
               <Heading level={3}>Needle</Heading>
@@ -338,8 +335,7 @@ export default function Landing() {
             </VStack>
           </Card>
 
-          // @ts-ignore
-          <Card variant="amber" padding={5} minHeight={220} className="instruction-card card-accent-amber">
+          <Card variant={"amber" as any} padding={5} minHeight={220} className="instruction-card card-accent-amber">
             <span className="card-frame" aria-hidden="true">
               <i className="card-frame__spark" />
             </span>
@@ -349,7 +345,6 @@ export default function Landing() {
                   ■
                 </span>
                 <span className="card-rule" />
-                // @ts-ignore
                 <Badge label="HEAVY" variant="secondary" />
               </HStack>
               <Heading level={3}>Cannon</Heading>
@@ -359,8 +354,7 @@ export default function Landing() {
             </VStack>
           </Card>
 
-          // @ts-ignore
-          <Card variant="orange" padding={5} minHeight={220} className="instruction-card card-accent-orange">
+          <Card variant={"orange" as any} padding={5} minHeight={220} className="instruction-card card-accent-orange">
             <span className="card-frame" aria-hidden="true">
               <i className="card-frame__spark" />
             </span>
@@ -370,7 +364,6 @@ export default function Landing() {
                   ◇
                 </span>
                 <span className="card-rule" />
-                // @ts-ignore
                 <Badge label="BOUNCE" variant="secondary" />
               </HStack>
               <Heading level={3}>Trick</Heading>
