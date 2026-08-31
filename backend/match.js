@@ -39,6 +39,7 @@ export function startMatch(room, net, opts = {}) {
   const inputState = room.seats.map(() => ({ seq: 0, mask: 0 }));
   let tickTimer = null;
   let breakTimer = null;
+  let graceTimer = null;
   let stopped = false;
   let snapCounter = 0;
 
@@ -47,6 +48,7 @@ export function startMatch(room, net, opts = {}) {
     stopped = true;
     if (tickTimer) clearInterval(tickTimer);
     if (breakTimer) clearTimeout(breakTimer);
+    if (graceTimer) clearTimeout(graceTimer);
     room.match = null;
   }
 
@@ -56,11 +58,20 @@ export function startMatch(room, net, opts = {}) {
   }
 
   function tick() {
-    if (room.seats.some(s => !s || s.readyState !== 1)) {
-      const alive = room.seats.findIndex(s => s && s.readyState === 1);
-      endMatch(alive >= 0 ? alive : null, 'OPPONENT DISCONNECTED');
-      return;
+    const missing = room.seats.findIndex(s => !s || s.readyState !== 1);
+    if (missing !== -1) {
+      // T10: hold the seat for graceMs, then award the match to the remaining player
+      if (!graceTimer) {
+        broadcast({ type: 'peerLeft', graceMs });
+        graceTimer = setTimeout(() => {
+          graceTimer = null;
+          const alive = room.seats.findIndex(s => s && s.readyState === 1);
+          endMatch(alive >= 0 ? alive : null, 'OPPONENT DISCONNECTED');
+        }, graceMs);
+      }
+      return; // pause simulation while a seat is empty
     }
+    if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; broadcast({ type: 'peerBack' }); }
     const inputs = inputState.map(st => maskToInputs(st.mask));
     simTick(match, inputs, 1);
 

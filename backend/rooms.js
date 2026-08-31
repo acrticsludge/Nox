@@ -124,6 +124,24 @@ export function attachRooms(server, net, opts = {}) {
         leave(ws);
         return;
       }
+      case 'rematchReq': {
+        // T10: both seats request -> fresh seed + new match (seat order kept)
+        const code = net.roomOf.get(ws);
+        const room = code && rooms.get(code);
+        if (!room || !room.seats.every(s => s)) return;
+        room.rematch = room.rematch || new Set();
+        room.rematch.add(ws);
+        if (room.rematch.size === 2) {
+          room.rematch.clear();
+          room.fullNotified = false;
+          room.seed = crypto.randomBytes(4).readUInt32LE(0);
+          broadcastRoom(room);   // re-fires onRoomFull -> startMatch with new seed
+        } else {
+          const peer = room.seats.find(s => s && s !== ws);
+          if (peer) send(peer, { type: 'rematchReq' });
+        }
+        return;
+      }
     }
   });
 
