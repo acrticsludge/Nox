@@ -76,8 +76,8 @@
 // Configuration — all tunable thresholds in one place
 const BOT_CONFIG = {
   // Behavior timing
-  BEHAVIOR_COMMITMENT_MIN: 60,
-  BEHAVIOR_COMMITMENT_MAX: 120,
+  BEHAVIOR_COMMITMENT_MIN: 120,
+  BEHAVIOR_COMMITMENT_MAX: 240,
   BEHAVIOR_RESELECT_INTERVAL: 10,
 
   // Threat thresholds
@@ -589,15 +589,19 @@ function executeEngagePlayer(bot, state) {
       bot.aimError = (Math.random() - 0.5) * BOT_CONFIG.BASE_AIM_ERROR;
       if (bot.overcharge > 0) bot.lastBurstAimError = bot.aimError;
     }
+    // Aim at predicted position with stable error
     bot.angle = bot.targetAngle + bot.aimError;
   }
 
-  // Movement: circle strafe at close range, aggressive strafe at mid, close distance at far
-  const strafeDir = bot.strafeDir || 1; // fallback to 1 if not set
-  const strafeAngle = bot.angle + Math.PI / 2 * strafeDir;
+  // For circle strafe, use FIXED orbit center (player position at engagement start)
+  // This prevents 360° spin caused by constantly updating strafeAngle
+  const strafeDir = bot.strafeDir || 1;
+  // Use targetAngle (where we're aiming) for strafe, not current angle
+  const strafeAngle = bot.targetAngle + Math.PI / 2 * strafeDir;
 
   if (dist < 150) {
     // CLOSE: Circle strafe at 0.8 speed - orbit player while shooting
+    // Use perpendicular to aim direction for consistent orbit
     mx = Math.cos(strafeAngle) * 0.8;
     my = Math.sin(strafeAngle) * 0.8;
   } else if (dist < 300) {
@@ -606,8 +610,8 @@ function executeEngagePlayer(bot, state) {
     my = Math.sin(strafeAngle) * 0.7;
   } else {
     // FAR: Close distance aggressively at 1.0 speed
-    mx = Math.cos(bot.angle);
-    my = Math.sin(bot.angle);
+    mx = Math.cos(bot.targetAngle);
+    my = Math.sin(bot.targetAngle);
   }
 
   // Dash to close distance when far
@@ -615,15 +619,15 @@ function executeEngagePlayer(bot, state) {
     dash = true;
   }
 
-  // Shoot with reaction delay (ms-based)
+  // Shoot with frame-based cooldown (consistent with game loop)
   if (bot.shootCd === 0) {
-    const now = Date.now();
-    if (now - bot.lastShotTime >= bot.reactionDelay) {
+    // Check if we're roughly aimed at player (within 30 degrees)
+    const angleToPlayer = Math.atan2(player.y - bot.y, player.x - bot.x);
+    const angleDiff = Math.abs(((bot.angle - angleToPlayer + Math.PI) % (2 * Math.PI)) - Math.PI);
+    
+    if (angleDiff < Math.PI / 6) { // Within 30 degrees
       shoot = true;
-      bot.lastShotTime = now;
-      // Reaction delay scales with difficulty
-      const baseDelay = BOT_CONFIG.BASE_REACTION_DELAY_MIN + Math.random() * (BOT_CONFIG.BASE_REACTION_DELAY_MAX - BOT_CONFIG.BASE_REACTION_DELAY_MIN);
-      bot.reactionDelay = baseDelay;
+      bot.shootCd = 11; // Standard cooldown
     }
   }
 
