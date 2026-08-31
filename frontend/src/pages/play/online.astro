@@ -172,7 +172,7 @@ import SEO from '../../components/SEO.astro';
   function showLobbyPanel() {
     const lob = buildLobby();
     lob.classList.remove('hidden');
-    if (roomCode) { noxRoomInfo.hidden = false; }
+    if (roomCode) { $('noxRoomInfo').hidden = false; }
   }
 
   function showLobby() {
