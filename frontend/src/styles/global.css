@@ -2109,8 +2109,8 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 /* Mobile controls hidden on desktop, shown only on touch/coarse pointer */
-.mobile-game-controls { display: none !important; }
-@media (pointer: coarse) { .mobile-game-controls { display: flex !important; } }
+/* keyboard-only game: coarse-pointer touch controls were removed (P0-06) -
+   they mapped P2 keys, had no vertical movement, and called a nonexistent API */
 
 
 .cyber-badge--secondary {
