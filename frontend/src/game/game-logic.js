@@ -1664,6 +1664,7 @@ function updateTrials(dt) {
     },
     pickups,
     hazards,
+    bullets: bullets.filter(b => b.owner !== 2), // Only player bullets (owner 0)
     walls: wallData,
     voidRect,
     safeRadius,

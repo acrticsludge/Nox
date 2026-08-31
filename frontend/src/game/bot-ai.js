@@ -54,6 +54,7 @@
  * @property {boolean} player.alive
  * @property {Array<Object>} pickups
  * @property {Array<Object>} hazards
+ * @property {Array<Object>} bullets - Player bullets (owner !== bot.id)
  * @property {Array<Object>} walls
  * @property {Object|null} voidRect
  * @property {number} safeRadius
@@ -125,6 +126,7 @@ const BOT_CONFIG = {
   OVERCHARGE_ENGAGE_RANGE: 400,
   BLINK_DODGE_RANGE: 60,
   BLINK_CLOSE_RANGE: 350,
+  BULLET_DODGE_RANGE: 120,
 
   // Arena bounds (trials mode)
   TRIALS_W: 1920,
@@ -230,9 +232,9 @@ function getDistanceToSafeZone(bot, state) {
 /**
  * Wall-aware movement: raycast lookahead to avoid sticking
  * @param {BotState} bot
- * @param {{mx:number, my:number}} desired
+ * @param {{mx:number, my:number}} desired - Normalized direction vector (magnitude 1)
  * @param {GameState} state
- * @returns {{mx:number, my:number}} Safe movement vector
+ * @returns {{mx:number, my:number}} Safe movement vector (normalized)
  */
 function getSafeMovementVector(bot, desired, state) {
   const { wallsCollide } = state;
@@ -244,14 +246,19 @@ function getSafeMovementVector(bot, desired, state) {
   // If no movement desired, return zero
   if (desired.mx === 0 && desired.my === 0) return { mx: 0, my: 0 };
 
+  // Normalize input (should already be normalized, but ensure)
+  const mag = Math.hypot(desired.mx, desired.my);
+  const nx = desired.mx / mag;
+  const ny = desired.my / mag;
+
   // Sample points ahead along desired vector
   for (let i = 1; i <= steps; i++) {
-    const testX = bot.x + desired.mx * stepSize * i;
-    const testY = bot.y + desired.my * stepSize * i;
+    const testX = bot.x + nx * stepSize * i;
+    const testY = bot.y + ny * stepSize * i;
     if (wallsCollide(testX, testY, r)) {
       // Collision predicted — try perpendicular slide vectors
-      const perp1 = { mx: -desired.my, my: desired.mx };
-      const perp2 = { mx: desired.my, my: -desired.mx };
+      const perp1 = { mx: -ny, my: nx };
+      const perp2 = { mx: ny, my: -nx };
 
       let blocked1 = false, blocked2 = false;
       for (let j = 1; j <= steps; j++) {
@@ -264,12 +271,21 @@ function getSafeMovementVector(bot, desired, state) {
       if (!blocked1) return perp1;
       if (!blocked2) return perp2;
 
-      // Stuck — return zero
+      // Stuck — try opposite direction (back away)
+      const back = { mx: -nx, my: -ny };
+      let backBlocked = false;
+      for (let j = 1; j <= steps; j++) {
+        const slideDist = stepSize * j;
+        if (wallsCollide(bot.x + back.mx * slideDist, bot.y + back.my * slideDist, r)) { backBlocked = true; break; }
+      }
+      if (!backBlocked) return back;
+
+      // Completely stuck — return zero
       return { mx: 0, my: 0 };
     }
   }
 
-  return desired;
+  return { mx: nx, my: ny };
 }
 
 // --- Behavior Scoring (Priority-based, independent) ---
@@ -467,6 +483,71 @@ function selectBehavior(bot, state) {
   return bestBehavior;
 }
 
+/**
+ * Compute dodge vector for incoming player bullets
+ * @param {BotState} bot
+ * @param {Array<Object>} bullets - Player bullets (owner !== bot.id)
+ * @returns {{mx:number, my:number, dist:number}|null} Dodge vector (normalized) and distance to closest threat
+ */
+function computeBulletDodge(bot, bullets) {
+  if (!bullets || bullets.length === 0) return null;
+
+  const botR = 16; // PLAYER_R
+  let closestThreat = null;
+  let closestDist = Infinity;
+  let dodgeX = 0, dodgeY = 0;
+
+  for (const bullet of bullets) {
+    // Only consider bullets moving towards bot
+    const dx = bot.x - bullet.x;
+    const dy = bot.y - bullet.y;
+    const dist = Math.hypot(dx, dy);
+    
+    // Bullet velocity
+    const bvx = bullet.vx || 0;
+    const bvy = bullet.vy || 0;
+    const bulletSpeed = Math.hypot(bvx, bvy);
+    
+    if (bulletSpeed === 0) continue;
+    
+    // Project bullet path: will it hit bot?
+    // Time to closest approach
+    const dot = dx * bvx + dy * bvy;
+    if (dot <= 0) continue; // Bullet moving away
+    
+    const tca = dot / bulletSpeed; // Time to closest approach
+    if (tca < 0 || tca > 60) continue; // Too far in future (60 frames = 1 second)
+    
+    // Perpendicular distance from bullet path to bot center
+    const projX = bullet.x + bvx * tca;
+    const projY = bullet.y + bvy * tca;
+    const perpDist = Math.hypot(bot.x - projX, bot.y - projY);
+    
+    if (perpDist < botR + 8) { // Bullet will hit or pass very close (8px margin)
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestThreat = bullet;
+        // Dodge perpendicular to bullet velocity
+        const dodgeMag = Math.hypot(-bvy, bvx);
+        if (dodgeMag > 0) {
+          dodgeX = -bvy / dodgeMag;
+          dodgeY = bvx / dodgeMag;
+          // Prefer dodge direction that moves away from bullet source
+          const toBulletX = bullet.x - bot.x;
+          const toBulletY = bullet.y - bot.y;
+          const dot2 = dodgeX * toBulletX + dodgeY * toBulletY;
+          if (dot2 > 0) { dodgeX = -dodgeX; dodgeY = -dodgeY; }
+        }
+      }
+    }
+  }
+
+  if (closestThreat) {
+    return { mx: dodgeX, my: dodgeY, dist: closestDist };
+  }
+  return null;
+}
+
 // --- Behavior Execution ---
 
 /**
@@ -600,16 +681,16 @@ function executeEngagePlayer(bot, state) {
   const strafeAngle = bot.targetAngle + Math.PI / 2 * strafeDir;
 
   if (dist < 150) {
-    // CLOSE: Circle strafe at 0.8 speed - orbit player while shooting
-    // Use perpendicular to aim direction for consistent orbit
-    mx = Math.cos(strafeAngle) * 0.8;
-    my = Math.sin(strafeAngle) * 0.8;
+    // CLOSE: Circle strafe - orbit player while shooting
+    // Return normalized vector (magnitude 1.0), game logic applies speed
+    mx = Math.cos(strafeAngle);
+    my = Math.sin(strafeAngle);
   } else if (dist < 300) {
-    // MID: Aggressive strafe at 0.7 speed
-    mx = Math.cos(strafeAngle) * 0.7;
-    my = Math.sin(strafeAngle) * 0.7;
+    // MID: Aggressive strafe
+    mx = Math.cos(strafeAngle);
+    my = Math.sin(strafeAngle);
   } else {
-    // FAR: Close distance aggressively at 1.0 speed
+    // FAR: Close distance aggressively
     mx = Math.cos(bot.targetAngle);
     my = Math.sin(bot.targetAngle);
   }
@@ -621,11 +702,11 @@ function executeEngagePlayer(bot, state) {
 
   // Shoot with frame-based cooldown (consistent with game loop)
   if (bot.shootCd === 0) {
-    // Check if we're roughly aimed at player (within 30 degrees)
-    const angleToPlayer = Math.atan2(player.y - bot.y, player.x - bot.x);
-    const angleDiff = Math.abs(((bot.angle - angleToPlayer + Math.PI) % (2 * Math.PI)) - Math.PI);
+    // Check if aim is roughly at predicted player position (within 35 degrees)
+    // bot.angle = targetAngle + aimError, so compare against targetAngle
+    const angleDiff = Math.abs(((bot.angle - bot.targetAngle + Math.PI) % (2 * Math.PI)) - Math.PI);
     
-    if (angleDiff < Math.PI / 6) { // Within 30 degrees
+    if (angleDiff < Math.PI / 5.14) { // Within ~35 degrees (0.61 rad)
       shoot = true;
       bot.shootCd = 11; // Standard cooldown
     }
@@ -782,6 +863,18 @@ function updateBotAI(bot, state, dt = 1) {
       // Blend: 70% engage, 30% evade
       output.mx = 0.7 * output.mx + 0.3 * evadeOutput.mx;
       output.my = 0.7 * output.my + 0.3 * evadeOutput.my;
+    }
+  }
+
+  // Bullet dodging: detect incoming player bullets and evade
+  const bulletDodge = computeBulletDodge(bot, state.bullets);
+  if (bulletDodge) {
+    // Blend: 50% current behavior, 50% dodge (high priority for survival)
+    output.mx = 0.5 * output.mx + 0.5 * bulletDodge.mx;
+    output.my = 0.5 * output.my + 0.5 * bulletDodge.my;
+    // If bullet is very close, dash to dodge
+    if (bulletDodge.dist < 80 && bot.dash === 0 && (bot.dashCd === 0 || bot.extraDash > 0)) {
+      output.dash = true;
     }
   }
 
