@@ -1,7 +1,7 @@
 # Nox backend — Render blueprint.
-# STATUS: deferred — do NOT deploy until the online multiplayer phase lands.
-# The game currently runs entirely on Vercel (static); this service's only
-# production job will be hosting the multiplayer WebSocket rooms.
+# STATUS: READY for online 1v1 (T12) — hosts the multiplayer WebSocket rooms.
+# The static frontend stays on Vercel; this service is the authoritative WS server.
+# REQUIRED secret: set WS_SECRET in the Render dashboard (long random string).
 services:
   - type: web
     name: nox
@@ -14,3 +14,5 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: WS_EXTRA_ORIGINS
+        sync: false   # set to https://<your-vercel-domain> in the dashboard
