@@ -1,4 +1,4 @@
-﻿# Spec: Void Trials // Solo Mode
+# Spec: Void Trials // Solo Mode
 
 ## Objective
 
