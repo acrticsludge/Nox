@@ -187,7 +187,8 @@ export function attachRooms(server, net, opts = {}) {
         // post-match state — never while a match is live, never a second sim
         const code = net.roomOf.get(ws);
         const room = code && rooms.get(code);
-        if (!room || !room.seats.every(s => s)) return;
+        if (!room) return;
+        if (!room.seats.every(s => s)) { send(ws, { type: 'roomError', reason: 'opponent left the room' }); return; }
         if (room.match || room.state === 'playing') {
           send(ws, { type: 'roomError', reason: 'match in progress' });
           return;

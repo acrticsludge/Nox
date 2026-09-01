@@ -105,3 +105,37 @@ test('live rematchReq rejected; natural end -> rematchWait -> mutual rematch res
   room.match.stop();
   a.ws.close(); b.ws.close();
 });
+
+test('rematchReq with the opponent gone answers roomError (button is never silently dead)', async () => {
+  const a = await connect('rc');
+  const b = await connect('rd');
+  a.send('quick'); b.send('quick');
+  const roomA = await a.next('room');
+  await b.next('room');
+  const code = roomA.code;
+  const room = server.noxNet.noxRooms.get(code);
+
+  a.send('ready'); b.send('ready');
+  await a.next('countdown');
+  await a.next('snapshot');
+
+  // natural end -> rematchWait
+  room.match.sim.scores[0] = WIN_SCORE;
+  room.match.sim.timeLeft = 0.05;
+  await a.next('matchEnd');
+  await b.next('matchEnd');
+  await a.next('room', 2500);
+
+  // opponent leaves deliberately (post-match leave frees the seat)
+  b.send('leave');
+  const left = await a.next('peerLeft');
+  assert.ok(left, 'remaining player is told the opponent left');
+
+  // a rematch click now gets explicit feedback instead of silence
+  a.send('rematchReq');
+  const err = await a.next('roomError');
+  assert.equal(err.reason, 'opponent left the room');
+
+  room.match?.stop?.();
+  a.ws.close(); b.ws.close();
+});

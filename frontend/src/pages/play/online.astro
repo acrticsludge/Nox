@@ -163,10 +163,13 @@ import SEO from '../../components/SEO.astro';
     }
   }
 
-  // post-match: keep the session + room, show the room panel (rematch/leave)
+  // post-match: keep the session + room, show the room panel (rematch/leave).
+  // lockLobby(true) is still held from the original queue/join click — the
+  // panel MUST unlock it or LEAVE/REMATCH stay disabled forever.
   function showLobbyPanel() {
     const lob = buildLobby();
     lob.classList.remove('hidden');
+    lockLobby(false);
     setOnlineHud({ hudVisible: false });   // never leave arena HUD/keys visible in the lobby
     if (roomCode) { $('noxRoomInfo').hidden = false; }
   }
@@ -344,7 +347,19 @@ import SEO from '../../components/SEO.astro';
   });
 
   bridge.on('peerLeft', (m: { graceMs?: number }) => {
+    // post-match (rematchWait) there is no match to award — say what happened
+    if (!matchLive) {
+      stageMsg('OPPONENT LEFT THE ROOM');
+      const seats = document.getElementById('noxSeats');
+      if (seats && roomCode) seats.textContent = 'OPPONENT LEFT — REMATCH NEEDS BOTH PLAYERS';
+      return;
+    }
     stageMsg('OPPONENT DISCONNECTED — REJOIN WITHIN ' + Math.round((m.graceMs ?? 20000) / 1000) + 's OR YOU WIN');
+  });
+
+  // server relays the opponent's rematch request while both seats are waiting
+  bridge.on('rematchReq', () => {
+    lobbyStatus('OPPONENT WANTS A REMATCH — PRESS REMATCH');
   });
 
   bridge.on('peerBack', () => stageMsg(''));
