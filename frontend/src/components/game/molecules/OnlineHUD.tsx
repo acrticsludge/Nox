@@ -58,7 +58,7 @@ export default function OnlineHUD() {
               <PowerChip variant="bl" label="BLNK" fillId={`blF${selfN}`} timerId={`blT${selfN}`} chipId={`blP${selfN}`} />
             </div>
             <div className="ammo-chip ammo-chip--standard" id={`ammoP${selfN}`}><span className="ammo-chip__spark" aria-hidden="true"></span><span id={`ammoT${selfN}`}>STD INF</span></div>
-            <button className="cyber-exit cyber-exit--cyan" onClick={handleExit} aria-label="Leave the online match (forfeit)">
+            <button className={`cyber-exit ${hud.selfSeat === 0 ? 'cyber-exit--cyan' : 'cyber-exit--pink'}`} onClick={handleExit} aria-label="Leave the online match (forfeit)">
               <span className="cyber-exit__icon" aria-hidden="true">✕</span>
               <span>EXIT</span>
               <span className="cyber-exit__spark" aria-hidden="true" />
