@@ -12,6 +12,8 @@ export interface OnlineHudState {
   oppNick: string | null;
   connection: OnlineConnection;
   pingMs: number | null;
+  selfHp: number;
+  oppHp: number;
 }
 
 const initial: OnlineHudState = {
@@ -21,6 +23,8 @@ const initial: OnlineHudState = {
   oppNick: null,
   connection: 'idle',
   pingMs: null,
+  selfHp: 6,
+  oppHp: 6,
 };
 
 let state: OnlineHudState = initial;

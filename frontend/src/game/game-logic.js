@@ -726,6 +726,7 @@ export function applyNetSnapshot(s) {
     netInterpolate();
     mirrorNetStateToLegacy();
     updateHUD();
+    setOnlineHud({ selfHp: players[0]?.hp ?? 6, oppHp: players[1]?.hp ?? 6 });
     mirrorTimelineToParticles(simFxTimeline);
     simVoidVisuals();
   }

@@ -6,7 +6,7 @@ import { getOnlineHud, subscribeOnlineHud, type OnlineConnection } from '../../.
 
 // P1-05: declarative online HUD. Both seats render from the store — self
 // EXIT always belongs to the local player's card regardless of cyan/pink,
-// identity/color/ping come from state, and the page script never mutates
+// identity/color/ping/health come from state, and the page script never mutates
 // these nodes.
 //
 // Visual-parity fix: the engine writes server player 0 (always CYAN) into
@@ -20,6 +20,27 @@ const CONNECTION_LABEL: Record<OnlineConnection, { text: string; color: string }
   live: { text: 'LIVE', color: 'var(--nox-lime)' },
   reconnecting: { text: 'RECONNECTING…', color: 'var(--nox-amber)' },
   lost: { text: 'CONNECTION LOST', color: 'var(--nox-pink)' },
+}
+
+const MAX_HP = 6
+
+function Hearts({ hp, seat }: { hp: number; seat: 0 | 1 }) {
+  const pct = (hp / MAX_HP) * 100
+  const isLow = hp <= 2
+  const isMid = hp <= 4
+  return (
+    <div className="hearts">
+      <div className="hp-fill" style={{ width: `${pct}%` }} className={isLow ? 'low' : ''} />
+      <div className="hp-text">{hp} / {MAX_HP}</div>
+      <style jsx>{`
+        .hearts { position: relative; width: 100%; height: 28px; }
+        .hp-fill { position: absolute; top: 0; left: 0; height: 100%; background: linear-gradient(90deg, var(--nox-pink), var(--nox-red)); border-radius: 4px; transition: width 0.12s linear; }
+        .hp-fill.low { background: var(--nox-red); animation: pulse 0.6s infinite; }
+        .hp-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font: 600 11px var(--nox-mono); color: var(--nox-text); pointer-events: none; text-shadow: 0 0 4px rgba(0,0,0,0.8); }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+      `}</style>
+    </div>
+  )
 }
 
 export default function OnlineHUD() {
@@ -37,7 +58,7 @@ export default function OnlineHUD() {
     <>
       <div className="game-top-bar" style={hud.hudVisible ? undefined : { display: 'none' }}>
         {/* SELF card — owns EXIT; ids map to MY server seat */}
-        <div className="player-hud p1" id="noxSelfCard">
+        <div className={`player-hud p${selfN}`} id="noxSelfCard">
           <div className="avatar">
             ◇
             <div className="ava-dash" id={`dashP${selfN}`} />
@@ -51,7 +72,7 @@ export default function OnlineHUD() {
               </div>
               <div className="score" id={`scoreP${selfN}`}>0</div>
             </div>
-            <div className="hearts" id={`heartsP${selfN}`} />
+            <Hearts hp={hud.selfHp} seat={hud.selfSeat} />
             <div className="status-row" id={`statusP${selfN}`}>
               <PowerChip variant="ov" label="OVER" fillId={`ovF${selfN}`} timerId={`ovT${selfN}`} chipId={`ovP${selfN}`} />
               <PowerChip variant="sh" label="SHLD" fillId={`shF${selfN}`} timerId={`shT${selfN}`} chipId={`shP${selfN}`} />
@@ -69,7 +90,7 @@ export default function OnlineHUD() {
         <CenterHUD mode="online" />
 
         {/* OPPONENT card — remote status only, no local exit */}
-        <div className="player-hud p2" id="noxOppCard">
+        <div className={`player-hud p${oppN}`} id="noxOppCard">
           <div className="hud-main">
             <div className="hud-topline">
               <div>
@@ -78,7 +99,7 @@ export default function OnlineHUD() {
               </div>
               <div className="score" id={`scoreP${oppN}`}>0</div>
             </div>
-            <div className="hearts" id={`heartsP${oppN}`} />
+            <Hearts hp={hud.oppHp} seat={hud.selfSeat === 0 ? 1 : 0} />
             <div className="status-row" id={`statusP${oppN}`}>
               <PowerChip variant="ov" label="OVER" fillId={`ovF${oppN}`} timerId={`ovT${oppN}`} chipId={`ovP${oppN}`} />
               <PowerChip variant="sh" label="SHLD" fillId={`shF${oppN}`} timerId={`shT${oppN}`} chipId={`shP${oppN}`} />
