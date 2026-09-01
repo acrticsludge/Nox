@@ -11,10 +11,12 @@ import { applyLedger, createLedger, ledgerTotal, sumLedger } from './trials-ledg
 import { TRIALS_SAVE_KEY, buildTrialsSaveSnapshot, loadTrialsSave } from './trials-save.js';
 // Optional import for online HUD (not available in backend test environment)
 let setOnlineHud = () => {};
+let getOnlineHud = () => ({ selfSeat: 0 });
 const _loadOnlineHud = async () => {
   try {
     const mod = await import('./net/online-hud.js');
     setOnlineHud = mod.setOnlineHud;
+    getOnlineHud = mod.getOnlineHud;
   } catch {}
 };
 // Preload for browser environments
@@ -726,7 +728,10 @@ export function applyNetSnapshot(s) {
     netInterpolate();
     mirrorNetStateToLegacy();
     updateHUD();
-    setOnlineHud({ selfHp: players[0]?.hp ?? 6, oppHp: players[1]?.hp ?? 6 });
+    const { selfSeat } = getOnlineHud();
+    const myIdx = selfSeat === 0 ? 0 : 1;
+    const oppIdx = selfSeat === 0 ? 1 : 0;
+    setOnlineHud({ selfHp: players[myIdx]?.hp ?? 6, oppHp: players[oppIdx]?.hp ?? 6 });
     mirrorTimelineToParticles(simFxTimeline);
     simVoidVisuals();
   }

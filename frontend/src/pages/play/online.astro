@@ -48,6 +48,73 @@ import SEO from '../../components/SEO.astro';
 /* in-arena: countdown + result modals use the same roundOverlay as local modes */
   /* #noxCd and #noxMsg are no longer used — removed to prevent overlapping modals */
   /* Round overlay (z-index: 60) and gameOverOverlay (z-index: 70) are in GameShell */
+
+  /* Match end / forfeit modals */
+  .match-end-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .match-end-overlay.visible { opacity: 1; pointer-events: auto; }
+  .match-end-modal {
+    background: linear-gradient(145deg, rgba(20,20,30,0.98), rgba(10,10,15,0.98));
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 40px 48px;
+    text-align: center;
+    min-width: 360px;
+    max-width: 90vw;
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05) inset;
+  }
+  .match-end-overlay.visible .match-end-modal { transform: scale(1) translateY(0); }
+  .match-end-icon {
+    font-size: 48px;
+    line-height: 1;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, var(--nox-lime), var(--nox-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .match-end-title {
+    font: 700 28px var(--nox-mono, monospace);
+    color: var(--nox-fg, #fff);
+    margin: 0 0 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .match-end-subtitle {
+    font: 14px var(--nox-ui, sans-serif);
+    color: var(--nox-muted, #9aa);
+    margin: 0 0 28px;
+    line-height: 1.5;
+  }
+  .match-end-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .match-end-actions .cyber-btn {
+    min-width: 140px;
+    padding: 12px 24px;
+    font: 600 13px var(--nox-mono, monospace);
+  }
+  .cyber-btn--primary {
+    background: linear-gradient(135deg, var(--nox-lime), var(--nox-cyan));
+    color: #0a0a0a;
+    border: none;
+  }
+  .cyber-btn--primary:hover { filter: brightness(1.15); }
 </style>
 
 <script>
@@ -293,32 +360,57 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('roundEnd', () => { resetInput(); /* roundOverlay shown by game-logic endRound via snapshot state */ });
 
-  // match over (win, forfeit or disconnect): one result message, then a full
-  // reset back to the lobby — the server has already destroyed the room.
-  // stopOnlineMatch() clears pending engine timers and hides the round/gameOver
-  // overlays so the 1v1 game-over UI can never bleed into the online lobby.
-  bridge.on('matchEnd', (m: { winner: number | null; reason?: string }) => {
+  // Graceful match end modal with action buttons
+  const showMatchEndModal = (title: string, subtitle: string, showRematch = false, showLeave = true) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'match-end-overlay';
+    overlay.innerHTML = `
+      <div class="match-end-modal">
+        <div class="match-end-icon">${win ? '◆' : '◇'}</div>
+        <h2 class="match-end-title">${title}</h2>
+        <p class="match-end-subtitle">${subtitle}</p>
+        <div class="match-end-actions">
+          ${showRematch ? '<button class="cyber-btn cyber-btn--primary" id="meRematch">REMATCH</button>' : ''}
+          ${showLeave ? '<button class="cyber-btn" id="meLeave">LEAVE</button>' : ''}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    // Force reflow for animation
+    void overlay.offsetWidth;
+    overlay.classList.add('visible');
+
+    return new Promise<'rematch' | 'leave'>((resolve) => {
+      const cleanup = () => {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 200);
+      };
+      overlay.querySelector('#meRematch')?.addEventListener('click', () => { cleanup(); resolve('rematch'); });
+      overlay.querySelector('#meLeave')?.addEventListener('click', () => { cleanup(); resolve('leave'); });
+      // Auto-resolve to leave after 10s if no action
+      setTimeout(() => { if (document.body.contains(overlay)) { cleanup(); resolve('leave'); } }, 10000);
+    });
+  };
+
+  // match over (win, forfeit or disconnect): show modal with actions
+  bridge.on('matchEnd', async (m: { winner: number | null; reason?: string; scores?: number[] }) => {
     setMatchLive(false);
     const win = m.winner === mySeat;
     const abandoned = /FORFEIT|DISCONNECT|LEFT/i.test(m.reason ?? '');
-    const text = m.winner === null ? 'MATCH OVER'
-      : abandoned ? (win ? 'OPPONENT LEFT — YOU WIN' : 'YOU LEFT — MATCH OVER')
-      : win ? 'YOU WIN' : 'OPPONENT WINS';
-    const g = gl; // engine is loaded by now (a match was running)
+    const title = m.winner === null ? 'MATCH OVER'
+      : abandoned ? (win ? 'OPPONENT LEFT — YOU WIN' : 'YOU FORFEITED')
+      : win ? 'VICTORY' : 'DEFEAT';
+    const sc = m.scores;
+    const subtitle = sc ? `Final Score: ${sc[0]} — ${sc[1]}` : '';
+    const g = gl;
     g?.stopOnlineMatch();
-    const sc = (m as { scores?: number[] }).scores;
-    stageMsg(text + (sc ? `  //  ${sc[0]} — ${sc[1]}` : ''));
-    setTimeout(() => {
-      stageMsg('');
-      if (roomCode) {
-        showLobbyPanel();
-        // replace the stale "VS … — starting…" seat line from match start
-        const seats = document.getElementById('noxSeats');
-        if (seats) seats.textContent = 'MATCH OVER — REMATCH OR LEAVE';
-      } else {
-        showLobby();
-      }
-    }, 2600);
+    const action = await showMatchEndModal(title, subtitle, roomCode && !abandoned, true);
+    if (action === 'rematch' && roomCode) {
+      bridge.send('rematchReq');
+    } else {
+      if (roomCode) bridge.send('leave');
+      showLobby();
+    }
   });
 
   bridge.on('peerLeft', (m: { graceMs?: number }) => {
@@ -367,7 +459,38 @@ import SEO from '../../components/SEO.astro';
     }
   });
 
-  window.addEventListener('nox:forfeit', () => {
+  window.addEventListener('nox:forfeit', async () => {
+    if (!matchLive) return;
+    // Confirmation modal for forfeit
+    const confirmForfeit = await new Promise<boolean>((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'match-end-overlay';
+      overlay.innerHTML = `
+        <div class="match-end-modal">
+          <div class="match-end-icon">⚠</div>
+          <h2 class="match-end-title">FORFEIT MATCH?</h2>
+          <p class="match-end-subtitle">You will lose this match and return to lobby.</p>
+          <div class="match-end-actions">
+            <button class="cyber-btn cyber-btn--primary" id="cfConfirm">YES, FORFEIT</button>
+            <button class="cyber-btn" id="cfCancel">CANCEL</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      void overlay.offsetWidth;
+      overlay.classList.add('visible');
+      overlay.querySelector('#cfConfirm')?.addEventListener('click', () => {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 200);
+        resolve(true);
+      });
+      overlay.querySelector('#cfCancel')?.addEventListener('click', () => {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 200);
+        resolve(false);
+      });
+    });
+    if (!confirmForfeit) return;
     setMatchLive(false);
     if (roomCode) bridge.send('forfeit');
     bridge.send('leave');
