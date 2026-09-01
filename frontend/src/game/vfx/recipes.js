@@ -20,7 +20,7 @@ export function profileOf(actor) {
 }
 
 const TAU = Math.PI * 2;
-const part = (x, y, vx, vy, life, r, color, type) => ({ x, y, vx, vy, life, max: life, r, color, type });
+const part = (x, y, vx, vy, life, r, color, type) => ({ x, y, vx, vy, life, max: life, r, color: color ?? '#58d8ff', type });
 const text = (x, y, color, t) => ({ x, y: y - 18, vx: 0, vy: -0.7, life: 26, max: 26, r: 0, color, type: 'healText', text: t });
 function fxN(r, n, build) {
   const out = [];
@@ -197,7 +197,7 @@ export function spawnForEvent(ev) {
 function hitParts(r, x, y, color) {
   return fxN(r, 10, r => {
     const a = r() * TAU, s = 1 + r() * 4;
-    return part(x, y, Math.cos(a) * s, Math.sin(a) * s, 18 + Math.floor(r() * 10), 18, 1.5 + r() * 2, color, 'hit');
+    return part(x, y, Math.cos(a) * s, Math.sin(a) * s, 18 + Math.floor(r() * 10), 1.5 + r() * 2, color, 'hit');
   });
 }
 
