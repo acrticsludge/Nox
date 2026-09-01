@@ -1328,12 +1328,41 @@ function simVoidVisuals() {
   }
 }
 
+// Self-healing arena chrome for online: walls/hazards are drawn once per
+// match, so a stage DOM replacement (late hydration, React re-mount) would
+// leave them blank forever while per-frame groups (players/bullets) recover
+// on their own. Rebuild them the moment their SVG groups are found empty.
+function ensureArenaChrome() {
+  const wallsG = document.getElementById('walls');
+  if (wallsG && wallsG.childElementCount === 0 && wallData.length) drawWalls();
+  const hazG = document.getElementById('hazards');
+  if (hazG && hazG.childElementCount === 0 && hazards.length) drawHazards();
+}
+
+// Idempotent arena refresh for page-level callers (countdown beats, lobby
+// returns) — cheap no-op when the chrome is already intact.
+export function refreshOnlineArena() {
+  if (!simMatch || !onlineActive) return;
+  ensureArenaChrome();
+  drawHazards();
+  updateHUD();
+}
+
+// Test hook: advance the online presentation by dt frames without the rAF loop.
+export function _netStep(dt) {
+  if (!simMatch || !onlineActive) return;
+  netFrame(dt);
+  ensureArenaChrome();
+  updateHUD();
+}
+
 function simUpdate(dt) {
   const m = simMatch;
   if (onlineActive) {
     // server-authoritative: no local ticking. Snapshots arrive via
     // applyNetSnapshot; effects age on the timeline at frame rate.
     netFrame(dt);
+    ensureArenaChrome();
     drawHazards();
     if (m.state !== 'playing' && gameState === 'playing') {
       // display-only round overlay; match end is owned by online.astro

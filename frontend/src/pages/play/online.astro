@@ -285,13 +285,21 @@ import SEO from '../../components/SEO.astro';
     // 1v1 parity: the lobby/start overlay is removed the moment the countdown
     // begins — the numbers must never render behind the form.
     hideLobby();
-    if (m.t > 0) { setHud(true); setMatchLive(true); bigCount(String(m.t)); return; }
+    if (m.t > 0) {
+      setHud(true); setMatchLive(true); bigCount(String(m.t));
+      // re-assert arena chrome (walls/hazards) in case hydration replaced the
+      // stage after startOnlineMatch drew them once
+      const g = await engine();
+      g.refreshOnlineArena();
+      return;
+    }
     bigCount('FIGHT!');
     // 1v1 parity: movement starts after the FIGHT! beat (420 ms), not at it
     setTimeout(async () => {
       const el = document.getElementById('noxCd');
       if (el && (el.firstChild as HTMLElement)?.textContent === 'FIGHT!') el.style.display = 'none';
       const g = await engine();
+      g.refreshOnlineArena();
       g.onlineResume();
     }, 420);
   });
