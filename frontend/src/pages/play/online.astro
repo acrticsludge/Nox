@@ -276,8 +276,9 @@ import SEO from '../../components/SEO.astro';
     // 1v1 parity: delegate to game-logic's startCountdown with server-driven values
     // This uses the same roundOverlay + cyber badge as local modes
     hideLobby();
+    setHud(true);
+    setMatchLive(true);
     const g = await engine();
-    // Trigger the shared countdown logic with server-provided countdown value
     g.startOnlineCountdown(m.t);
   });
 
