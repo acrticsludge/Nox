@@ -9,6 +9,16 @@ import { EffectTimeline } from './vfx/timeline.js';
 import { TRICK_DMG } from './vfx/recipes.js';
 import { applyLedger, createLedger, ledgerTotal, sumLedger } from './trials-ledger.js';
 import { TRIALS_SAVE_KEY, buildTrialsSaveSnapshot, loadTrialsSave } from './trials-save.js';
+// Optional import for online HUD (not available in backend test environment)
+let setOnlineHud = () => {};
+const _loadOnlineHud = async () => {
+  try {
+    const mod = await import('./net/online-hud.js');
+    setOnlineHud = mod.setOnlineHud;
+  } catch {}
+};
+// Preload for browser environments
+if (typeof window !== 'undefined') _loadOnlineHud();
 // P2-06 migration slice 1: gameplay constants are owned by core/constants.js
 // (pre-existing canonical module). game-logic re-exports them so NOX_GAME and
 // existing importers keep working; tuning happens in exactly one file.
@@ -854,6 +864,58 @@ export function onlineResume() {
   gameState = 'playing';
   const ro = document.getElementById('roundOverlay');
   if (ro) ro.classList.add('hidden');
+}
+
+/**
+ * Start countdown for online mode - uses same roundOverlay + cyber badge as local modes
+ * Driven by server countdown value (3, 2, 1, 0 for FIGHT!)
+ */
+export function startOnlineCountdown(serverT) {
+  clearPendingTimeouts();
+  clearInputState();
+  gameState = 'countdown';
+  const ro = document.getElementById('roundOverlay');
+  const badge = document.getElementById('roundBadge');
+  const title = document.getElementById('roundTitle');
+  const sub = document.getElementById('roundSub');
+  const go = document.getElementById('gameOverOverlay');
+  if (!ro) return;
+  go?.classList.add('hidden');
+  ro.classList.remove('hidden');
+
+  // Ensure HUD is visible
+  setOnlineHud({ hudVisible: true });
+
+  // Cyber badge for online: ROUND N
+  if (badge) {
+    setCyberBadgeText(badge, `ROUND ${round || 1}`);
+    setCyberBadgeVariant(badge, 'cyan');
+  }
+
+  const beatMs = 650;
+  const fightHoldMs = 420;
+  let c = serverT > 0 ? serverT : 3;
+
+  const tick = () => {
+    if (gameState !== 'countdown') return;
+    if (c > 0) {
+      if (title) { title.textContent = String(c); title.className = 'result-score winner-draw'; }
+      if (sub) sub.textContent = 'Get ready...';
+      c--;
+      trackTimeout(setTimeout(tick, beatMs));
+    } else {
+      // FIGHT!
+      if (title) { title.textContent = 'FIGHT!'; title.className = 'result-score winner-draw'; }
+      if (sub) sub.textContent = 'Dash = invincible • Grab the orb!';
+      trackTimeout(setTimeout(() => {
+        if (gameState !== 'countdown') return;
+        ro.classList.add('hidden');
+        gameState = 'playing';
+        onlineResume();
+      }, fightHoldMs));
+    }
+  };
+  tick();
 }
 
 export function stopOnlineMatch() {

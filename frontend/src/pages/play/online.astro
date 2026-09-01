@@ -45,11 +45,9 @@ import SEO from '../../components/SEO.astro';
   #noxLobby .id-cyan { color: #58d8ff; }
   #noxLobby .id-pink { color: #ff2d78; }
 
-  /* in-arena: big countdown modal + centered result modal */
-  #noxCd { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 55; }
-  #noxCd span { display: inline-block; min-width: 190px; text-align: center; padding: 18px 34px; background: rgba(13,16,22,0.92); border: 1px solid rgba(201,255,47,0.45); border-radius: 10px; font: 700 clamp(44px, 8vw, 76px) var(--nox-mono, monospace); color: var(--nox-lime, #c9ff2f); text-shadow: 0 0 18px rgba(201,255,47,0.4); box-shadow: 0 0 40px rgba(0,0,0,0.6); }
-  #noxMsg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 56; }
-  #noxMsg span { display: inline-block; max-width: 80%; text-align: center; padding: 20px 30px; background: rgba(13,16,22,0.94); border: 1px solid rgba(255,178,62,0.5); border-radius: 10px; font: 700 clamp(16px, 2.6vw, 26px) var(--nox-mono, monospace); letter-spacing: 0.08em; color: var(--nox-amber, #ffb23e); box-shadow: 0 0 40px rgba(0,0,0,0.65); }
+/* in-arena: countdown + result modals use the same roundOverlay as local modes */
+  /* #noxCd and #noxMsg are no longer used — removed to prevent overlapping modals */
+  /* Round overlay (z-index: 60) and gameOverOverlay (z-index: 70) are in GameShell */
 </style>
 
 <script>
@@ -180,8 +178,6 @@ import SEO from '../../components/SEO.astro';
     // P1-05: HUD visibility/identity come from the store, not DOM writes
     resetOnlineHud();
     setOnlineHud({ selfNick: ($('noxNick') as HTMLInputElement | undefined)?.value.trim().toUpperCase() || 'YOU' });
-    const cd = document.getElementById('noxCd'); if (cd) cd.style.display = 'none';
-    const msg = document.getElementById('noxMsg'); if (msg) msg.style.display = 'none';
     const lob = buildLobby();
     lob.classList.remove('hidden');
     $('noxRoomInfo').hidden = true;
@@ -232,14 +228,6 @@ import SEO from '../../components/SEO.astro';
     setOnlineHud({ hudVisible: v });
   };
 
-  const bigCount = (txt: string) => {
-    const el = document.getElementById('noxCd');
-    if (!el) return;
-    el.innerHTML = '<span></span>';
-    (el.firstChild as HTMLElement).textContent = txt;
-    el.style.display = 'flex';
-  };
-
   // ---------- net -> game wiring ----------
   bridge.on('room', async (msg: { code: string; youSeat: number; seats: Array<{ nick: string } | null>; seed: number; rematchWait?: boolean }) => {
     roomCode = msg.code;
@@ -285,26 +273,12 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('countdown', async (m: { t: number }) => {
     if (!roomCode) return;
-    // 1v1 parity: the lobby/start overlay is removed the moment the countdown
-    // begins — the numbers must never render behind the form.
+    // 1v1 parity: delegate to game-logic's startCountdown with server-driven values
+    // This uses the same roundOverlay + cyber badge as local modes
     hideLobby();
-    if (m.t > 0) {
-      setHud(true); setMatchLive(true); bigCount(String(m.t));
-      // re-assert arena chrome (walls/hazards) in case hydration replaced the
-      // stage after startOnlineMatch drew them once
-      const g = await engine();
-      g.refreshOnlineArena();
-      return;
-    }
-    bigCount('FIGHT!');
-    // 1v1 parity: movement starts after the FIGHT! beat (420 ms), not at it
-    setTimeout(async () => {
-      const el = document.getElementById('noxCd');
-      if (el && (el.firstChild as HTMLElement)?.textContent === 'FIGHT!') el.style.display = 'none';
-      const g = await engine();
-      g.refreshOnlineArena();
-      g.onlineResume();
-    }, 420);
+    const g = await engine();
+    // Trigger the shared countdown logic with server-provided countdown value
+    g.startOnlineCountdown(m.t);
   });
 
   bridge.on('snapshot', async (m: { state: string }) => {
@@ -443,16 +417,8 @@ import SEO from '../../components/SEO.astro';
     const mount = document.getElementById('noxLobbyMount');
     if (!mount) return false;
     const stage = document.getElementById('stage');
-    if (stage && !document.getElementById('noxCd')) {
-      const cd = document.createElement('div');
-      cd.id = 'noxCd'; cd.style.display = 'none';
-      stage.appendChild(cd);
-      const msg = document.createElement('div');
-      msg.id = 'noxMsg'; msg.style.display = 'none';
-      stage.appendChild(msg);
-      const p2 = document.querySelector('#cardP2 .hud-name');
-      if (p2) p2.textContent = '—';   // opponent slot empty until paired
-    }
+    const p2 = document.querySelector('#cardP2 .hud-name');
+    if (p2) p2.textContent = '—';   // opponent slot empty until paired
     if (!document.getElementById('noxLobby')) mount.appendChild(buildLobby());
     return true;
   }
