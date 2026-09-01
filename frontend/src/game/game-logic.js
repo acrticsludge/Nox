@@ -716,18 +716,19 @@ export function applyNetSnapshot(s) {
 }
 
 // One frame of online presentation: release due events into the timeline,
-// age effects at frame rate, then render interpolated remote state.
-function netFrame(dt) {
-  netDisplayTick += dt;
-  while (pendingEv.length && pendingEv[0].due <= netDisplayTick) {
-    simFxTimeline.ingest(pendingEv.shift().ev);   // dedupe by id inside the timeline
+  // age effects at frame rate, then render interpolated remote state.
+  function netFrame(dt) {
+    netDisplayTick += dt;
+    while (pendingEv.length && pendingEv[0].due <= netDisplayTick) {
+      simFxTimeline.ingest(pendingEv.shift().ev);   // dedupe by id inside the timeline
+    }
+    simFxTimeline.step(dt);
+    netInterpolate();
+    mirrorNetStateToLegacy();
+    updateHUD();
+    mirrorTimelineToParticles(simFxTimeline);
+    simVoidVisuals();
   }
-  simFxTimeline.step(dt);
-  netInterpolate();
-  mirrorNetStateToLegacy();
-  mirrorTimelineToParticles(simFxTimeline);
-  simVoidVisuals();
-}
 
 const lerp = (a, b, t) => a + (b - a) * t;
 function lerpAngle(a, b, t) {
