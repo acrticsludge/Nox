@@ -22,23 +22,16 @@ const CONNECTION_LABEL: Record<OnlineConnection, { text: string; color: string }
   lost: { text: 'CONNECTION LOST', color: 'var(--nox-pink)' },
 }
 
-const MAX_HP = 6
+const MAX_HP = 12
 
-function Hearts({ hp, seat }: { hp: number; seat: 0 | 1 }) {
+function Hearts({ hp }: { hp: number }) {
   const pct = (hp / MAX_HP) * 100
   const isLow = hp <= 2
   const isMid = hp <= 4
   return (
     <div className="hearts">
-      <div className="hp-fill" style={{ width: `${pct}%` }} className={isLow ? 'low' : ''} />
+      <div className={`hp-fill${isLow ? ' low' : ''}`} style={{ width: `${pct}%` }} />
       <div className="hp-text">{hp} / {MAX_HP}</div>
-      <style jsx>{`
-        .hearts { position: relative; width: 100%; height: 28px; }
-        .hp-fill { position: absolute; top: 0; left: 0; height: 100%; background: linear-gradient(90deg, var(--nox-pink), var(--nox-red)); border-radius: 4px; transition: width 0.12s linear; }
-        .hp-fill.low { background: var(--nox-red); animation: pulse 0.6s infinite; }
-        .hp-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font: 600 11px var(--nox-mono); color: var(--nox-text); pointer-events: none; text-shadow: 0 0 4px rgba(0,0,0,0.8); }
-        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
-      `}</style>
     </div>
   )
 }
@@ -72,7 +65,7 @@ export default function OnlineHUD() {
               </div>
               <div className="score" id={`scoreP${selfN}`}>0</div>
             </div>
-            <Hearts hp={hud.selfHp} seat={hud.selfSeat} />
+            <Hearts hp={hud.selfHp} />
             <div className="status-row" id={`statusP${selfN}`}>
               <PowerChip variant="ov" label="OVER" fillId={`ovF${selfN}`} timerId={`ovT${selfN}`} chipId={`ovP${selfN}`} />
               <PowerChip variant="sh" label="SHLD" fillId={`shF${selfN}`} timerId={`shT${selfN}`} chipId={`shP${selfN}`} />
@@ -99,7 +92,7 @@ export default function OnlineHUD() {
               </div>
               <div className="score" id={`scoreP${oppN}`}>0</div>
             </div>
-            <Hearts hp={hud.oppHp} seat={hud.selfSeat === 0 ? 1 : 0} />
+            <Hearts hp={hud.oppHp} />
             <div className="status-row" id={`statusP${oppN}`}>
               <PowerChip variant="ov" label="OVER" fillId={`ovF${oppN}`} timerId={`ovT${oppN}`} chipId={`ovP${oppN}`} />
               <PowerChip variant="sh" label="SHLD" fillId={`shF${oppN}`} timerId={`shT${oppN}`} chipId={`shP${oppN}`} />
