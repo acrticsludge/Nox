@@ -338,15 +338,80 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('queued', (m: { position: number }) => lobbyStatus('SEARCHING… POSITION ' + m.position));
 
+  // Queueing modal state
+  let queueModal: HTMLElement | null = null;
+  let matchFoundModal: HTMLElement | null = null;
+
+  const showQueueModal = (position: number) => {
+    if (queueModal) return;
+    queueModal = document.createElement('div');
+    queueModal.className = 'match-end-overlay';
+    queueModal.innerHTML = `
+      <div class="match-end-modal">
+        <div class="match-end-icon">⟳</div>
+        <h2 class="match-end-title">SEARCHING FOR MATCH</h2>
+        <p class="match-end-subtitle">Position in queue: <strong id="queuePos">${position}</strong></p>
+        <div class="match-end-actions">
+          <button class="cyber-btn" id="queueCancel">CANCEL</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(queueModal);
+    void queueModal.offsetWidth;
+    queueModal.classList.add('visible');
+    queueModal.querySelector('#queueCancel')?.addEventListener('click', () => {
+      bridge.send('leaveQueue');
+      hideQueueModal();
+      showLobby();
+    });
+  };
+
+  const hideQueueModal = () => {
+    if (queueModal) {
+      queueModal.classList.remove('visible');
+      setTimeout(() => queueModal?.remove(), 200);
+      queueModal = null;
+    }
+  };
+
+  const showMatchFoundModal = () => {
+    hideQueueModal();
+    matchFoundModal = document.createElement('div');
+    matchFoundModal.className = 'match-end-overlay';
+    matchFoundModal.innerHTML = `
+      <div class="match-end-modal">
+        <div class="match-end-icon" style="color: var(--nox-lime);">◆</div>
+        <h2 class="match-end-title">MATCH FOUND</h2>
+        <p class="match-end-subtitle">Preparing arena…</p>
+      </div>
+    `;
+    document.body.appendChild(matchFoundModal);
+    void matchFoundModal.offsetWidth;
+    matchFoundModal.classList.add('visible');
+  };
+
+  const hideMatchFoundModal = () => {
+    if (matchFoundModal) {
+      matchFoundModal.classList.remove('visible');
+      setTimeout(() => matchFoundModal?.remove(), 150);
+      matchFoundModal = null;
+    }
+  };
+
+  bridge.on('queued', (m: { position: number }) => {
+    showQueueModal(m.position);
+  });
+
   bridge.on('countdown', async (m: { t: number }) => {
     if (!roomCode) return;
+    hideMatchFoundModal();
     // 1v1 parity: delegate to game-logic's startCountdown with server-driven values
     // This uses the same roundOverlay + cyber badge as local modes
     hideLobby();
     setHud(true);
-    setMatchLive(true);
+    // Don't set matchLive yet - wait for countdown to finish (FIX: input lag)
     const g = await engine();
-    g.startOnlineCountdown(m.t);
+    g.startOnlineCountdown(m.t, () => { setMatchLive(true); });
   });
 
   bridge.on('snapshot', async (m: { state: string }) => {
@@ -358,10 +423,31 @@ import SEO from '../../components/SEO.astro';
     }
   });
 
-  bridge.on('roundEnd', () => { resetInput(); /* roundOverlay shown by game-logic endRound via snapshot state */ });
+  bridge.on('roundEnd', (m: { winner: number | null; reason?: string; scores?: number[] }) => {
+    resetInput();
+    // Show brief round end message using roundOverlay
+    const g = gl;
+    const ro = document.getElementById('roundOverlay');
+    const title = document.getElementById('roundTitle');
+    const sub = document.getElementById('roundSub');
+    const badge = document.getElementById('roundBadge');
+    if (ro && title && sub && g) {
+      const win = m.winner === mySeat;
+      title.textContent = win ? 'ROUND WON' : 'ROUND LOST';
+      title.className = 'result-score ' + (win ? 'winner-p1' : 'winner-p2');
+      sub.textContent = m.scores ? `${m.scores[0]} — ${m.scores[1]}` : '';
+      if (badge) {
+        setCyberBadgeText(badge, `ROUND ${g.round || 1}`);
+        setCyberBadgeVariant(badge, win ? 'cyan' : 'pink');
+      }
+      ro.classList.remove('hidden');
+      // Hide after brief moment (server will send countdown soon)
+      setTimeout(() => ro.classList.add('hidden'), 250);
+    }
+  });
 
-  // Graceful match end modal with action buttons
-  const showMatchEndModal = (title: string, subtitle: string, showRematch = false, showLeave = true) => {
+  // match over (win, forfeit or disconnect): show modal with actions
+  const showMatchEndModal = (title: string, subtitle: string, win: boolean, showRematch = false, showLeave = true) => {
     const overlay = document.createElement('div');
     overlay.className = 'match-end-overlay';
     overlay.innerHTML = `
@@ -376,7 +462,6 @@ import SEO from '../../components/SEO.astro';
       </div>
     `;
     document.body.appendChild(overlay);
-    // Force reflow for animation
     void overlay.offsetWidth;
     overlay.classList.add('visible');
 
@@ -387,12 +472,10 @@ import SEO from '../../components/SEO.astro';
       };
       overlay.querySelector('#meRematch')?.addEventListener('click', () => { cleanup(); resolve('rematch'); });
       overlay.querySelector('#meLeave')?.addEventListener('click', () => { cleanup(); resolve('leave'); });
-      // Auto-resolve to leave after 10s if no action
       setTimeout(() => { if (document.body.contains(overlay)) { cleanup(); resolve('leave'); } }, 10000);
     });
   };
 
-  // match over (win, forfeit or disconnect): show modal with actions
   bridge.on('matchEnd', async (m: { winner: number | null; reason?: string; scores?: number[] }) => {
     setMatchLive(false);
     const win = m.winner === mySeat;
@@ -404,7 +487,7 @@ import SEO from '../../components/SEO.astro';
     const subtitle = sc ? `Final Score: ${sc[0]} — ${sc[1]}` : '';
     const g = gl;
     g?.stopOnlineMatch();
-    const action = await showMatchEndModal(title, subtitle, roomCode && !abandoned, true);
+    const action = await showMatchEndModal(title, subtitle, win, roomCode && !abandoned, true);
     if (action === 'rematch' && roomCode) {
       bridge.send('rematchReq');
     } else {
@@ -493,8 +576,8 @@ import SEO from '../../components/SEO.astro';
     if (!confirmForfeit) return;
     setMatchLive(false);
     if (roomCode) bridge.send('forfeit');
-    bridge.send('leave');
-    showLobby();
+    // Don't send leave here - wait for server's matchEnd response
+    // which will show the appropriate modal and handle cleanup
   });
 
   // ---------- input: P0 keys -> 6-bit mask @30Hz ----------

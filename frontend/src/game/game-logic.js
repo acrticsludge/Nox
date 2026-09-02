@@ -876,8 +876,10 @@ export function onlineResume() {
 /**
  * Start countdown for online mode - uses same roundOverlay + cyber badge as local modes
  * Driven by server countdown value (3, 2, 1, 0 for FIGHT!)
+ * @param serverT - server countdown value (3, 2, 1, or 0)
+ * @param onFight - optional callback fired when FIGHT! phase starts (gameState = 'playing')
  */
-export function startOnlineCountdown(serverT) {
+export function startOnlineCountdown(serverT, onFight) {
   clearPendingTimeouts();
   clearInputState();
   gameState = 'countdown';
@@ -899,8 +901,8 @@ export function startOnlineCountdown(serverT) {
     setCyberBadgeVariant(badge, 'cyan');
   }
 
-  const beatMs = 650;
-  const fightHoldMs = 420;
+  const beatMs = 200;
+  const fightHoldMs = 100;
   let c = serverT > 0 ? serverT : 3;
 
   const tick = () => {
@@ -919,6 +921,7 @@ export function startOnlineCountdown(serverT) {
         ro.classList.add('hidden');
         gameState = 'playing';
         onlineResume();
+        if (onFight) onFight();
       }, fightHoldMs));
     }
   };

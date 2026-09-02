@@ -5,12 +5,10 @@ import { drainVfx } from '../frontend/src/game/vfx/events.js';
 
 const TICK_MS = 1000 / 60;
 const SNAPSHOT_EVERY = 2;          // 30Hz
-// Countdown cadence is 1v1 parity: 650ms per 3/2/1 beat, a FIGHT! beat of
-// 420ms (movement starts AFTER it, not at it), and a round break that equals
-// the 1v1 roundEnd overlay (1600ms) followed by the same countdown replay.
-const ROUND_BREAK_MS = 1600;
-const COUNTDOWN_BEAT_MS = 650;
-const FIGHT_HOLD_MS = 420;
+// Countdown cadence - faster for instant feel between rounds
+const ROUND_BREAK_MS = 300;        // brief round end pause
+const COUNTDOWN_BEAT_MS = 200;     // fast 3-2-1 beats
+const FIGHT_HOLD_MS = 100;         // quick FIGHT! hold
 
 // input mask: 1=up 2=down 4=left 8=right 16=dash 32=shoot
 function maskToInputs(mask) {
