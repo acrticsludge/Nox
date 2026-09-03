@@ -26,24 +26,68 @@ import SEO from '../../components/SEO.astro';
 <style is:global>
   /* is:global is required — the lobby/countdown/banner DOM is injected at
      runtime, so Astro's scoped style attribute never matches it */
-  /* Lobby card — reuses site tokens; injected above the stage overlay layer */
+  /* Lobby card — compact, responsive, no scroll on small laptops */
   #noxLobby { z-index: 60; }
-  #noxLobby .menu-card { width: min(430px, 92vw); padding: 28px 26px; }
-  #noxLobby .lob-label { display: block; margin: 16px 0 6px; font: 10px var(--nox-mono, monospace); letter-spacing: 0.2em; color: var(--nox-muted, #9aa); text-align: left; }
-  #noxLobby input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.15); color: var(--nox-fg, #fff); font: 13px var(--nox-mono, monospace); padding: 10px 12px; border-radius: 6px; box-sizing: border-box; }
+  #noxLobby .menu-card {
+    width: min(400px, 94vw);
+    padding: 20px 18px;
+    max-height: min(85vh, 520px);
+    gap: 12px;
+  }
+  #noxLobby .lob-label { display: block; margin: 10px 0 4px; font: 9px var(--nox-mono, monospace); letter-spacing: 0.18em; color: var(--nox-muted, #9aa); text-align: left; }
+  #noxLobby input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); color: var(--nox-fg, #fff); font: 13px var(--nox-mono, monospace); padding: 9px 11px; border-radius: 6px; box-sizing: border-box; }
   #noxLobby input:focus { outline: 1px solid var(--nox-lime, #c9ff2f); }
-  #noxLobby .code-input { text-transform: uppercase; letter-spacing: 0.3em; }
-  #noxLobby .btn-row { display: flex; gap: 10px; width: 100%; justify-content: flex-start; }
-  #noxLobby .btn-row .btn { white-space: nowrap; }
-  #noxLobby .btn-row input { flex: 1; min-width: 0; }
-  #noxLobby .lob-divider { margin: 18px 0 0; border: 0; border-top: 1px dashed rgba(255,255,255,0.12); }
-  #noxLobby .lob-status { min-height: 1.3em; margin-top: 12px; color: var(--nox-muted, #9aa); font: 12px var(--nox-mono, monospace); }
-  #noxLobby .lob-error { min-height: 1.3em; margin-top: 6px; color: #ff5470; font: 12px var(--nox-mono, monospace); }
-  #noxLobby .room-code { letter-spacing: 0.35em; color: var(--nox-lime, #c9ff2f); font-size: 1.3rem; user-select: all; }
-  #noxLobby .share-link { font: 11px var(--nox-mono, monospace); opacity: 0.7; user-select: all; word-break: break-all; }
-  #noxLobby .seat-line { margin: 10px 0 0; font: 12px var(--nox-mono, monospace); color: var(--nox-fg, #fff); }
+  #noxLobby .code-input { text-transform: uppercase; letter-spacing: 0.25em; }
+  #noxLobby .btn-row { display: flex; gap: 8px; width: 100%; }
+  #noxLobby .btn-row > * { flex: 1; min-width: 0; }
+  #noxLobby .btn-row .btn { width: 100%; padding: 10px 14px; font-size: 12px; white-space: nowrap; }
+  #noxLobby .lob-divider { margin: 12px 0; border: 0; border-top: 1px dashed rgba(255,255,255,0.1); }
+  #noxLobby .lob-status { min-height: 1.2em; margin-top: 8px; color: var(--nox-muted, #9aa); font: 11px var(--nox-mono, monospace); }
+  #noxLobby .lob-error { min-height: 1.2em; margin-top: 4px; color: #ff5470; font: 11px var(--nox-mono, monospace); }
+  #noxLobby .room-code { letter-spacing: 0.3em; color: var(--nox-lime, #c9ff2f); font-size: 1.2rem; user-select: all; }
+  #noxLobby .share-link { font: 10px var(--nox-mono, monospace); opacity: 0.65; user-select: all; word-break: break-all; }
+  #noxLobby .seat-line { margin: 6px 0 0; font: 11px var(--nox-mono, monospace); color: var(--nox-fg, #fff); }
   #noxLobby .id-cyan { color: #58d8ff; }
   #noxLobby .id-pink { color: #ff2d78; }
+  #noxLobby .badge { margin-bottom: 4px; }
+  #noxLobby .menu-title { font-size: clamp(36px, 8vw, 56px); margin: 8px 0 2px; }
+  #noxLobby .menu-desc { margin: 0; font: 11px var(--nox-mono, monospace); color: var(--nox-muted); line-height: 1.5; max-width: 40ch; }
+
+  /* Match end / forfeit / queue modals — compact, centered, no scroll */
+  .match-end-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    padding: 16px;
+  }
+  .match-end-overlay.visible { opacity: 1; pointer-events: auto; }
+  .match-end-modal {
+    background: linear-gradient(145deg, rgba(18,18,26,0.98), rgba(8,8,12,0.98));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 28px 32px;
+    text-align: center;
+    min-width: 300px;
+    max-width: min(420px, 92vw);
+    transform: scale(0.92) translateY(16px);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  }
+  .match-end-overlay.visible .match-end-modal { transform: scale(1) translateY(0); }
+  .match-end-icon { font-size: 36px; line-height: 1; margin-bottom: 10px; background: linear-gradient(135deg, var(--nox-lime), var(--nox-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .match-end-title { font: 700 20px var(--nox-mono, monospace); color: var(--nox-fg, #fff); margin: 0 0 8px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .match-end-subtitle { font: 12px var(--nox-ui, sans-serif); color: var(--nox-muted, #9aa); margin: 0 0 20px; line-height: 1.4; }
+  .match-end-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .match-end-actions .cyber-btn { min-width: 120px; padding: 10px 18px; font: 600 11px var(--nox-mono, monospace); }
+  .cyber-btn--primary { background: linear-gradient(135deg, var(--nox-lime), var(--nox-cyan)); color: #0a0a0a; border: none; }
+  .cyber-btn--primary:hover { filter: brightness(1.15); }
 
 /* in-arena: countdown + result modals use the same roundOverlay as local modes */
   /* #noxCd and #noxMsg are no longer used — removed to prevent overlapping modals */
@@ -152,13 +196,13 @@ import SEO from '../../components/SEO.astro';
     el.className = 'overlay';
     el.innerHTML = `
       <div class="menu-card">
-        <div class="badge" style="display:inline-block;border:1px solid rgba(88,216,255,.4);color:#58d8ff;font:10px var(--nox-mono,monospace);letter-spacing:.15em;padding:4px 10px;border-radius:4px;">ONLINE // GUEST // NO LOGIN</div>
-        <h2 class="menu-title" style="margin-top:16px;">ONLINE 1V1</h2>
-        <p style="color:var(--nox-muted,#9aa);font:12px var(--nox-mono,monospace);line-height:1.6;">First to 5 wins the void. Quick match or share a room code.</p>
+        <div class="badge" style="display:inline-block;border:1px solid rgba(88,216,255,.35);color:#58d8ff;font:9px var(--nox-mono,monospace);letter-spacing:.12em;padding:3px 8px;border-radius:999px;">ONLINE // GUEST // NO LOGIN</div>
+        <h2 class="menu-title">ONLINE 1V1</h2>
+        <p class="menu-desc">First to 5 wins the void. Quick match or share a room code.</p>
         <label class="lob-label" for="noxNick">NICKNAME</label>
         <input id="noxNick" maxlength="16" placeholder="2-16 CHARACTERS" autocomplete="off" />
-        <div class="btn-row" style="margin-top:14px;">
-          <button class="btn btn-primary" id="noxQuick" style="flex:1;">QUICK MATCH</button>
+        <div class="btn-row" style="margin-top:6px;">
+          <button class="btn btn-primary" id="noxQuick">QUICK MATCH</button>
           <button class="btn" id="noxCreate">CREATE ROOM</button>
         </div>
         <hr class="lob-divider" />
@@ -350,7 +394,7 @@ import SEO from '../../components/SEO.astro';
     queueModal.className = 'match-end-overlay';
     queueModal.innerHTML = `
       <div class="match-end-modal">
-        <div class="match-end-icon">⟳</div>
+        <div class="match-end-icon" style="color: var(--nox-cyan);">⟳</div>
         <h2 class="match-end-title">SEARCHING FOR MATCH</h2>
         <p class="match-end-subtitle">Position in queue: <strong id="queuePos">${position}</strong></p>
         <div class="match-end-actions">
@@ -552,7 +596,7 @@ import SEO from '../../components/SEO.astro';
       overlay.className = 'match-end-overlay';
       overlay.innerHTML = `
         <div class="match-end-modal">
-          <div class="match-end-icon">⚠</div>
+          <div class="match-end-icon" style="color: var(--nox-amber);">⚠</div>
           <h2 class="match-end-title">FORFEIT MATCH?</h2>
           <p class="match-end-subtitle">You will lose this match and return to lobby.</p>
           <div class="match-end-actions">
