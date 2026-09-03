@@ -1,7 +1,7 @@
 // T6 (part 1): client WebSocket bridge — guest identity, hello handshake, typed events.
 // Consumed by /play/online UI; later feeds snapshots into game-logic's mirror seam (T8).
 
-import { encodeInput, encodePing, decodeMessage, MSG_TYPE } from './binary-codec.js';
+import { encodeInput, encodePing, decodeMessage } from './binary-codec.js';
 
 const GUEST_KEY = 'nv_guest_id';
 

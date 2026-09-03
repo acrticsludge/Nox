@@ -120,6 +120,7 @@ import SEO from '../../components/SEO.astro';
 <script>
   import { NetBridge, getNick, setNick } from '../../game/net/net-bridge.js';
   import { setOnlineHud, resetOnlineHud } from '../../game/net/online-hud';
+  import { setCyberBadgeText, setCyberBadgeVariant } from '../../game/game-logic.js';
 
   // O1: the game engine is loaded ONLY when a match actually starts. Importing it
   // eagerly booted its rAF loop during the lobby -> mutated HUD DOM before React
@@ -488,7 +489,7 @@ import SEO from '../../components/SEO.astro';
     const subtitle = sc ? `Final Score: ${sc[0]} — ${sc[1]}` : '';
     const g = gl;
     g?.stopOnlineMatch();
-    const action = await showMatchEndModal(title, subtitle, win, roomCode && !abandoned, true);
+    const action = await showMatchEndModal(title, subtitle, win, !!roomCode && !abandoned, true);
     if (action === 'rematch' && roomCode) {
       bridge.send('rematchReq');
     } else {
