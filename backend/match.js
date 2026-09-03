@@ -55,7 +55,7 @@ function deltaSnapshotOf(m, evBatch, tracker) {
     time: r1(m.timeLeft),
     sr: Math.round(m.safeRadius),
     pk: m.pickups.map(pu => [r1(pu.x), r1(pu.y), pu.kind]),
-    hz: m.hazards.map(h => [r1(h.x), r1(h.y), h.kind]),
+    hz: m.hazards.map(h => [r1(h.x), r1(h.y), h.kind, r1(h.t)]),
     ev: evBatch,
     rr: m.roundResult,
     mw: m.matchWinner,

@@ -289,8 +289,8 @@ function hazardAt(x, y) {
 }
 
 function isLavaActive(h) {
-  const mod = h.t % 300;
-  return mod >= 120 && mod < 228;
+  const mod = h.t % 480;
+  return mod < 300;
 }
 
 
@@ -700,7 +700,7 @@ export function applyNetSnapshot(s) {
   }
   if (Array.isArray(s.hz)) {
     simMatch.hazards.length = 0;
-    for (const h of s.hz) simMatch.hazards.push({ x: h[0], y: h[1], w: 36, h: 36, kind: h[2], t: 0, lavaCd: 0 });
+    for (const h of s.hz) simMatch.hazards.push({ x: h[0], y: h[1], w: 36, h: 36, kind: h[2], t: h[3] ?? 0, lavaCd: 0 });
     hazards.length = 0;
     for (const h of simMatch.hazards) hazards.push(h);
     drawHazards();

@@ -15,8 +15,8 @@ import {
 } from './game-logic.js';
 
 function isLavaWarning(h) {
-  const mod = h.t % 300;
-  return mod < 120;
+  const mod = h.t % 480;
+  return mod >= 420 && mod < 480;
 }
 
 function drawWalls() {
