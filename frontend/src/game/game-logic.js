@@ -761,6 +761,12 @@ function matchFallbackBulletId(row) {
   return `f${netFallbackSeq++}`;
 }
 
+// Dead reckoning state for opponent extrapolation
+const deadReckon = {
+  lastPos: [{ x: 0, y: 0, tick: 0 }, { x: 0, y: 0, tick: 0 }],
+  velocity: [{ x: 0, y: 0 }, { x: 0, y: 0 }],
+};
+
 function netInterpolate() {
   if (!simMatch || netBuf.length === 0) return;
   const buf = netBuf;
@@ -779,8 +785,31 @@ function netInterpolate() {
     const sp = simMatch.players[i];
     if (!sp) return;
     const e = (b && b.p && b.p[i]) || d;
-    sp.x = lerp(d[0], e[0], alpha);
-    sp.y = lerp(d[1], e[1], alpha);
+    
+    // Compute velocity from snapshots for dead reckoning
+    if (b && b.p && b.p[i]) {
+      const dt = (b.tick - a.tick) / 60; // seconds between snapshots
+      if (dt > 0) {
+        deadReckon.velocity[i].x = (b.p[i][0] - a.p[i][0]) / dt;
+        deadReckon.velocity[i].y = (b.p[i][1] - a.p[i][1]) / dt;
+      }
+      deadReckon.lastPos[i] = { x: b.p[i][0], y: b.p[i][1], tick: b.tick };
+    }
+    
+    // Interpolation between snapshots, extrapolation beyond latest
+    if (span > 0 && netDisplayTick < a.tick + span) {
+      // Normal interpolation between a and b
+      sp.x = lerp(d[0], e[0], alpha);
+      sp.y = lerp(d[1], e[1], alpha);
+    } else if (netDisplayTick >= a.tick) {
+      // Extrapolation (dead reckoning) beyond latest snapshot
+      const dt = (netDisplayTick - a.tick) / 60; // seconds since snapshot a
+      sp.x = d[0] + deadReckon.velocity[i].x * dt;
+      sp.y = d[1] + deadReckon.velocity[i].y * dt;
+    } else {
+      sp.x = d[0];
+      sp.y = d[1];
+    }
     sp.angle = lerpAngle(d[2], e[2], alpha);
     sp.hp = d[3];
     sp.alive = d[3] > 0;

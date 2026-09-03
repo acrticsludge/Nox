@@ -20,35 +20,93 @@ function maskToInputs(mask) {
 
 const r1 = n => Math.round(n * 10) / 10;
 
-function snapshotOf(m, evBatch) {
+// Delta compression: track last sent state per seat
+function createDeltaTracker() {
   return {
+    players: [null, null],      // last sent player state per seat
+    bullets: new Map(),         // last sent bullet state by id
+    pickups: null,              // last sent pickups
+    hazards: null,              // last sent hazards
+    safeRadius: null,           // last sent safeRadius
+    scores: [null, null],       // last sent scores
+    round: null,                // last sent round
+    timeLeft: null,             // last sent timeLeft
+    state: null,                // last sent state
+  };
+}
+
+function hasChanged(a, b) {
+  if (a === null || b === null) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return true;
+    return a.some((v, i) => v !== b[i]);
+  }
+  return a !== b;
+}
+
+function deltaSnapshotOf(m, evBatch, tracker) {
+  // Build delta by comparing with last sent
+  const delta = {
     type: 'snapshot',
     tick: m.tick,
     state: m.state,
     round: m.round,
     score: m.scores,
     time: r1(m.timeLeft),
-    p: m.players.map(p => [
-      r1(p.x), r1(p.y), r1(p.angle), p.hp, p.ammoType, p.shield ? p.shieldHp : 0,
-      p.ammoType === 'standard' ? -1 : p.ammo,
-      // visual-state flags for parity rendering (dash flame, cooldown bar,
-      // invuln blink, overcharge ring, blink charges, squish)
-      [p.dash | 0, Math.max(0, Math.round(p.dashCd)), Math.max(0, Math.round(p.inv)),
-        Math.max(0, Math.round(p.overcharge)), Math.max(0, Math.round(p.speedBoost)),
-        p.extraDash | 0, Math.max(0, Math.round(p.squish))],
-    ]),
-    // stable bullet id (index 6) for interpolation continuity + trick bounce
-    // count (index 7) for the pip label
-    b: m.bullets.map(b => [r1(b.x), r1(b.y), Math.round(b.vx * 10) / 10, Math.round(b.vy * 10) / 10, b.type, b.owner, b.id, b.bounces ?? 0]),
-    pk: m.pickups.map(pu => [r1(pu.x), r1(pu.y), pu.kind]),
-    // void ring + relocated hazards so the client arena matches the server sim
     sr: Math.round(m.safeRadius),
+    pk: m.pickups.map(pu => [r1(pu.x), r1(pu.y), pu.kind]),
     hz: m.hazards.map(h => [r1(h.x), r1(h.y), h.kind]),
-    // ordered visual events since the last snapshot (monotonic id + tick)
     ev: evBatch,
     rr: m.roundResult,
     mw: m.matchWinner,
   };
+  let hasChanges = false;
+
+  // Players: only send changed seats, but always include the array structure
+  delta.p = m.players.map((p, i) => {
+    const current = [
+      r1(p.x), r1(p.y), r1(p.angle), p.hp, p.ammoType, p.shield ? p.shieldHp : 0,
+      p.ammoType === 'standard' ? -1 : p.ammo,
+      [p.dash | 0, Math.max(0, Math.round(p.dashCd)), Math.max(0, Math.round(p.inv)),
+        Math.max(0, Math.round(p.overcharge)), Math.max(0, Math.round(p.speedBoost)),
+        p.extraDash | 0, Math.max(0, Math.round(p.squish))],
+    ];
+    if (hasChanged(tracker.players[i], current)) {
+      tracker.players[i] = current;
+      hasChanges = true;
+      return current;
+    }
+    return null; // unchanged seat
+  });
+
+  // Bullets: only send changed/new bullets
+  const bulletDeltas = [];
+  const seenBulletIds = new Set();
+  for (const b of m.bullets) {
+    const id = b.id;
+    seenBulletIds.add(id);
+    const current = [r1(b.x), r1(b.y), Math.round(b.vx * 10) / 10, Math.round(b.vy * 10) / 10, b.type, b.owner, id, b.bounces ?? 0];
+    if (hasChanged(tracker.bullets.get(id), current)) {
+      tracker.bullets.set(id, current);
+      bulletDeltas.push(current);
+      hasChanges = true;
+    }
+  }
+  // Remove dead bullets from tracker
+  for (const id of tracker.bullets.keys()) {
+    if (!seenBulletIds.has(id)) {
+      tracker.bullets.delete(id);
+      hasChanges = true;
+    }
+  }
+  if (bulletDeltas.length > 0) delta.b = bulletDeltas;
+
+  // If nothing changed, return minimal heartbeat (but still include critical fields)
+  if (!hasChanges) {
+    return { ...delta, heartbeat: true, p: delta.p.map(() => null), b: [] };
+  }
+
+  return delta;
 }
 
 export function startMatch(room, net, opts = {}) {
@@ -64,6 +122,8 @@ export function startMatch(room, net, opts = {}) {
   let graceTimer = null;
   let stopped = false;
   let snapCounter = 0;
+  // Delta compression tracker
+  const deltaTracker = createDeltaTracker();
   // Task 11 (P1-03): ready is a per-seat set and the waiting -> countdown
   // transition is one-shot — duplicate ready packets can never stack timers
   const readySeats = new Set();
@@ -131,10 +191,10 @@ export function startMatch(room, net, opts = {}) {
     simTick(match, inputs, 1);
     evBatch.push(...drainVfx(match));
 
-    if (++snapCounter % SNAPSHOT_EVERY === 0) broadcast(snapshotOf(match, evBatch.splice(0)));
+    if (++snapCounter % SNAPSHOT_EVERY === 0) broadcast(deltaSnapshotOf(match, evBatch.splice(0), deltaTracker));
 
     if (match.state !== 'playing') {
-      broadcast(snapshotOf(match, evBatch.splice(0)));
+      broadcast(deltaSnapshotOf(match, evBatch.splice(0), deltaTracker));
       if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
       if (match.matchWinner != null) {
         endMatch(match.matchWinner, match.roundResult?.reason ?? 'MATCH OVER');

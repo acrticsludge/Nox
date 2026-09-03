@@ -94,6 +94,11 @@ export function attachNet(server, opts = {}) {
     ws._noxIp = clientIp(req);
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
+    // TCP optimizations for lower latency
+    if (ws._socket) {
+      ws._socket.setNoDelay(true);       // Disable Nagle's algorithm
+      ws._socket.setKeepAlive(true, 10000); // Keep-alive every 10s
+    }
     const rate = { count: 0, windowStart: Date.now() };
     ws._noxRate = rate;
     ws.on('message', data => {
@@ -102,7 +107,31 @@ export function attachNet(server, opts = {}) {
       if (now - rate.windowStart >= RATE_WINDOW_MS) { rate.windowStart = now; rate.count = 0; }
       if (++rate.count > RATE_LIMIT) { ws.close(1008, 'rate limit'); return; }
       let msg;
-      try { msg = JSON.parse(data.toString('utf8')); } catch { ws.close(1008, 'bad json'); return; }
+      try {
+        // Handle binary frames (input, ping)
+        if (data instanceof Buffer) {
+          const buf = new Uint8Array(data);
+          // Binary input frame: [type:1][seq:1][mask:1]
+          if (buf.length === 3 && buf[0] === 0x01) {
+            msg = { type: 'input', seq: buf[1], m: buf[2] };
+          }
+          // Binary ping: [type:1][timestamp:8]
+          else if (buf.length === 9 && buf[0] === 0x03) {
+            const view = new DataView(buf.buffer, buf.byteOffset + 1);
+            msg = { type: 'ping', t: Number(view.getBigUint64(0, false)) };
+          }
+          // Binary pong from client (we don't expect this, but handle it)
+          else if (buf.length === 9 && buf[0] === 0x04) {
+            const view = new DataView(buf.buffer, buf.byteOffset + 1);
+            msg = { type: 'pong', t: Number(view.getBigUint64(0, false)) };
+          }
+          else {
+            msg = JSON.parse(data.toString('utf8'));
+          }
+        } else {
+          msg = JSON.parse(data.toString('utf8'));
+        }
+      } catch { ws.close(1008, 'bad json'); return; }
       if (!msg || typeof msg.type !== 'string') { ws.close(1008, 'bad frame'); return; }
       const sess = sessions.get(ws);
       if (!sess) {
@@ -117,7 +146,16 @@ export function attachNet(server, opts = {}) {
       }
       if (!sess.authed) return;
       // T13: one app-level ping protocol — client measures RTT to this reply
-      if (msg.type === 'ping') { ws.send(JSON.stringify({ type: 'pong', t: Date.now() })); return; }
+      // Respond with binary pong if ping was binary, else JSON
+      if (msg.type === 'ping') {
+        const clientTs = msg.t;
+        const buf = Buffer.alloc(9);
+        buf[0] = 0x04; // MSG_TYPE.PONG
+        const view = new DataView(buf.buffer);
+        view.setBigUint64(1, BigInt(clientTs), false);
+        ws.send(buf);
+        return;
+      }
       wss.emit('nox:message', ws, sess, msg);
     });
     ws.on('close', () => { wss.emit('nox:close', ws, sessions.get(ws)); sessions.delete(ws); roomOf.delete(ws); });

@@ -1,6 +1,8 @@
 // T6 (part 1): client WebSocket bridge — guest identity, hello handshake, typed events.
 // Consumed by /play/online UI; later feeds snapshots into game-logic's mirror seam (T8).
 
+import { encodeInput, encodePing, decodeMessage, MSG_TYPE } from './binary-codec.js';
+
 const GUEST_KEY = 'nv_guest_id';
 
 export function getGuestId() {
@@ -45,7 +47,16 @@ export class NetBridge {
   }
 
   send(type, data = {}) {
-    if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type, ...data }));
+    if (!this.ws || this.ws.readyState !== 1) return;
+    if (type === 'input' && typeof data.seq === 'number' && typeof data.m === 'number') {
+      this.ws.send(encodeInput(data.seq, data.m));
+      return;
+    }
+    if (type === 'ping') {
+      this.ws.send(encodePing());
+      return;
+    }
+    this.ws.send(JSON.stringify({ type, ...data }));
   }
 
   connect(url) {
@@ -58,9 +69,19 @@ export class NetBridge {
       ws.addEventListener('open', () => {
         ws.send(JSON.stringify({ type: 'hello', guestId: getGuestId(), nick: getNick() || 'Player' }));
       });
-      ws.addEventListener('message', ev => {
+      ws.addEventListener('message', async (ev) => {
         let m;
-        try { m = JSON.parse(ev.data); } catch { return; }
+        try {
+          if (ev.data instanceof ArrayBuffer || ev.data instanceof Blob) {
+            const buf = ev.data instanceof ArrayBuffer
+              ? new Uint8Array(ev.data)
+              : new Uint8Array(await ev.data.arrayBuffer());
+            m = decodeMessage(buf);
+            if (!m) return;
+          } else {
+            m = JSON.parse(ev.data);
+          }
+        } catch { return; }
         if (m.type === 'session') {
           clearTimeout(to);
           this.authed = true;
@@ -98,16 +119,22 @@ export class NetBridge {
     if (this._pongBound) { this.off('pong', this._pongBound); }
     this._pongBound = () => { this.pingMs = Math.round(performance.now() - (this._lastPingSent || 0)); this._emit('pingChanged', this.pingMs); };
     this.on('pong', this._pongBound);
-    this._pingTimer = setInterval(() => {
+    // Continuous RTT measurement: ping every 1s, adaptive based on RTT
+    const schedulePing = () => {
+      if (!this.ws || this.ws.readyState !== 1) return;
       this._lastPingSent = performance.now();
       this.send('ping');
-    }, 5000);
+      // Adaptive interval: faster when RTT is high, slower when stable
+      const interval = this.pingMs > 100 ? 500 : this.pingMs > 50 ? 1000 : 2000;
+      this._pingTimer = setTimeout(schedulePing, interval);
+    };
+    schedulePing();
   }
 
   off(type, fn) { this.handlers.get(type)?.delete(fn); }
 
   _stopPing() {
-    if (this._pingTimer) { clearInterval(this._pingTimer); this._pingTimer = null; }
+    if (this._pingTimer) { clearTimeout(this._pingTimer); this._pingTimer = null; }
   }
 
   close() {
