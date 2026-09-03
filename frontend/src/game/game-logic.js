@@ -647,7 +647,7 @@ function mirrorTimelineToParticles(tl) {
 // render pipeline. Effects are NEVER synthesized from snapshot diffs; remote
 // state renders from a small interpolation buffer (100ms delay) while the
 // EffectTimeline ages at frame rate between 30Hz snapshots.
-const NET_INTERP_TICKS = 6;   // 100 ms at 60 Hz server ticks (spec default; measure before tuning)
+const NET_INTERP_TICKS = 3;   // 50 ms at 60 Hz server ticks (reduced from 100ms for lower latency)
 let netBuf = [];              // recent snapshots for interpolation
 let pendingEv = [];           // { due, ev } events scheduled against server tick
 let netDisplayTick = 0;       // server-tick clock the client renders at
@@ -941,6 +941,36 @@ export function stopOnlineMatch() {
   pendingEv = [];
   netBulletViews = new Map();
   simFxTimeline.clear();
+}
+
+// Client-side prediction for instant local input response
+// Applies input directly to local player entity; reconciled when server snapshot arrives
+export function predictLocalInput(action, pressed) {
+  if (!simMatch || !onlineActive || gameState !== 'playing') return;
+  const { selfSeat } = getOnlineHud();
+  const myIdx = selfSeat === 0 ? 0 : 1;
+  const p = players[myIdx];
+  if (!p || !p.alive) return;
+  const SPEED = BASE_SPEED;
+  const DASH_SPEED = BASE_SPEED * 2.5;
+  switch (action) {
+    case 'up':    p.vy = pressed ? -SPEED : (p.vy === -SPEED ? 0 : p.vy); break;
+    case 'down':  p.vy = pressed ? SPEED : (p.vy === SPEED ? 0 : p.vy); break;
+    case 'left':  p.vx = pressed ? -SPEED : (p.vx === -SPEED ? 0 : p.vx); break;
+    case 'right': p.vx = pressed ? SPEED : (p.vx === SPEED ? 0 : p.vx); break;
+    case 'dash':
+      if (pressed && p.dashCd <= 0 && p.dash <= 0) {
+        p.dash = DASH_TIME;
+        p.dashCd = DASH_COOLDOWN;
+        p.inv = Math.max(p.inv, DASH_TIME);
+      }
+      break;
+    case 'shoot':
+      if (pressed && p.shootCd <= 0) {
+        p.shootCd = 0.15; // fire rate limit
+      }
+      break;
+  }
 }
 
 // Online round end: display-only. The server owns round advancement and the

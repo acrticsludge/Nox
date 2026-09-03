@@ -597,12 +597,15 @@ import SEO from '../../components/SEO.astro';
     const k = KEYMAP[e.code];
     if (!k || !matchLive || isTypingTarget(e.target)) return;
     INPUT[k] = true;
+    // Client-side prediction: instant local response
+    if (gl && gl.predictLocalInput) gl.predictLocalInput(k, true);
     if (e.code === 'Space') e.preventDefault();
   });
   addEventListener('keyup', (e) => {
     const k = KEYMAP[e.code];
     if (!k || isTypingTarget(e.target)) return;   // always honour releases
     INPUT[k] = false;
+    if (gl && gl.predictLocalInput) gl.predictLocalInput(k, false);
   });
   addEventListener('blur', resetInput);
   document.addEventListener('visibilitychange', () => { if (document.hidden) resetInput(); });
@@ -614,7 +617,7 @@ import SEO from '../../components/SEO.astro';
     const m = (INPUT.up ? 1 : 0) | (INPUT.down ? 2 : 0) | (INPUT.left ? 4 : 0)
       | (INPUT.right ? 8 : 0) | (INPUT.dash ? 16 : 0) | (INPUT.shoot ? 32 : 0);
     bridge.send('input', { seq: ++inputSeq, m });
-  }, 1000 / 30);
+  }, 1000 / 60);  // 60Hz input send (was 30Hz)
 
   // boot: wait for React hydration to finish (it rebuilds #stage), then hide the
   // local start overlay and mount the lobby. Observer on body re-asserts if React
