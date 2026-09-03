@@ -299,6 +299,7 @@ import SEO from '../../components/SEO.astro';
   bridge.on('room', async (msg: { code: string; youSeat: number; seats: Array<{ nick: string } | null>; seed: number; rematchWait?: boolean }) => {
     roomCode = msg.code;
     mySeat = msg.youSeat;
+    hideQueueModal(); // Player matched - hide queue modal
     showRoom(msg);
     lobbyStatus('');
     const row = document.getElementById('noxRematchRow');
