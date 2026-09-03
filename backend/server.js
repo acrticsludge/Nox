@@ -27,6 +27,9 @@ export function createServer() {
     res.end(req.method === 'GET' || req.method === 'HEAD' ? 'Not Found' : 'Method Not Allowed');
   });
 
+  // TCP optimizations at HTTP level (covers upgrade path)
+  server.on('connection', socket => socket.setNoDelay(true));
+
   const net = attachNet(server);
   server.noxNet = net;
   const roomsApi = attachRooms(server, net, {

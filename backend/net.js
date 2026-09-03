@@ -69,7 +69,10 @@ export function attachNet(server, opts = {}) {
     }
     return req.socket.remoteAddress || 'unknown';
   };
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({
+  noServer: true,
+  perMessageDeflate: { threshold: 1024 }, // compress frames >1KB
+});
   const sessions = new Map();       // ws -> {guestId, nick, token, authed}
   const roomOf = new Map();         // ws -> roomCode (T5 registers itself here)
 
@@ -168,7 +171,7 @@ export function attachNet(server, opts = {}) {
       ws.isAlive = false;
       try { ws.ping(); } catch {}
     }
-  }, 30000);
+  }, 15000);  // was 30000 - faster dead peer detection
   if (heartbeat.unref) heartbeat.unref();
   wss.on('close', () => clearInterval(heartbeat));
 
