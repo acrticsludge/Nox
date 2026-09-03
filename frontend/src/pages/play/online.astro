@@ -221,7 +221,10 @@ import SEO from '../../components/SEO.astro';
           <div class="btn-row" id="noxRematchRow" hidden>
             <button class="btn btn-primary" id="noxRematch" style="flex:1;">REMATCH</button>
           </div>
-          <div class="btn-row"><button class="btn btn-ghost" id="noxLeave">LEAVE ROOM</button></div>
+          <div class="btn-row" id="noxLeaveRow">
+            <button class="btn btn-ghost" id="noxLeave">LEAVE ROOM</button>
+            <button class="btn btn-ghost" id="noxDelete" style="display:none;">DELETE ROOM</button>
+          </div>
         </div>
       </div>`;
     document.getElementById('stage')?.appendChild(el);
@@ -242,6 +245,7 @@ import SEO from '../../components/SEO.astro';
       run('join', code);
     });
     el.querySelector('#noxLeave')!.addEventListener('click', () => { bridge.send('leave'); bridge.reconnectCred = null; showLobby(); });
+    el.querySelector('#noxDelete')!.addEventListener('click', () => { bridge.send('leave'); bridge.reconnectCred = null; showLobby(); });
     el.querySelector('#noxRematch')!.addEventListener('click', () => {
       bridge.send('rematchReq');
       lobbyStatus('REMATCH REQUESTED — WAITING FOR OPPONENT…');
@@ -309,7 +313,8 @@ import SEO from '../../components/SEO.astro';
     $('noxIdentity').innerHTML =
       'YOU ARE <strong class="' + (mine === 'CYAN' ? 'id-cyan' : 'id-pink') + '">' + mine + '</strong>' +
       ' // OPPONENT IS <strong class="' + (theirs === 'CYAN' ? 'id-cyan' : 'id-pink') + '">' + theirs + '</strong>';
-    $('noxSeats').textContent = !msg.seats.every(Boolean)
+    const opponentJoined = msg.seats.every(Boolean);
+    $('noxSeats').textContent = !opponentJoined
       ? 'WAITING FOR OPPONENT…'
       : msg.rematchWait
         ? 'MATCH OVER — REMATCH OR LEAVE'
@@ -324,6 +329,25 @@ import SEO from '../../components/SEO.astro';
     });
     const link = new URL(location.href); link.search = '?room=' + msg.code;
     $('noxShare').textContent = link.href;
+
+    // Button visibility: creator (seat 0) gets DELETE ROOM; joiner (seat 1) gets LEAVE ROOM
+    // REMATCH only shows after match ends (rematchWait)
+    const rematchRow = $('noxRematchRow');
+    const leaveBtn = $('noxLeave');
+    const deleteBtn = $('noxDelete');
+    if (rematchRow) rematchRow.hidden = !msg.rematchWait;
+    if (leaveBtn && deleteBtn) {
+      const isCreator = msg.youSeat === 0;
+      if (msg.rematchWait) {
+        // After match: both see REMATCH; creator sees DELETE, joiner sees LEAVE
+        leaveBtn.style.display = isCreator ? 'none' : 'inline-flex';
+        deleteBtn.style.display = isCreator ? 'inline-flex' : 'none';
+      } else {
+        // Before match: creator sees DELETE, joiner sees LEAVE
+        leaveBtn.style.display = isCreator ? 'none' : 'inline-flex';
+        deleteBtn.style.display = isCreator ? 'inline-flex' : 'none';
+      }
+    }
   }
 
   const stageMsg = (m: string, ms = 0) => {
