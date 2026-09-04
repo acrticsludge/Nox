@@ -15,11 +15,12 @@ function connect() {
   return new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { origin: `http://localhost:${PORT}` });
 }
 const send = (ws, o) => ws.send(typeof o === 'string' ? o : JSON.stringify(o));
-const hello = nick => JSON.stringify({ type: 'hello', nick, guestId: 'guest-' + nick.toLowerCase() + '123' });
+// Server accepts client-provided guestId if valid; hello can include guestId for reconnection
+const hello = (nick, guestId) => JSON.stringify({ type: 'hello', nick, ...(guestId ? { guestId } : {}) });
 
 function makeClient(nick) {
   const ws = connect();
-  const client = { ws, box: [], nick, next(type, timeout = 4000) {
+  const client = { ws, box: [], nick, guestId: null, next(type, timeout = 4000) {
     return new Promise((resolve, reject) => {
       const to = setTimeout(() => reject(new Error('timeout: ' + type)), timeout);
       let iv = null;
@@ -127,14 +128,16 @@ test('grace: opponent drop holds seat, rejoin resumes, rematch reseeds', async (
   const a = makeClient('GrA');
   await new Promise(r => a.ws.on('open', r));
   send(a.ws, hello('GrA'));
-  await a.next('session');
+  const sessionA = await a.next('session');
+  a.guestId = sessionA.guestId;
   send(a.ws, { type: 'create' });
   const roomA = await a.next('room');
 
   let b = makeClient('GrB');
   await new Promise(r => b.ws.on('open', r));
   send(b.ws, hello('GrB'));
-  await b.next('session');
+  const sessionB = await b.next('session');
+  b.guestId = sessionB.guestId;
   send(b.ws, { type: 'join', code: roomA.code });
   await b.next('room');
 
@@ -144,18 +147,24 @@ test('grace: opponent drop holds seat, rejoin resumes, rematch reseeds', async (
 
   // b drops -> a gets peerLeft with graceMs, match pauses (no matchEnd)
   b.ws.close();
-  const pl = await a.next('peerLeft');
+const pl = await a.next('peerLeft');
   assert.equal(typeof pl.graceMs, 'number');
 
   // b reconnects with its signed seat credential (task 10) -> match resumes
   const bCred = b.box.find(m => m.type === 'reconnectCred');
   assert.ok(bCred, 'bob must hold a reconnect credential');
+  const originalGuestId = b.guestId; // Use the guestId from the first session
   b = makeClient('GrB');
   await new Promise(r => b.ws.on('open', r));
-  send(b.ws, hello('GrB'));
-  await b.next('session');
+  send(b.ws, hello('GrB', originalGuestId)); // Reconnect with original guestId
+  const sessionB2 = await b.next('session');
+  b.guestId = sessionB2.guestId;
   send(b.ws, { type: 'join', code: roomA.code, reconnect: { roomCode: roomA.code, seat: bCred.seat, token: bCred.token } });
-  const bRejoined = await b.next('rejoined');
+  const response = await b.next('rejoined', 5000).catch(() => b.next('roomError', 5000));
+  if (response.type === 'roomError') {
+    throw new Error('Reconnect failed: ' + response.reason);
+  }
+  const bRejoined = response;
   assert.equal(bRejoined.seat, bCred.seat);
   const resumed = await a.next('snapshot', 6000);
   assert.equal(resumed.state, 'playing');

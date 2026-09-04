@@ -1,5 +1,6 @@
 // T6 (part 1): client WebSocket bridge — guest identity, hello handshake, typed events.
 // Consumed by /play/online UI; later feeds snapshots into game-logic's mirror seam (T8).
+// Server assigns guestId on first connection; client stores it for reconnection.
 
 import { encodeInput, encodePing, decodeMessage } from './binary-codec.js';
 
@@ -7,13 +8,20 @@ const GUEST_KEY = 'nv_guest_id';
 
 export function getGuestId() {
   let id = localStorage.getItem(GUEST_KEY);
-  if (!id || !/^[A-Za-z0-9_-]{8,64}$/.test(id)) {
+  if (!id || !/^g-[A-Za-z0-9_-]{20,}$/.test(id)) {
+    // Fallback for old format or missing - will be replaced by server on next connect
     const b = new Uint8Array(12);
     crypto.getRandomValues(b);
     id = 'g-' + Array.from(b, x => x.toString(36).padStart(2, '0')).join('').slice(0, 22);
     localStorage.setItem(GUEST_KEY, id);
   }
   return id;
+}
+
+export function setGuestId(id) {
+  if (id && /^g-[A-Za-z0-9_-]{20,}$/.test(id)) {
+    localStorage.setItem(GUEST_KEY, id);
+  }
 }
 
 export function getNick() {
@@ -67,7 +75,8 @@ export class NetBridge {
       this.ws = ws;
       const to = setTimeout(() => reject(new Error('connection timeout')), 8000);
       ws.addEventListener('open', () => {
-        ws.send(JSON.stringify({ type: 'hello', guestId: getGuestId(), nick: getNick() || 'Player' }));
+        // Server now assigns guestId; we don't send one in hello
+        ws.send(JSON.stringify({ type: 'hello', nick: getNick() || 'Player' }));
       });
       ws.addEventListener('message', async (ev) => {
         let m;
@@ -85,6 +94,8 @@ export class NetBridge {
         if (m.type === 'session') {
           clearTimeout(to);
           this.authed = true;
+          // Store server-assigned guestId for reconnection
+          if (m.guestId) setGuestId(m.guestId);
           this._startPing();
           resolve(m);
         }

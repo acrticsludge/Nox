@@ -116,7 +116,7 @@ export function startMatch(room, net, opts = {}) {
   const broadcast = obj => { for (const s of room.seats) send(s, obj); };
 
   const match = createMatch(room.seed, {});
-  const inputState = room.seats.map(() => ({ seq: 0, mask: 0 }));
+  const inputState = room.seats.map(() => ({ seq: 0, mask: 0, seenSeqs: new Uint8Array(256) }));
   let tickTimer = null;
   let breakTimer = null;
   let graceTimer = null;
@@ -232,9 +232,15 @@ export function startMatch(room, net, opts = {}) {
       case 'input': {
         const st = inputState[seat];
         const m = msg.m | 0;
-        if (typeof msg.seq !== 'number' || msg.seq <= st.seq) return;  // monotonic seq
-        if (m < 0 || m > 63 || !Number.isInteger(m)) return;           // 6-bit mask
-        st.seq = msg.seq;
+        if (typeof msg.seq !== 'number') return;
+        const seq = msg.seq & 0xFF;
+        // Monotonic check with wrap handling: allow increase or wrap-around
+        const diff = (seq - st.seq + 256) % 256;
+        if (diff === 0 || diff > 128) return; // duplicate or too far back (replay)
+        // Replay window: track last 128 sequence numbers
+        if (st.seenSeqs[seq]) return; // already processed
+        st.seenSeqs[seq] = 1;
+        st.seq = seq;
         st.mask = m;
         return;
       }

@@ -7,6 +7,11 @@ const RATE_LIMIT = 60;          // msgs per window per socket
 const RATE_WINDOW_MS = 1000;
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 
+// IP connection limiting (prevent DoS via connection exhaustion)
+const MAX_CONNECTIONS_PER_IP = 20;
+const CONNECTION_WINDOW_MS = 60 * 1000; // 1 minute window
+const ipConnections = new Map(); // ip -> { count, windowStart }
+
 export function signToken(payload, secret) {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const mac = crypto.createHmac('sha256', secret).update(body).digest('base64url');
@@ -32,14 +37,13 @@ export function sanitizeNick(raw) {
   const s = raw.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim().slice(0, 16);
   return s.length >= 2 ? s : null;
 }
-function validGuestId(g) { return typeof g === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(g); }
 
 function isAllowedOrigin(origin, host, extra, isDev) {
   if (!origin) return false;
   let o; try { o = new URL(origin); } catch { return false; }
   if (o.host === host) return true;
-  // P2-02: the localhost allowance is development-only; production relies on
-  // the explicit allowlist (o.host === host + WS_EXTRA_ORIGINS)
+  // Development: allow localhost origins (exact hostname match)
+  // Production: require explicit allowlist via WS_EXTRA_ORIGINS
   if (isDev && (o.hostname === 'localhost' || o.hostname === '127.0.0.1' || o.hostname === '[::1]')) return true;
   if (extra && extra.includes(origin)) return true;
   return false;
@@ -69,12 +73,32 @@ export function attachNet(server, opts = {}) {
     }
     return req.socket.remoteAddress || 'unknown';
   };
-  const wss = new WebSocketServer({
+const wss = new WebSocketServer({
   noServer: true,
   perMessageDeflate: { threshold: 1024 }, // compress frames >1KB
 });
-  const sessions = new Map();       // ws -> {guestId, nick, token, authed}
-  const roomOf = new Map();         // ws -> roomCode (T5 registers itself here)
+const sessions = new Map();       // ws -> {guestId, nick, token, authed}
+const roomOf = new Map();         // ws -> roomCode (T5 registers itself here)
+
+function checkIpConnection(ip) {
+  const now = Date.now();
+  let entry = ipConnections.get(ip);
+  if (!entry || now - entry.windowStart >= CONNECTION_WINDOW_MS) {
+    entry = { count: 0, windowStart: now };
+    ipConnections.set(ip, entry);
+  }
+  if (++entry.count > MAX_CONNECTIONS_PER_IP) {
+    return false;
+  }
+  return true;
+}
+
+function releaseIpConnection(ip) {
+  const entry = ipConnections.get(ip);
+  if (entry && --entry.count <= 0) {
+    ipConnections.delete(ip);
+  }
+}
 
   server.on('upgrade', (req, socket, head) => {
     // P2-17: WebSocket upgrades are only served on /ws
@@ -87,6 +111,13 @@ export function attachNet(server, opts = {}) {
     const origin = req.headers.origin || '';
     if (!isAllowedOrigin(origin, req.headers.host, extraOrigins, isDev)) {
       socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    // IP connection limiting (before full handshake)
+    const ip = clientIp(req);
+    if (!checkIpConnection(ip)) {
+      socket.write('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
@@ -104,6 +135,14 @@ export function attachNet(server, opts = {}) {
     }
     const rate = { count: 0, windowStart: Date.now() };
     ws._noxRate = rate;
+    
+    ws.on('close', () => {
+      releaseIpConnection(ws._noxIp);
+      wss.emit('nox:close', ws, sessions.get(ws));
+      sessions.delete(ws);
+      roomOf.delete(ws);
+    });
+    ws.on('error', () => { try { ws.close(); } catch {} });
     ws.on('message', data => {
       if (data.length > MAX_MSG_BYTES) { ws.close(1009, 'message too large'); return; }
       const now = Date.now();
@@ -140,10 +179,16 @@ export function attachNet(server, opts = {}) {
       if (!sess) {
         if (msg.type !== 'hello') { ws.close(1008, 'expected hello'); return; }
         const nick = sanitizeNick(msg.nick);
-        if (!nick || !validGuestId(msg.guestId)) { ws.close(1008, 'bad hello'); return; }
-        const token = signToken({ guestId: msg.guestId, nick, exp: Date.now() + TOKEN_TTL_MS }, secret);
-        sessions.set(ws, { guestId: msg.guestId, nick, token, authed: true });
-        ws.send(JSON.stringify({ type: 'session', token, nick }));
+        if (!nick) { ws.close(1008, 'bad hello'); return; }
+        // Accept client-provided guestId if valid (sufficient entropy), otherwise generate
+        // Format: g-<base64url 12 bytes = 16 chars>. Accept 16+ chars after g-.
+        let guestId = msg.guestId;
+        if (!guestId || !/^g-[A-Za-z0-9_-]{16,}$/.test(guestId)) {
+          guestId = 'g-' + crypto.randomBytes(12).toString('base64url');
+        }
+        const token = signToken({ guestId, nick, exp: Date.now() + TOKEN_TTL_MS }, secret);
+        sessions.set(ws, { guestId, nick, token, authed: true });
+        ws.send(JSON.stringify({ type: 'session', token, nick, guestId }));
         wss.emit('nox:authed', ws, sessions.get(ws));
         return;
       }

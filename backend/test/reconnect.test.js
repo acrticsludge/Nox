@@ -10,11 +10,11 @@ import { createServer } from '../server.js';
 const PORT = 3112;
 let server;
 
-function connect(nick) {
+function connect(nick, guestId) {
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { origin: `http://localhost:${PORT}` });
   const box = [];
   ws.on('message', (d) => { try { box.push(JSON.parse(d.toString())); } catch {} });
-  ws.on('open', () => ws.send(JSON.stringify({ type: 'hello', guestId: 'guest-' + nick, nick })));
+  ws.on('open', () => ws.send(JSON.stringify({ type: 'hello', nick, ...(guestId ? { guestId } : {}) }))); // Server accepts guestId for reconnection
   const wait = (type, ms = 4000) => new Promise((res, rej) => {
     const t0 = Date.now();
     const iv = setInterval(() => {
@@ -23,7 +23,7 @@ function connect(nick) {
       else if (Date.now() - t0 > ms) { clearInterval(iv); rej(new Error('timeout waiting ' + type + '; got: ' + box.map(x => x.type).join(','))); }
     }, 15);
   });
-  const c = { ws, box, wait, send: (t, d = {}) => ws.send(JSON.stringify({ type: t, ...d })) };
+  const c = { ws, box, wait, send: (t, d = {}) => ws.send(JSON.stringify({ type: t, ...d })), guestId: null };
   return new Promise((res, rej) => {
     ws.on('error', rej);
     ws.on('open', () => res(c));
@@ -46,6 +46,8 @@ test('credential issued on join; seat reserved on disconnect; signed owner recla
   a.send('quick'); b.send('quick');
   const roomA = await a.wait('room');
   const credA = await a.wait('reconnectCred');
+  const sessionB = await b.wait('session');
+  b.guestId = sessionB.guestId;
   await b.wait('reconnectCred');
   assert.equal(credA.seat, roomA.youSeat);
   const code = roomA.code;
@@ -56,13 +58,18 @@ test('credential issued on join; seat reserved on disconnect; signed owner recla
 
   // stranger cannot take the reserved seat
   const e = await connect('eve');
+  const sessionE = await e.wait('session');
+  e.guestId = sessionE.guestId;
   e.send('join', { code });
   assert.equal((await e.wait('roomError')).reason, 'room full');
 
   // owner reconnects: join carries the signed claim -> reclaims same seat
   const bCred = b.box.find(x => x.type === 'reconnectCred');
   assert.ok(bCred, 'bob had a credential');
-  const b2 = await connect('bob');
+  const originalGuestId = b.guestId;
+  const b2 = await connect('bob', originalGuestId);
+  const sessionB2 = await b2.wait('session');
+  b2.guestId = sessionB2.guestId;
   b2.send('join', { code, reconnect: { roomCode: code, seat: bCred.seat, token: bCred.token } });
   const rejoined = await b2.wait('rejoined');
   assert.equal(rejoined.seat, bCred.seat);
@@ -84,6 +91,8 @@ test('forged token cannot reclaim a reserved seat', async () => {
   await a.wait('peerLeft');
 
   const f = await connect('mallory');
+  const sessionF = await f.wait('session');
+  f.guestId = sessionF.guestId;
   f.send('join', { code, reconnect: { roomCode: code, seat: roomA.youSeat === 0 ? 1 : 0, token: 'forged.token.value' } });
   const r = await f.wait('roomError');
   assert.ok(['reconnect failed', 'room full'].includes(r.reason), 'must not seat mallory: ' + r.reason);
@@ -102,6 +111,8 @@ test('mismatched room/seat binding in the credential is rejected', async () => {
 
   // dave presents his OWN valid token but claims the WRONG seat
   const wrong = await connect('dave');
+  const sessionWrong = await wrong.wait('session');
+  wrong.guestId = sessionWrong.guestId;
   wrong.send('join', { code, reconnect: { roomCode: code, seat: credB.seat === 0 ? 1 : 0, token: credB.token } });
   assert.equal((await wrong.wait('roomError')).reason, 'reconnect failed');
 });

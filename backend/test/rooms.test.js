@@ -12,8 +12,9 @@ let server, net, rooms;
 let genCodes = [];
 let codeN = 0;
 
-function hello(nick, guestId) {
-  return JSON.stringify({ type: 'hello', nick, guestId: guestId || 'guest-' + Math.random().toString(36).slice(2, 10) });
+// Server now assigns guestId; hello only needs nick
+function hello(nick) {
+  return JSON.stringify({ type: 'hello', nick });
 }
 
 function send(ws, obj) { ws.send(typeof obj === 'string' ? obj : JSON.stringify(obj)); }

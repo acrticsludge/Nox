@@ -9,7 +9,7 @@ import { signToken, verifyToken, sanitizeNick } from '../net.js';
 const PORT = 3104;
 let server;
 
-const hello = (guestId = 'guest-abcd1234', nick = 'PlayerOne') =>
+const hello = (guestId = 'g-' + 'a'.repeat(16), nick = 'PlayerOne') =>
   JSON.stringify({ type: 'hello', guestId, nick });
 
 function connect(origin = `http://localhost:${PORT}`) {
@@ -43,13 +43,15 @@ test('sanitizer strips control chars and enforces length', () => {
 });
 
 test('hello issues HMAC session token that verifies', async () => {
+  const customGuestId = 'g-' + 'b'.repeat(16);
   const ws = connect();
   await new Promise(r => ws.on('open', r));
-  ws.send(hello());
+  ws.send(hello(customGuestId));
   const sess = await once(ws, 'session');
   assert.equal(sess.nick, 'PlayerOne');
+  assert.equal(sess.guestId, customGuestId);
   const payload = verifyToken(sess.token, server.noxNet.secret);
-  assert.equal(payload.guestId, 'guest-abcd1234');
+  assert.equal(payload.guestId, customGuestId);
   ws.close();
 });
 
@@ -64,7 +66,7 @@ test('non-hello first message is rejected', async () => {
 test('bad nick rejected', async () => {
   const ws = connect();
   await new Promise(r => ws.on('open', r));
-  ws.send(JSON.stringify({ type: 'hello', guestId: 'guest-abcd1234', nick: 'x' }));
+  ws.send(JSON.stringify({ type: 'hello', guestId: 'g-' + 'c'.repeat(16), nick: 'x' }));
   const code = await closed(ws);
   assert.equal(code, 1008);
 });
