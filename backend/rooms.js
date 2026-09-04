@@ -169,8 +169,22 @@ export function attachRooms(server, net, opts = {}) {
         if (net.roomOf.has(ws)) { send(ws, { type: 'roomError', reason: 'already in room' }); return; }
         if (queueIndex(ws) !== -1) { send(ws, { type: 'queued', position: queueIndex(ws) + 1 }); return; }
         if (queue.length >= queueCap) { send(ws, { type: 'roomError', reason: 'queue full' }); return; }
-        const partner = queue.shift();
-        if (partner && partner.readyState === 1 && !net.roomOf.has(partner)) {
+        // Find a valid partner from the queue (skip disconnected or already-in-room sockets)
+        let partner = null;
+        const requeue = [];
+        while (queue.length > 0 && !partner) {
+          const candidate = queue.shift();
+          if (candidate && candidate.readyState === 1 && !net.roomOf.has(candidate)) {
+            partner = candidate;
+          } else if (candidate && candidate.readyState === 1) {
+            // Candidate is connected but already in a room (race condition) - requeue at front
+            requeue.push(candidate);
+          }
+          // Disconnected candidates are dropped (not requeued)
+        }
+        // Put back any in-room candidates at the front (they'll be cleaned by sweep)
+        for (let i = requeue.length - 1; i >= 0; i--) queue.unshift(requeue[i]);
+        if (partner) {
           makeRoom(partner, ws);
         } else {
           queue.push(ws);

@@ -168,6 +168,41 @@ test('queue cap enforced (cap 3 in test opts) → roomError queue full', async (
   d.close();
 });
 
+test('quick: invalid partner in queue is skipped, valid partner pairs correctly', async () => {
+  rooms.queue.length = 0;
+  // Add a disconnected socket to queue (simulates stale entry)
+  const deadSocket = { readyState: 3 }; // WebSocket.CLOSED
+  rooms.queue.push(deadSocket);
+  
+  // Add a connected but already-in-room socket (race condition)
+  const inRoomSocket = { readyState: 1 };
+  rooms.queue.push(inRoomSocket);
+  // Mark it as already in a room
+  net.roomOf.set(inRoomSocket, 'EXISTING_ROOM');
+  
+  // Player A queues
+  const a = connect(); await new Promise(r => a.on('open', r)); send(a, hello('QuickA')); await expectMsg(a, 'session');
+  send(a, { type: 'quick' });
+  await expectMsg(a, 'queued'); // A is now in queue (position 1 after cleanup)
+  
+  // Player B quick matches - should skip dead/in-room and pair with A
+  const b = connect(); await new Promise(r => b.on('open', r)); send(b, hello('QuickB')); await expectMsg(b, 'session');
+  send(b, { type: 'quick' });
+  
+  const roomA = await expectMsg(a, 'room');
+  const roomB = await expectMsg(b, 'room');
+  assert.equal(roomA.code, roomB.code);
+  assert.equal(roomA.seed, roomB.seed);
+  assert.notEqual(roomA.youSeat, roomB.youSeat);
+  
+  // The in-room socket should be requeued (at front)
+  // Dead socket should be dropped
+  a.close(); b.close();
+  
+  // Cleanup: remove the in-room socket from net.roomOf
+  net.roomOf.delete(inRoomSocket);
+});
+
 test('code collision: genCode returns existing code once, server retries and succeeds', async () => {
   rooms.createsByIp.clear();
   const a = connect(); await new Promise(r => a.on('open', r)); send(a, hello('HostX')); await expectMsg(a, 'session');

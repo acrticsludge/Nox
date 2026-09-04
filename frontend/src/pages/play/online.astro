@@ -186,6 +186,7 @@ import SEO from '../../components/SEO.astro';
 
   let roomCode: string | null = null;
   let mySeat = 0;
+  let intentionalDisconnect = false;
 
   // ---------- lobby DOM (site-styled overlay inside the stage) ----------
   function buildLobby(): HTMLElement {
@@ -244,8 +245,8 @@ import SEO from '../../components/SEO.astro';
       if (code.length !== 5) { lobbyError('Room code is 5 characters.'); return; }
       run('join', code);
     });
-    el.querySelector('#noxLeave')!.addEventListener('click', () => { bridge.send('leave'); bridge.reconnectCred = null; showLobby(); });
-    el.querySelector('#noxDelete')!.addEventListener('click', () => { bridge.send('leave'); bridge.reconnectCred = null; showLobby(); });
+    el.querySelector('#noxLeave')!.addEventListener('click', () => { intentionalDisconnect = true; bridge.send('leave'); bridge.reconnectCred = null; showLobby(); });
+    el.querySelector('#noxDelete')!.addEventListener('click', () => { intentionalDisconnect = true; bridge.send('leave'); bridge.reconnectCred = null; showLobby(); });
     el.querySelector('#noxRematch')!.addEventListener('click', () => {
       bridge.send('rematchReq');
       lobbyStatus('REMATCH REQUESTED — WAITING FOR OPPONENT…');
@@ -291,6 +292,8 @@ import SEO from '../../components/SEO.astro';
   function showLobby() {
     gl?.stopOnlineMatch();
     roomCode = null;
+    intentionalDisconnect = false;
+    resetCountdownFlag();
     // P1-05: HUD visibility/identity come from the store, not DOM writes
     resetOnlineHud();
     setOnlineHud({ selfNick: ($('noxNick') as HTMLInputElement | undefined)?.value.trim().toUpperCase() || 'YOU' });
@@ -472,17 +475,23 @@ import SEO from '../../components/SEO.astro';
     showQueueModal(m.position);
   });
 
+  let countdownStarted = false;
   bridge.on('countdown', async (m: { t: number }) => {
     if (!roomCode) return;
     hideMatchFoundModal();
-    // 1v1 parity: delegate to game-logic's startCountdown with server-driven values
-    // This uses the same roundOverlay + cyber badge as local modes
-    hideLobby();
-    setHud(true);
-    // Don't set matchLive yet - wait for countdown to finish (FIX: input lag)
-    const g = await engine();
-    g.startOnlineCountdown(m.t, () => { setMatchLive(true); });
+    // Only start the countdown once (on first server countdown message)
+    // The client runs its own 3-2-1-FIGHT locally for smooth visual sync
+    if (!countdownStarted) {
+      countdownStarted = true;
+      hideLobby();
+      setHud(true);
+      const g = await engine();
+      g.startOnlineCountdown(m.t, () => { setMatchLive(true); });
+    }
   });
+
+  // Reset countdownStarted when match ends or leaves
+  const resetCountdownFlag = () => { countdownStarted = false; };
 
   bridge.on('snapshot', async (m: { state: string }) => {
     const g = await engine();
@@ -548,6 +557,7 @@ import SEO from '../../components/SEO.astro';
 
   bridge.on('matchEnd', async (m: { winner: number | null; reason?: string; scores?: number[] }) => {
     setMatchLive(false);
+    resetCountdownFlag();
     const win = m.winner === mySeat;
     const abandoned = /FORFEIT|DISCONNECT|LEFT/i.test(m.reason ?? '');
     const title = m.winner === null ? 'MATCH OVER'
@@ -561,7 +571,7 @@ import SEO from '../../components/SEO.astro';
     if (action === 'rematch' && roomCode) {
       bridge.send('rematchReq');
     } else {
-      if (roomCode) bridge.send('leave');
+      if (roomCode) { intentionalDisconnect = true; bridge.send('leave'); }
       showLobby();
     }
   });
@@ -574,6 +584,10 @@ import SEO from '../../components/SEO.astro';
       if (seats && roomCode) seats.textContent = 'OPPONENT LEFT — REMATCH NEEDS BOTH PLAYERS';
       return;
     }
+    // During active match: peer disconnected, stop local input, show grace period
+    setMatchLive(false);
+    resetCountdownFlag();
+    setOnlineHud({ connection: 'reconnecting' });
     stageMsg('OPPONENT DISCONNECTED — REJOIN WITHIN ' + Math.round((m.graceMs ?? 20000) / 1000) + 's OR YOU WIN');
   });
 
@@ -592,6 +606,13 @@ import SEO from '../../components/SEO.astro';
   });
 
   bridge.on('disconnected', () => {
+    // If this was an intentional disconnect (user clicked leave), don't reconnect
+    if (intentionalDisconnect) {
+      intentionalDisconnect = false;
+      setMatchLive(false);
+      setOnlineHud({ connection: 'idle' });
+      return;
+    }
     setMatchLive(false);
     setOnlineHud({ connection: roomCode ? 'reconnecting' : 'idle' });
     if (roomCode) {
@@ -645,6 +666,7 @@ import SEO from '../../components/SEO.astro';
     });
     if (!confirmForfeit) return;
     setMatchLive(false);
+    resetCountdownFlag();
     if (roomCode) bridge.send('forfeit');
     // Don't send leave here - wait for server's matchEnd response
     // which will show the appropriate modal and handle cleanup
